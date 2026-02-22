@@ -31,7 +31,7 @@ Relaciones principales:
 
 1. Ejecuta `docs/supabase/01_schema.sql`
 2. Ejecuta `docs/supabase/02_rls.sql`
-3. Ejecuta `docs/supabase/03_seed.sql`
+3. Ejecuta `docs/supabase/03_seed.sql` (incluye el menú completo original de v0: mismas categorías, productos y precios)
 
 ## C) Integración en Next.js por pasos
 
