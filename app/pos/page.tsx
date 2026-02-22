@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Trash2, Coffee, ShoppingBag, Minus, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { logout } from "@/app/actions/auth"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -567,7 +568,14 @@ export default function CafePOS() {
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
   return (
-    <div className="flex h-screen bg-stone-50 overflow-hidden">
+    <div className="relative flex h-screen bg-stone-50 overflow-hidden">
+      <div className="absolute right-4 top-4 z-50">
+        <form action={logout}>
+          <Button type="submit" variant="outline" className="bg-white/80 backdrop-blur">
+            Cerrar sesión
+          </Button>
+        </form>
+      </div>
       {/* ───── LEFT PANEL (Products) ───── */}
       <div className="w-3/5 flex flex-col h-full border-r border-stone-200">
         {/* Header */}

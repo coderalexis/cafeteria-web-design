@@ -20,6 +20,24 @@ export async function createCategory(formData: FormData) {
   return { success: true }
 }
 
+export async function updateCategory(formData: FormData) {
+  const id = String(formData.get("id") ?? "")
+  const name = String(formData.get("name") ?? "")
+  const slug = String(formData.get("slug") ?? "")
+
+  if (!id || !name || !slug) {
+    return { error: "ID, nombre y slug son obligatorios." }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from("menu_categories").update({ name, slug }).eq("id", id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath("/admin")
+  return { success: true }
+}
+
 export async function createProduct(formData: FormData) {
   const name = String(formData.get("name") ?? "")
   const categoryId = String(formData.get("category_id") ?? "")
@@ -35,6 +53,28 @@ export async function createProduct(formData: FormData) {
     category_id: categoryId,
     description: description || null,
   })
+
+  if (error) return { error: error.message }
+
+  revalidatePath("/admin")
+  return { success: true }
+}
+
+export async function updateProduct(formData: FormData) {
+  const id = String(formData.get("id") ?? "")
+  const name = String(formData.get("name") ?? "")
+  const categoryId = String(formData.get("category_id") ?? "")
+  const description = String(formData.get("description") ?? "")
+
+  if (!id || !name || !categoryId) {
+    return { error: "ID, nombre y categoría son obligatorios." }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("menu_products")
+    .update({ name, category_id: categoryId, description: description || null })
+    .eq("id", id)
 
   if (error) return { error: error.message }
 
