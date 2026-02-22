@@ -282,4 +282,4 @@ insert into public.modifiers (id, group_id, name, price_delta, sort_order) value
 insert into public.product_modifier_groups (product_id, group_id) values
   ('ef3ce130-1687-5e7a-9110-e624d6fda845', '906160b8-1c83-533a-91cd-34c7f41a781f'),
   ('ef3ce130-1687-5e7a-9110-e624d6fda845', '821003f4-d746-54d7-a583-63e49dc549f9'),
-  ('ae4d8f0f-68d1-55fb-8895-8c4bc122b07c', '906160b8-1c83-533a-91cd-34c7f41a781f');
+  ('8307b749-92fc-5802-84d7-6d2345d8f4b4', '906160b8-1c83-533a-91cd-34c7f41a781f');
