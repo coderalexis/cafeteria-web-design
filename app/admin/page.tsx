@@ -1,172 +1,251 @@
-import { createCategory, createProduct, createVariant, updateCategory, updateProduct } from "@/app/actions/menu"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { Tag, Package, Layers, DollarSign, TrendingUp, ShoppingBag, Receipt } from "lucide-react"
+import Link from "next/link"
 
-export default async function AdminPage() {
+export default async function AdminDashboard() {
   const supabase = await createClient()
 
-  const [{ data: categories }, { data: products }, { data: variants }] = await Promise.all([
-    supabase.from("menu_categories").select("id, name, slug, sort_order").order("sort_order"),
+  /* ── Fetch counts ───────────────────────────────────────────────── */
+  const [
+    { count: categoryCount },
+    { count: productCount },
+    { count: variantCount },
+    { data: todayTickets },
+    { data: recentTickets },
+  ] = await Promise.all([
+    supabase
+      .from("menu_categories")
+      .select("*", { count: "exact", head: true }),
     supabase
       .from("menu_products")
-      .select("id, name, description, category_id, menu_categories(name)")
-      .order("name"),
+      .select("*", { count: "exact", head: true }),
     supabase
       .from("menu_variants")
-      .select("id, name, product_id, price, menu_products(name)")
-      .order("name")
-      .limit(30),
+      .select("*", { count: "exact", head: true }),
+    (() => {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      return supabase
+        .from("tickets")
+        .select("id, total")
+        .gte("created_at", todayStart.toISOString())
+    })(),
+    supabase
+      .from("tickets")
+      .select("id, total, payment_method, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
   ])
 
+  const todaySales = (todayTickets || []).reduce(
+    (sum, t) => sum + (t.total || 0),
+    0
+  )
+  const todayCount = todayTickets?.length || 0
+
+  const stats = [
+    {
+      label: "Categorías",
+      value: categoryCount ?? 0,
+      icon: Tag,
+      href: "/admin/categorias",
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+    },
+    {
+      label: "Productos",
+      value: productCount ?? 0,
+      icon: Package,
+      href: "/admin/productos",
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
+      label: "Variantes",
+      value: variantCount ?? 0,
+      icon: Layers,
+      href: "/admin/variantes",
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+    },
+    {
+      label: "Ventas hoy",
+      value: todayCount,
+      icon: ShoppingBag,
+      href: "/admin/ventas",
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+  ]
+
   return (
-    <main className="space-y-6 p-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Panel Admin · Menú</h1>
-        <p className="text-sm text-muted-foreground">
-          Aquí puedes crear y modificar categorías y productos sin usar UUID manual.
+    <div className="p-6 max-w-6xl mx-auto space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-stone-800">Dashboard</h1>
+        <p className="text-sm text-stone-500 mt-1">
+          Resumen general de tu menú y ventas
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Stats grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat) => (
+          <Link key={stat.label} href={stat.href}>
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-stone-500">
+                      {stat.label}
+                    </p>
+                    <p className="text-3xl font-bold text-stone-800 mt-1">
+                      {stat.value}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl ${stat.bg}`}>
+                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      {/* Revenue card */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Crear categoría</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Ingresos de hoy
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={createCategory} className="grid gap-2 sm:grid-cols-3">
-              <Input name="name" placeholder="Bebidas calientes" required />
-              <Input name="slug" placeholder="bebidas-calientes" required />
-              <Button type="submit">Crear</Button>
-            </form>
+            <p className="text-4xl font-bold text-stone-800">
+              ${todaySales.toFixed(2)}
+            </p>
+            <p className="text-sm text-stone-500 mt-1">
+              {todayCount} {todayCount === 1 ? "venta" : "ventas"} registradas
+              hoy
+            </p>
           </CardContent>
         </Card>
 
+        {/* Recent sales */}
         <Card>
           <CardHeader>
-            <CardTitle>Crear producto</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5 text-amber-600" />
+              Ventas recientes
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={createProduct} className="grid gap-2 sm:grid-cols-4">
-              <Input name="name" placeholder="Latte" required className="sm:col-span-2" />
-              <select name="category_id" className="rounded-md border bg-background px-3" required>
-                <option value="">Categoría...</option>
-                {categories?.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
+            {(recentTickets?.length ?? 0) === 0 ? (
+              <p className="text-sm text-stone-400 py-4 text-center">
+                No hay ventas registradas aún
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentTickets?.slice(0, 5).map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-stone-700">
+                        ${ticket.total?.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-stone-400">
+                        {ticket.payment_method === "efectivo"
+                          ? "Efectivo"
+                          : ticket.payment_method === "transferencia"
+                          ? "Transferencia"
+                          : "Tarjeta"}
+                      </p>
+                    </div>
+                    <p className="text-xs text-stone-400">
+                      {new Date(ticket.created_at).toLocaleTimeString("es-MX", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
                 ))}
-              </select>
-              <Input name="description" placeholder="Descripción" />
-              <Button type="submit" className="sm:col-span-4">
-                Crear producto
-              </Button>
-            </form>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Quick links */}
       <Card>
         <CardHeader>
-          <CardTitle>Editar categorías</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {categories?.map((category) => (
-            <form key={category.id} action={updateCategory} className="grid gap-2 rounded-md border p-3 sm:grid-cols-4">
-              <input type="hidden" name="id" value={category.id} />
-              <Input name="name" defaultValue={category.name} required />
-              <Input name="slug" defaultValue={category.slug} required />
-              <Input name="sort_order" defaultValue={String(category.sort_order ?? 0)} disabled />
-              <Button type="submit" variant="secondary">
-                Guardar
-              </Button>
-            </form>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Editar productos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {products?.slice(0, 40).map((product) => (
-            <form key={product.id} action={updateProduct} className="grid gap-2 rounded-md border p-3 lg:grid-cols-5">
-              <input type="hidden" name="id" value={product.id} />
-              <Input name="name" defaultValue={product.name} required />
-              <select name="category_id" defaultValue={product.category_id} className="rounded-md border bg-background px-3" required>
-                {categories?.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              <Input name="description" defaultValue={product.description ?? ""} placeholder="Descripción" className="lg:col-span-2" />
-              <Button type="submit" variant="secondary">
-                Guardar
-              </Button>
-            </form>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Vista rápida</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 text-sm">
-          <div>
-            <h2 className="mb-2 font-medium">Categorías ({categories?.length ?? 0})</h2>
-            <ul className="space-y-1">
-              {categories?.map((category) => (
-                <li key={category.id}>
-                  {category.name} ({category.slug})
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-2 font-medium">Productos ({products?.length ?? 0})</h2>
-            <ul className="space-y-1">
-              {products?.slice(0, 20).map((product) => (
-                <li key={product.id}>{product.name}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-2 font-medium">Variantes (últimas 30)</h2>
-            <ul className="space-y-1">
-              {variants?.map((variant) => (
-                <li key={variant.id}>
-                  {variant.name} - ${variant.price}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear variante</CardTitle>
+          <CardTitle className="text-lg">Acciones rápidas</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createVariant} className="grid gap-2 sm:grid-cols-4">
-            <select name="product_id" className="rounded-md border bg-background px-3" required>
-              <option value="">Producto...</option>
-              {products?.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
-            <Input name="name" placeholder="Grande 16 oz" required />
-            <Input name="price" type="number" step="0.01" placeholder="65" required />
-            <Button type="submit">Crear variante</Button>
-          </form>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Link
+              href="/admin/categorias"
+              className="flex items-center gap-3 p-4 rounded-xl border border-stone-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all"
+            >
+              <Tag className="h-5 w-5 text-blue-600" />
+              <div>
+                <p className="text-sm font-medium text-stone-800">
+                  Gestionar categorías
+                </p>
+                <p className="text-xs text-stone-400">
+                  Crear, editar y ordenar
+                </p>
+              </div>
+            </Link>
+            <Link
+              href="/admin/productos"
+              className="flex items-center gap-3 p-4 rounded-xl border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-all"
+            >
+              <Package className="h-5 w-5 text-emerald-600" />
+              <div>
+                <p className="text-sm font-medium text-stone-800">
+                  Gestionar productos
+                </p>
+                <p className="text-xs text-stone-400">
+                  Agregar y modificar menú
+                </p>
+              </div>
+            </Link>
+            <Link
+              href="/admin/variantes"
+              className="flex items-center gap-3 p-4 rounded-xl border border-stone-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all"
+            >
+              <Layers className="h-5 w-5 text-purple-600" />
+              <div>
+                <p className="text-sm font-medium text-stone-800">
+                  Gestionar variantes
+                </p>
+                <p className="text-xs text-stone-400">
+                  Precios y tamaños
+                </p>
+              </div>
+            </Link>
+            <Link
+              href="/admin/ventas"
+              className="flex items-center gap-3 p-4 rounded-xl border border-stone-200 hover:border-amber-300 hover:bg-amber-50/50 transition-all"
+            >
+              <Receipt className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-stone-800">
+                  Historial de ventas
+                </p>
+                <p className="text-xs text-stone-400">
+                  Ver y gestionar ventas
+                </p>
+              </div>
+            </Link>
+          </div>
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

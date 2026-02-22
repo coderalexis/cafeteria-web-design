@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 
 export async function createTicket(formData: FormData) {
@@ -67,4 +68,25 @@ export async function createTicket(formData: FormData) {
   }
 
   return { success: true, ticketId: ticket.id }
+}
+
+export async function deleteTicket(formData: FormData) {
+  const id = String(formData.get("id") ?? "")
+
+  if (!id) {
+    return { error: "ID de ticket requerido." }
+  }
+
+  const supabase = await createClient()
+
+  const { error } = await supabase.from("tickets").delete().eq("id", id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath("/admin", "layout")
+  revalidatePath("/pos")
+
+  return { success: true }
 }
