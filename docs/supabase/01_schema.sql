@@ -9,6 +9,7 @@ create type public.payment_method as enum ('efectivo', 'transferencia', 'tarjeta
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text,
+  username text unique,
   role public.app_role not null default 'cajero',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -144,8 +145,13 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name, role)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', ''), 'cajero')
+  insert into public.profiles (id, full_name, username, role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    split_part(new.email, '@', 1),
+    'cajero'
+  )
   on conflict (id) do nothing;
   return new;
 end;

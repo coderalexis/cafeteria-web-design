@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Tag, Package, Layers, Receipt } from "lucide-react"
+import { LayoutDashboard, Tag, Package, Layers, Receipt, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin/productos", label: "Productos", icon: Package },
   { href: "/admin/variantes", label: "Variantes", icon: Layers },
   { href: "/admin/ventas", label: "Ventas", icon: Receipt },
+  { href: "/admin/cajeros", label: "Cajeros", icon: Users },
 ]
 
 export function AdminNav() {

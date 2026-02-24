@@ -27,10 +27,10 @@ export default async function AdminLayout({
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, username")
       .eq("id", user.id)
       .maybeSingle()
-    userName = profile?.full_name || user.email?.split("@")[0] || "Admin"
+    userName = profile?.full_name || profile?.username || "Admin"
   }
 
   return (

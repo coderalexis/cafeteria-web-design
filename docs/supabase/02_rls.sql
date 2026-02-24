@@ -10,10 +10,14 @@ alter table public.tickets enable row level security;
 alter table public.ticket_items enable row level security;
 alter table public.ticket_item_modifiers enable row level security;
 
+-- SECURITY DEFINER bypasses RLS when querying profiles,
+-- preventing infinite recursion (profiles policy also calls current_role).
 create or replace function public.current_role()
 returns public.app_role
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select role from public.profiles where id = auth.uid()
 $$;
@@ -25,6 +29,12 @@ for select using (auth.uid() = id or public.current_role() = 'admin');
 create policy "profiles_update_own_or_admin" on public.profiles
 for update using (auth.uid() = id or public.current_role() = 'admin')
 with check (auth.uid() = id or public.current_role() = 'admin');
+
+create policy "profiles_insert_admin" on public.profiles
+for insert with check (public.current_role() = 'admin');
+
+create policy "profiles_delete_admin" on public.profiles
+for delete using (public.current_role() = 'admin');
 
 -- Menu readable by authenticated users
 create policy "menu_categories_select_authenticated" on public.menu_categories
@@ -63,6 +73,9 @@ for insert with check (
 
 create policy "tickets_select_own_or_admin" on public.tickets
 for select using (cashier_id = auth.uid() or public.current_role() = 'admin');
+
+create policy "tickets_delete_admin" on public.tickets
+for delete using (public.current_role() = 'admin');
 
 create policy "ticket_items_insert_cashier_or_admin" on public.ticket_items
 for insert with check (
