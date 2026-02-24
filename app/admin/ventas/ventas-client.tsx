@@ -19,12 +19,14 @@ import {
   Receipt,
   Banknote,
   CreditCard,
+  Smartphone,
   Trash2,
   Clock,
   DollarSign,
   ShoppingBag,
   Calendar,
   User,
+  StickyNote,
 } from "lucide-react"
 
 /* ────────────────────────────────────────────────────── Types */
@@ -58,7 +60,7 @@ interface VentasClientProps {
 /* ────────────────────────────────────────────────────── Helpers */
 
 type DateFilter = "hoy" | "ayer" | "7dias" | "30dias" | "todo"
-type PaymentFilter = "todos" | "efectivo" | "tarjeta"
+type PaymentFilter = "todos" | "efectivo" | "transferencia" | "tarjeta"
 
 const dateFilterLabels: { key: DateFilter; label: string }[] = [
   { key: "hoy", label: "Hoy" },
@@ -71,6 +73,7 @@ const dateFilterLabels: { key: DateFilter; label: string }[] = [
 const paymentFilterLabels: { key: PaymentFilter; label: string }[] = [
   { key: "todos", label: "Todos" },
   { key: "efectivo", label: "Efectivo" },
+  { key: "transferencia", label: "Transfer" },
   { key: "tarjeta", label: "Tarjeta" },
 ]
 
@@ -175,11 +178,10 @@ export default function VentasClient({ tickets }: VentasClientProps) {
     if (paymentFilter === "efectivo" && ticket.paymentMethod !== "efectivo") {
       return false
     }
-    if (
-      paymentFilter === "tarjeta" &&
-      ticket.paymentMethod !== "tarjeta_clip" &&
-      ticket.paymentMethod !== "transferencia"
-    ) {
+    if (paymentFilter === "transferencia" && ticket.paymentMethod !== "transferencia") {
+      return false
+    }
+    if (paymentFilter === "tarjeta" && ticket.paymentMethod !== "tarjeta_clip") {
       return false
     }
 
@@ -396,8 +398,15 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                         </p>
                       </td>
                       <td className="px-4 py-3 text-stone-700">
-                        {ticket.items.length}{" "}
-                        {ticket.items.length === 1 ? "item" : "items"}
+                        <span>
+                          {ticket.items.length}{" "}
+                          {ticket.items.length === 1 ? "item" : "items"}
+                        </span>
+                        {ticket.notes && (
+                          <span className="ml-1.5 inline-flex" title={ticket.notes}>
+                            <StickyNote className="h-3 w-3 text-amber-500" />
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-stone-800">
                         {formatCurrency(ticket.total)}
@@ -409,6 +418,8 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                         >
                           {ticket.paymentMethod === "efectivo" ? (
                             <Banknote className="h-3 w-3 mr-1" />
+                          ) : ticket.paymentMethod === "transferencia" ? (
+                            <Smartphone className="h-3 w-3 mr-1" />
                           ) : (
                             <CreditCard className="h-3 w-3 mr-1" />
                           )}
@@ -528,6 +539,8 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                   >
                     {selectedTicket.paymentMethod === "efectivo" ? (
                       <Banknote className="h-3 w-3 mr-1" />
+                    ) : selectedTicket.paymentMethod === "transferencia" ? (
+                      <Smartphone className="h-3 w-3 mr-1" />
                     ) : (
                       <CreditCard className="h-3 w-3 mr-1" />
                     )}

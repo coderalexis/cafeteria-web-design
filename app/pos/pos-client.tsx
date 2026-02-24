@@ -11,11 +11,14 @@ import {
   Settings,
   Banknote,
   CreditCard,
+  Smartphone,
   Printer,
   CheckCircle2,
+  Search,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { logout } from "@/app/actions/auth"
 import { createTicket } from "@/app/actions/sales"
 import { Badge } from "@/components/ui/badge"
@@ -33,7 +36,7 @@ import {
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
-type PaymentMethod = "efectivo" | "tarjeta_clip"
+type PaymentMethod = "efectivo" | "transferencia" | "tarjeta_clip"
 
 interface SizeOption {
   variantId: string
@@ -72,6 +75,7 @@ interface CompletedSale {
   total: number
   paymentMethod: PaymentMethod
   date: Date
+  notes?: string
 }
 
 interface POSClientProps {
@@ -86,6 +90,7 @@ interface POSClientProps {
 /* ------------------------------------------------------------------ */
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   efectivo: "Efectivo",
+  transferencia: "Transferencia",
   tarjeta_clip: "Tarjeta",
 }
 
@@ -136,6 +141,7 @@ function ReceiptView({
       `Fecha: ${sale.date.toLocaleDateString("es-MX")}`,
       `Hora: ${sale.date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
       `Pago: ${PAYMENT_LABELS[sale.paymentMethod]}`,
+      ...(sale.notes ? [`Nota: ${sale.notes}`] : []),
       "",
       "--------------------------------",
       ...sale.items.flatMap((item) => {
@@ -213,6 +219,12 @@ function ReceiptView({
           </span>
         </div>
 
+        {sale.notes && (
+          <p className="text-xs text-stone-500 bg-amber-50 border border-amber-100 rounded-md px-2 py-1">
+            📝 {sale.notes}
+          </p>
+        )}
+
         <Separator />
 
         {/* Items */}
@@ -245,6 +257,8 @@ function ReceiptView({
           <div className="flex items-center gap-2">
             {sale.paymentMethod === "efectivo" ? (
               <Banknote className="h-4 w-4 text-green-600" />
+            ) : sale.paymentMethod === "transferencia" ? (
+              <Smartphone className="h-4 w-4 text-violet-600" />
             ) : (
               <CreditCard className="h-4 w-4 text-blue-600" />
             )}
@@ -295,12 +309,16 @@ export default function POSClient({
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("efectivo")
   const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [ticketNotes, setTicketNotes] = useState("")
 
   /* filtered & grouped products */
-  const filtered =
-    activeCategory === "todos"
-      ? products
-      : products.filter((p) => p.category === activeCategory)
+  const searchLower = searchQuery.toLowerCase().trim()
+  const filtered = products.filter((p) => {
+    const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower)
+    const matchesCategory = searchLower || activeCategory === "todos" || p.category === activeCategory
+    return matchesSearch && matchesCategory
+  })
 
   const grouped = filtered.reduce<Record<string, Product[]>>((acc, p) => {
     const key = p.subcategory
@@ -363,6 +381,7 @@ export default function POSClient({
       const formData = new FormData()
       formData.set("payment_method", paymentMethod)
       formData.set("items", JSON.stringify(items))
+      if (ticketNotes.trim()) formData.set("notes", ticketNotes.trim())
 
       const result = await createTicket(formData)
 
@@ -374,9 +393,11 @@ export default function POSClient({
           total,
           paymentMethod,
           date: new Date(),
+          notes: ticketNotes.trim() || undefined,
         })
         setTotalSales((prev) => prev + total)
         setCart([])
+        setTicketNotes("")
       } else {
         toast.error(result.error || "Error al registrar la venta")
       }
@@ -450,14 +471,37 @@ export default function POSClient({
             </div>
           </div>
 
+          {/* Search bar */}
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+            <Input
+              placeholder="Buscar producto..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setSizePickerFor(null)
+              }}
+              className="pl-9 bg-stone-50 border-stone-200 h-9 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
           {/* Categories scroll */}
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-2 mt-2 overflow-x-auto pb-1 scrollbar-hide">
             {categories.map((cat) => (
               <Button
                 key={cat.id}
                 variant={activeCategory === cat.id ? "default" : "outline"}
                 onClick={() => {
                   setActiveCategory(cat.id)
+                  setSearchQuery("")
                   setSizePickerFor(null)
                 }}
                 className={`rounded-full shrink-0 text-sm ${
@@ -676,6 +720,14 @@ export default function POSClient({
 
         {/* Checkout */}
         <div className="shrink-0 p-4 border-t border-stone-200 bg-stone-50/80 space-y-3">
+          {/* Ticket notes */}
+          <Input
+            placeholder="Nota: mesa, nombre, para llevar..."
+            value={ticketNotes}
+            onChange={(e) => setTicketNotes(e.target.value)}
+            className="bg-white border-stone-200 h-8 text-sm"
+          />
+
           {/* Payment method selector */}
           <div className="flex gap-2">
             <button
@@ -689,6 +741,18 @@ export default function POSClient({
             >
               <Banknote className="h-4 w-4" />
               Efectivo
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("transferencia")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                paymentMethod === "transferencia"
+                  ? "border-violet-500 bg-violet-50 text-violet-700"
+                  : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
+              }`}
+            >
+              <Smartphone className="h-4 w-4" />
+              Transfer
             </button>
             <button
               type="button"
@@ -717,6 +781,8 @@ export default function POSClient({
             className={`w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
               paymentMethod === "efectivo"
                 ? "bg-green-600 hover:bg-green-700"
+                : paymentMethod === "transferencia"
+                ? "bg-violet-600 hover:bg-violet-700"
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
             size="lg"

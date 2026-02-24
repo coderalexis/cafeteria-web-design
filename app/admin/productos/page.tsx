@@ -12,7 +12,7 @@ export default async function ProductosPage() {
     supabase
       .from("menu_products")
       .select(
-        `id, name, description, category_id, sort_order,
+        `id, name, description, category_id, sort_order, is_active,
          menu_categories(id, name, slug),
          menu_variants(id, name, size_label, price, sort_order)`
       )
@@ -45,6 +45,7 @@ export default async function ProductosPage() {
       categoryName: cat?.name || "",
       categorySlug: cat?.slug || "",
       sortOrder: p.sort_order as number,
+      isActive: p.is_active as boolean,
       minPrice,
       maxPrice,
       variantCount: variants.length,

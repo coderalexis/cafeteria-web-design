@@ -149,6 +149,26 @@ export async function deleteVariant(formData: FormData) {
   return { success: true }
 }
 
+export async function toggleProductActive(formData: FormData) {
+  const id = String(formData.get("id") ?? "")
+  const isActive = formData.get("is_active") === "true"
+
+  if (!id) {
+    return { error: "ID es obligatorio." }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("menu_products")
+    .update({ is_active: isActive })
+    .eq("id", id)
+
+  if (error) return { error: error.message }
+
+  revalidateAll()
+  return { success: true }
+}
+
 export async function deleteProduct(formData: FormData) {
   const id = String(formData.get("id") ?? "")
 

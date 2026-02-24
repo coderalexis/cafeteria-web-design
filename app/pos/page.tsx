@@ -27,14 +27,16 @@ export default async function POSPage() {
     supabase
       .from("menu_categories")
       .select("id, name, slug, sort_order")
+      .eq("is_active", true)
       .order("sort_order"),
     supabase
       .from("menu_products")
       .select(
         `id, name, description, sort_order, category_id,
          menu_categories(id, name, slug),
-         menu_variants(id, name, size_label, price, sort_order)`
+         menu_variants(id, name, size_label, price, sort_order, is_active)`
       )
+      .eq("is_active", true)
       .order("sort_order"),
   ])
 
@@ -50,9 +52,9 @@ export default async function POSPage() {
   /* ── Transform products ─────────────────────────────────────────── */
   const products = (dbProducts || []).map((p: any) => {
     const cat = p.menu_categories as { id: string; name: string; slug: string } | null
-    const variants = [...(p.menu_variants || [])].sort(
-      (a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)
-    )
+    const variants = [...(p.menu_variants || [])]
+      .filter((v: any) => v.is_active !== false)
+      .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
 
     const isFlat = variants.length === 1 && variants[0].name === "Único"
     const categorySlug = cat?.slug || ""

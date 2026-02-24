@@ -49,7 +49,14 @@ export async function login(formData: FormData) {
     return { error: "Contraseña incorrecta." }
   }
 
-  redirect("/")
+  // Redirect based on role
+  const { data: roleData } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", profile.id)
+    .maybeSingle()
+
+  redirect(roleData?.role === "admin" ? "/admin" : "/pos")
 }
 
 /* ── Logout ───────────────────────────────────────────────────────── */

@@ -5,6 +5,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  toggleProductActive,
   createVariant,
   updateVariant,
   deleteVariant,
@@ -28,6 +29,8 @@ import {
   Trash2,
   Layers,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -57,6 +60,7 @@ interface Product {
   categoryName: string
   categorySlug: string
   sortOrder: number
+  isActive: boolean
   minPrice: number
   maxPrice: number
   variantCount: number
@@ -228,19 +232,34 @@ export default function ProductosClient({
                   <button
                     key={product.id}
                     onClick={() => openProduct(product)}
-                    className="w-full text-left rounded-xl border border-stone-200 bg-white hover:border-amber-300 hover:shadow-md transition-all duration-150 overflow-hidden group"
+                    className={`w-full text-left rounded-xl border transition-all duration-150 overflow-hidden group ${
+                      product.isActive
+                        ? "border-stone-200 bg-white hover:border-amber-300 hover:shadow-md"
+                        : "border-stone-200 bg-stone-50 opacity-60 hover:opacity-80"
+                    }`}
                   >
                     <div className="p-3">
-                      <p className="font-semibold text-stone-800 text-sm leading-tight line-clamp-2 group-hover:text-amber-800">
-                        {product.name}
-                      </p>
+                      <div className="flex items-start justify-between gap-1">
+                        <p className={`font-semibold text-sm leading-tight line-clamp-2 ${
+                          product.isActive
+                            ? "text-stone-800 group-hover:text-amber-800"
+                            : "text-stone-500"
+                        }`}>
+                          {product.name}
+                        </p>
+                        {!product.isActive && (
+                          <EyeOff className="h-3.5 w-3.5 text-stone-400 shrink-0 mt-0.5" />
+                        )}
+                      </div>
                       {product.description &&
                         product.description !== product.categoryName && (
                           <p className="text-xs text-stone-400 mt-0.5 truncate">
                             {product.description}
                           </p>
                         )}
-                      <p className="text-amber-700 font-bold text-base mt-1">
+                      <p className={`font-bold text-base mt-1 ${
+                        product.isActive ? "text-amber-700" : "text-stone-400"
+                      }`}>
                         {getPriceDisplay(product)}
                       </p>
                       <div className="flex items-center gap-1.5 mt-2">
@@ -251,6 +270,14 @@ export default function ProductosClient({
                           {product.variantCount}{" "}
                           {product.variantCount === 1 ? "var" : "vars"}
                         </Badge>
+                        {!product.isActive && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 border-red-200 text-red-500 bg-red-50"
+                          >
+                            Inactivo
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -299,6 +326,30 @@ function EditProductSheet({
 }) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isToggling, setIsToggling] = useState(false)
+
+  const handleToggleActive = async () => {
+    setIsToggling(true)
+    const fd = new FormData()
+    fd.set("id", product.id)
+    fd.set("is_active", (!product.isActive).toString())
+
+    const result = await toggleProductActive(fd)
+
+    if (result.error) {
+      toast.error(result.error)
+      setIsToggling(false)
+      return
+    }
+
+    toast.success(
+      product.isActive
+        ? `"${product.name}" desactivado — ya no aparecerá en el POS`
+        : `"${product.name}" activado — ahora aparecerá en el POS`
+    )
+    onClose()
+    router.refresh()
+  }
 
   const handleDeleteProduct = async () => {
     const confirmed = window.confirm(
@@ -382,6 +433,47 @@ function EditProductSheet({
               Guardar producto
             </Button>
           </form>
+
+          {/* ── Active toggle ── */}
+          <div className={`rounded-lg border p-4 flex items-center justify-between ${
+            product.isActive
+              ? "border-stone-200 bg-stone-50"
+              : "border-amber-200 bg-amber-50"
+          }`}>
+            <div className="flex items-center gap-2">
+              {product.isActive ? (
+                <Eye className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <EyeOff className="h-4 w-4 text-amber-600" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-stone-700">
+                  {product.isActive ? "Producto activo" : "Producto inactivo"}
+                </p>
+                <p className="text-xs text-stone-500">
+                  {product.isActive
+                    ? "Visible en el POS para los cajeros"
+                    : "No aparece en el POS"}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleActive}
+              disabled={isToggling}
+              className={product.isActive
+                ? "border-amber-300 text-amber-700 hover:bg-amber-50"
+                : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              }
+            >
+              {isToggling
+                ? "..."
+                : product.isActive
+                ? "Desactivar"
+                : "Activar"}
+            </Button>
+          </div>
 
           <Separator />
 
