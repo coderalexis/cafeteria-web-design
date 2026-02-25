@@ -27,6 +27,7 @@ import {
   Calendar,
   User,
   StickyNote,
+  Flame,
 } from "lucide-react"
 
 /* ────────────────────────────────────────────────────── Types */
@@ -197,6 +198,59 @@ export default function VentasClient({ tickets }: VentasClientProps) {
   const todayCount = todayTickets.length
   const todayRevenue = todayTickets.reduce((sum, t) => sum + t.total, 0)
   const avgTicket = todayCount > 0 ? todayRevenue / todayCount : 0
+  const todayItemsSold = todayTickets.reduce(
+    (sum, ticket) => sum + ticket.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
+    0
+  )
+
+  const salesByHour = Array.from({ length: 24 }, (_, hour) => {
+    const hourTickets = todayTickets.filter(
+      (ticket) => new Date(ticket.createdAt).getHours() === hour
+    )
+    const revenue = hourTickets.reduce((sum, ticket) => sum + ticket.total, 0)
+
+    return {
+      hour,
+      count: hourTickets.length,
+      revenue,
+    }
+  })
+
+  const topHour = salesByHour.reduce(
+    (best, current) => (current.revenue > best.revenue ? current : best),
+    { hour: 0, count: 0, revenue: 0 }
+  )
+
+  const methodTotals = {
+    efectivo: todayTickets
+      .filter((ticket) => ticket.paymentMethod === "efectivo")
+      .reduce((sum, ticket) => sum + ticket.total, 0),
+    transferencia: todayTickets
+      .filter((ticket) => ticket.paymentMethod === "transferencia")
+      .reduce((sum, ticket) => sum + ticket.total, 0),
+    tarjeta: todayTickets
+      .filter((ticket) => ticket.paymentMethod === "tarjeta_clip")
+      .reduce((sum, ticket) => sum + ticket.total, 0),
+  }
+
+  const productSales = new Map<string, { quantity: number; revenue: number }>()
+
+  todayTickets.forEach((ticket) => {
+    ticket.items.forEach((item) => {
+      const key = `${item.productName} ${item.sizeLabel || item.variantName}`.trim()
+      const current = productSales.get(key) || { quantity: 0, revenue: 0 }
+
+      productSales.set(key, {
+        quantity: current.quantity + item.quantity,
+        revenue: current.revenue + item.lineTotal,
+      })
+    })
+  })
+
+  const topProducts = Array.from(productSales.entries())
+    .map(([name, values]) => ({ name, ...values }))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 5)
 
   /* ── Handlers ─────────────────────────────────────── */
 
@@ -250,7 +304,7 @@ export default function VentasClient({ tickets }: VentasClientProps) {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
@@ -304,7 +358,114 @@ export default function VentasClient({ tickets }: VentasClientProps) {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-stone-500">
+                  Items Vendidos Hoy
+                </p>
+                <p className="text-3xl font-bold text-stone-800 mt-1">
+                  {todayItemsSold}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-violet-50">
+                <ShoppingBag className="h-6 w-6 text-violet-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="xl:col-span-2">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-stone-700">Ventas por metodo (hoy)</p>
+              <p className="text-xs text-stone-400">Total: {formatCurrency(todayRevenue)}</p>
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: "Efectivo", value: methodTotals.efectivo, icon: Banknote },
+                { label: "Transferencia", value: methodTotals.transferencia, icon: Smartphone },
+                { label: "Tarjeta", value: methodTotals.tarjeta, icon: CreditCard },
+              ].map(({ label, value, icon: Icon }) => {
+                const percentage = todayRevenue > 0 ? (value / todayRevenue) * 100 : 0
+                return (
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-1.5 text-sm">
+                      <div className="flex items-center gap-2 text-stone-700">
+                        <Icon className="h-4 w-4 text-stone-500" />
+                        {label}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-stone-800">{formatCurrency(value)}</p>
+                        <p className="text-xs text-stone-500">{percentage.toFixed(1)}%</p>
+                      </div>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-amber-500"
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5 space-y-3">
+            <p className="text-sm font-semibold text-stone-700">Hora pico (hoy)</p>
+            <div>
+              <p className="text-3xl font-bold text-stone-800">
+                {`${topHour.hour.toString().padStart(2, "0")}:00`}
+              </p>
+              <p className="text-sm text-stone-500 mt-1">
+                {topHour.count} ventas · {formatCurrency(topHour.revenue)}
+              </p>
+            </div>
+            <p className="text-xs text-stone-400">
+              Basado en la hora con mayor ingreso acumulado del dia.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
+              <Flame className="h-4 w-4 text-amber-600" />
+              Productos top del dia
+            </h2>
+          </div>
+
+          {topProducts.length === 0 ? (
+            <p className="text-sm text-stone-500">Aun no hay ventas registradas hoy.</p>
+          ) : (
+            <div className="space-y-3">
+              {topProducts.map((product, index) => (
+                <div key={product.name} className="flex items-center justify-between border-b border-stone-100 pb-3 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-7 w-7 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold flex items-center justify-center shrink-0">
+                      #{index + 1}
+                    </div>
+                    <p className="text-sm text-stone-700 truncate">{product.name}</p>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <p className="text-sm font-semibold text-stone-800">{product.quantity} uds</p>
+                    <p className="text-xs text-stone-500">{formatCurrency(product.revenue)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
