@@ -17,7 +17,7 @@ export default async function VentasPage() {
       )
     `)
     .order("created_at", { ascending: false })
-    .limit(200)
+    .limit(1000)
 
   // Fetch all profiles to map cashier names
   const { data: profiles } = await admin
