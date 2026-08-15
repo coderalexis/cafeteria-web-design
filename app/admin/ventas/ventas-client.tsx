@@ -13,14 +13,29 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { deleteTicket } from "@/app/actions/sales"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { cancelTicket } from "@/app/actions/sales"
+import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, type PaymentMethodKey } from "@/lib/format"
+import { buildTicketLines, printLines, receiptFromTicket } from "@/lib/receipt"
+import type { TicketRecord } from "@/lib/tickets"
 import { toast } from "sonner"
 import {
   Receipt,
   Banknote,
   CreditCard,
   Smartphone,
-  Trash2,
+  Ban,
+  Printer,
   Clock,
   DollarSign,
   ShoppingBag,
@@ -32,30 +47,15 @@ import {
 
 /* ────────────────────────────────────────────────────── Types */
 
-interface TicketItem {
-  id: string
-  quantity: number
-  unitPrice: number
-  lineTotal: number
-  notes: string
-  productName: string
-  variantName: string
-  sizeLabel: string
-}
-
-interface Ticket {
-  id: string
-  paymentMethod: string
-  subtotal: number
-  total: number
-  notes: string
-  createdAt: string
-  cashierName: string
-  items: TicketItem[]
-}
+type Ticket = TicketRecord
 
 interface VentasClientProps {
   tickets: Ticket[]
+}
+
+function PaymentIcon({ method, className }: { method: string; className?: string }) {
+  const Icon = PAYMENT_METHODS[method as PaymentMethodKey]?.icon ?? CreditCard
+  return <Icon className={className} />
 }
 
 /* ────────────────────────────────────────────────────── Helpers */
@@ -84,19 +84,6 @@ function startOfDay(date: Date): Date {
   return d
 }
 
-function paymentLabel(method: string): string {
-  switch (method) {
-    case "efectivo":
-      return "Efectivo"
-    case "transferencia":
-      return "Transferencia"
-    case "tarjeta_clip":
-      return "Tarjeta"
-    default:
-      return method
-  }
-}
-
 function paymentColor(method: string): string {
   switch (method) {
     case "efectivo":
@@ -108,17 +95,6 @@ function paymentColor(method: string): string {
     default:
       return "bg-stone-100 text-stone-700 border-stone-200"
   }
-}
-
-function formatCurrency(amount: number): string {
-  return `$${amount.toFixed(2)}`
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
 }
 
 function formatDate(dateStr: string): string {
@@ -149,7 +125,9 @@ export default function VentasClient({ tickets }: VentasClientProps) {
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("todos")
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
+  const [cancelling, setCancelling] = useState(false)
 
   /* ── Filter tickets ───────────────────────────────── */
 
@@ -189,11 +167,14 @@ export default function VentasClient({ tickets }: VentasClientProps) {
     return true
   })
 
-  /* ── Stats ────────────────────────────────────────── */
+  /* ── Stats (solo ventas completadas) ──────────────── */
 
   const todayStart = startOfDay(new Date())
   const todayTickets = tickets.filter(
-    (t) => new Date(t.createdAt) >= todayStart
+    (t) => t.status === "completado" && new Date(t.createdAt) >= todayStart
+  )
+  const todayCancelled = tickets.filter(
+    (t) => t.status === "cancelado" && new Date(t.createdAt) >= todayStart
   )
   const todayCount = todayTickets.length
   const todayRevenue = todayTickets.reduce((sum, t) => sum + t.total, 0)
@@ -259,30 +240,29 @@ export default function VentasClient({ tickets }: VentasClientProps) {
     setSheetOpen(true)
   }
 
-  async function handleDelete() {
+  function handleReprint() {
     if (!selectedTicket) return
+    if (!printLines(buildTicketLines(receiptFromTicket(selectedTicket, true)), `Ticket ${selectedTicket.folio}`)) {
+      toast.error("El navegador bloqueó la ventana de impresión.")
+    }
+  }
 
-    const confirmed = window.confirm(
-      `¿Estás seguro de eliminar el ticket #${selectedTicket.id.slice(0, 8)}? Esta acción no se puede deshacer.`
-    )
-    if (!confirmed) return
+  async function handleCancel() {
+    if (!selectedTicket || cancelling) return
+    setCancelling(true)
+    const result = await cancelTicket({ ticketId: selectedTicket.id, reason: cancelReason.trim() })
+    setCancelling(false)
 
-    setDeleting(true)
-    const fd = new FormData()
-    fd.set("id", selectedTicket.id)
-
-    const result = await deleteTicket(fd)
-
-    if (result.error) {
+    if (!result.success) {
       toast.error(result.error)
-      setDeleting(false)
       return
     }
 
-    toast.success("Ticket eliminado correctamente")
+    toast.success(`Ticket #${result.folio} cancelado`)
+    setCancelOpen(false)
+    setCancelReason("")
     setSheetOpen(false)
     setSelectedTicket(null)
-    setDeleting(false)
     router.refresh()
   }
 
@@ -298,7 +278,8 @@ export default function VentasClient({ tickets }: VentasClientProps) {
             Historial de Ventas
           </h1>
           <p className="text-sm text-stone-500 mt-1">
-            {tickets.length} ventas registradas en total
+            {tickets.filter((t) => t.status === "completado").length} ventas registradas en total
+            {todayCancelled.length > 0 && ` · ${todayCancelled.length} cancelada${todayCancelled.length === 1 ? "" : "s"} hoy`}
           </p>
         </div>
       </div>
@@ -520,7 +501,7 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                 <thead>
                   <tr className="border-b border-stone-200 bg-stone-50/50">
                     <th className="text-left px-4 py-3 font-medium text-stone-500">
-                      ID
+                      Folio
                     </th>
                     <th className="text-left px-4 py-3 font-medium text-stone-500">
                       Hora
@@ -544,10 +525,21 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                     <tr
                       key={ticket.id}
                       onClick={() => openTicket(ticket)}
-                      className="border-b border-stone-100 last:border-0 cursor-pointer hover:bg-amber-50/50 transition-colors"
+                      className={`border-b border-stone-100 last:border-0 cursor-pointer transition-colors ${
+                        ticket.status === "cancelado"
+                          ? "bg-red-50/40 hover:bg-red-50 text-stone-400"
+                          : "hover:bg-amber-50/50"
+                      }`}
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-stone-500">
-                        {ticket.id.slice(0, 8)}
+                      <td className="px-4 py-3 font-semibold text-stone-700">
+                        <div className="flex items-center gap-2">
+                          #{ticket.folio}
+                          {ticket.status === "cancelado" && (
+                            <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 text-[10px]">
+                              Cancelado
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-stone-700">
                         <div className="flex items-center gap-1.5">
@@ -569,7 +561,11 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-stone-800">
+                      <td
+                        className={`px-4 py-3 text-right font-semibold ${
+                          ticket.status === "cancelado" ? "line-through text-stone-400" : "text-stone-800"
+                        }`}
+                      >
                         {formatCurrency(ticket.total)}
                       </td>
                       <td className="px-4 py-3">
@@ -577,13 +573,7 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                           variant="outline"
                           className={`text-xs ${paymentColor(ticket.paymentMethod)}`}
                         >
-                          {ticket.paymentMethod === "efectivo" ? (
-                            <Banknote className="h-3 w-3 mr-1" />
-                          ) : ticket.paymentMethod === "transferencia" ? (
-                            <Smartphone className="h-3 w-3 mr-1" />
-                          ) : (
-                            <CreditCard className="h-3 w-3 mr-1" />
-                          )}
+                          <PaymentIcon method={ticket.paymentMethod} className="h-3 w-3 mr-1" />
                           {paymentLabel(ticket.paymentMethod)}
                         </Badge>
                       </td>
@@ -608,7 +598,12 @@ export default function VentasClient({ tickets }: VentasClientProps) {
               <SheetHeader className="px-6 pt-6 pb-4 border-b border-stone-200">
                 <SheetTitle className="flex items-center gap-2 text-stone-800">
                   <Receipt className="h-5 w-5 text-amber-600" />
-                  Ticket #{selectedTicket.id.slice(0, 8)}
+                  Ticket #{selectedTicket.folio}
+                  {selectedTicket.status === "cancelado" && (
+                    <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 ml-1">
+                      Cancelado
+                    </Badge>
+                  )}
                 </SheetTitle>
                 <div className="space-y-1.5 mt-2">
                   <div className="flex items-center gap-2 text-sm text-stone-500">
@@ -620,6 +615,18 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                     Cajero: {selectedTicket.cashierName}
                   </div>
                 </div>
+                {selectedTicket.status === "cancelado" && (
+                  <div className="mt-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 space-y-0.5">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <Ban className="h-3.5 w-3.5" /> Venta cancelada
+                    </p>
+                    {selectedTicket.cancelReason && <p>Motivo: {selectedTicket.cancelReason}</p>}
+                    <p className="text-xs text-red-600/80">
+                      {selectedTicket.cancelledByName ? `Por ${selectedTicket.cancelledByName}` : ""}
+                      {selectedTicket.cancelledAt ? ` · ${formatDateTime(selectedTicket.cancelledAt)}` : ""}
+                    </p>
+                  </div>
+                )}
               </SheetHeader>
 
               {/* Items list */}
@@ -693,40 +700,89 @@ export default function VentasClient({ tickets }: VentasClientProps) {
 
                 {/* Payment badge */}
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-stone-500">Metodo de pago</p>
+                  <p className="text-sm text-stone-500">Método de pago</p>
                   <Badge
                     variant="outline"
                     className={`text-xs ${paymentColor(selectedTicket.paymentMethod)}`}
                   >
-                    {selectedTicket.paymentMethod === "efectivo" ? (
-                      <Banknote className="h-3 w-3 mr-1" />
-                    ) : selectedTicket.paymentMethod === "transferencia" ? (
-                      <Smartphone className="h-3 w-3 mr-1" />
-                    ) : (
-                      <CreditCard className="h-3 w-3 mr-1" />
-                    )}
+                    <PaymentIcon method={selectedTicket.paymentMethod} className="h-3 w-3 mr-1" />
                     {paymentLabel(selectedTicket.paymentMethod)}
                   </Badge>
                 </div>
 
+                {/* Efectivo recibido / cambio */}
+                {selectedTicket.paymentMethod === "efectivo" && selectedTicket.cashReceived != null && (
+                  <div className="flex items-center justify-between text-sm">
+                    <p className="text-stone-500">
+                      Recibido {formatCurrency(selectedTicket.cashReceived)}
+                    </p>
+                    <p className="font-medium text-emerald-700">
+                      Cambio {formatCurrency(selectedTicket.changeDue ?? 0)}
+                    </p>
+                  </div>
+                )}
+
                 <Separator />
 
-                {/* Delete */}
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="w-full"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {deleting ? "Eliminando..." : "Eliminar ticket"}
-                </Button>
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={handleReprint}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Reimprimir
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
+                    disabled={selectedTicket.status === "cancelado"}
+                    onClick={() => {
+                      setCancelReason("")
+                      setCancelOpen(true)
+                    }}
+                  >
+                    <Ban className="h-4 w-4 mr-2" />
+                    {selectedTicket.status === "cancelado" ? "Ya cancelado" : "Cancelar venta"}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Confirmación de cancelación con motivo */}
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar ticket #{selectedTicket?.folio}</AlertDialogTitle>
+            <AlertDialogDescription>
+              La venta de {selectedTicket ? formatCurrency(selectedTicket.total) : ""} dejará de contar en
+              ingresos y cortes de caja. Queda registrada como cancelada, con motivo, quién y cuándo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Motivo de la cancelación (obligatorio)"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            maxLength={300}
+            rows={3}
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={cancelReason.trim().length < 3 || cancelling}
+              onClick={(e) => {
+                e.preventDefault()
+                handleCancel()
+              }}
+            >
+              {cancelling ? "Cancelando..." : "Cancelar venta"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

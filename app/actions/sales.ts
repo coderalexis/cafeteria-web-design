@@ -3,19 +3,32 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { requireAdmin } from "@/lib/auth"
+import { businessDayRange } from "@/lib/dates"
+import {
+  TICKET_SELECT,
+  buildProfileNameMap,
+  serializeTicket,
+  type TicketRecord,
+  type TicketRow,
+} from "@/lib/tickets"
 import type { ActionResult } from "./types"
+
+function revalidateSales() {
+  revalidatePath("/admin", "layout")
+  revalidatePath("/pos")
+}
 
 /* ------------------------------------------------------------------ */
 /*  Crear ticket — el RPC create_ticket recalcula los precios en el    */
-/*  servidor e inserta ticket + items en una sola transacción; el      */
-/*  client_ref hace idempotente el reintento tras un timeout.          */
+/*  servidor, exige caja abierta e inserta ticket + items en una sola  */
+/*  transacción; el client_ref hace idempotente el reintento.          */
 /* ------------------------------------------------------------------ */
 
 const createTicketSchema = z.object({
   clientRef: z.string().uuid(),
   paymentMethod: z.enum(["efectivo", "transferencia", "tarjeta_clip"]),
   notes: z.string().trim().max(500).optional(),
+  cashReceived: z.number().finite().nonnegative().max(9_999_999).optional(),
   items: z
     .array(
       z.object({
@@ -34,6 +47,8 @@ interface CreateTicketData {
   ticketId: string
   folio: number
   total: number
+  cashReceived: number | null
+  changeDue: number | null
 }
 
 export async function createTicket(
@@ -44,7 +59,7 @@ export async function createTicket(
     return { error: "Datos de venta inválidos." }
   }
 
-  const { clientRef, paymentMethod, notes, items } = parsed.data
+  const { clientRef, paymentMethod, notes, items, cashReceived } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("create_ticket", {
@@ -52,50 +67,97 @@ export async function createTicket(
     p_payment_method: paymentMethod,
     p_items: items,
     p_notes: notes,
+    p_cash_received: paymentMethod === "efectivo" ? cashReceived : undefined,
   })
 
   if (error) {
     return { error: error.message }
   }
 
-  const ticket = data as { ticket_id: string; folio: number; total: number }
+  const ticket = data as {
+    ticket_id: string
+    folio: number
+    total: number
+    cash_received: number | null
+    change_due: number | null
+  }
 
-  revalidatePath("/admin", "layout")
-  revalidatePath("/pos")
+  revalidateSales()
 
   return {
     success: true,
     ticketId: ticket.ticket_id,
     folio: ticket.folio,
     total: ticket.total,
+    cashReceived: ticket.cash_received ?? null,
+    changeDue: ticket.change_due ?? null,
   }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Eliminar ticket (solo admin)                                       */
+/*  Cancelar ticket (con motivo). Las reglas de quién puede cancelar   */
+/*  qué viven en el RPC cancel_ticket.                                 */
 /* ------------------------------------------------------------------ */
 
-export async function deleteTicket(formData: FormData): Promise<ActionResult> {
-  const id = String(formData.get("id") ?? "")
+const cancelSchema = z.object({
+  ticketId: z.string().uuid(),
+  reason: z.string().trim().min(3, "Indica el motivo.").max(300),
+})
 
-  if (!id) {
-    return { error: "ID de ticket requerido." }
-  }
-
-  const { error: authError } = await requireAdmin()
-  if (authError) {
-    return { error: authError }
+export async function cancelTicket(
+  input: z.infer<typeof cancelSchema>,
+): Promise<ActionResult<{ folio: number }>> {
+  const parsed = cancelSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("tickets").delete().eq("id", id)
+  const { data, error } = await supabase.rpc("cancel_ticket", {
+    p_ticket_id: parsed.data.ticketId,
+    p_reason: parsed.data.reason,
+  })
 
   if (error) {
     return { error: error.message }
   }
 
-  revalidatePath("/admin", "layout")
-  revalidatePath("/pos")
+  revalidateSales()
+  return { success: true, folio: (data as { folio: number }).folio }
+}
 
-  return { success: true }
+/* ------------------------------------------------------------------ */
+/*  Tickets del día de operación (RLS: cajero ve los suyos, admin todos) */
+/* ------------------------------------------------------------------ */
+
+export async function getTodayTickets(): Promise<ActionResult<{ tickets: TicketRecord[] }>> {
+  const supabase = await createClient()
+  const { fromIso, toIso } = businessDayRange()
+
+  const { data: rows, error } = await supabase
+    .from("tickets")
+    .select(TICKET_SELECT)
+    .gte("created_at", fromIso)
+    .lt("created_at", toIso)
+    .order("created_at", { ascending: false })
+    .limit(200)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  const ids = new Set<string>()
+  for (const r of rows ?? []) {
+    ids.add(r.cashier_id)
+    if (r.cancelled_by) ids.add(r.cancelled_by)
+  }
+
+  const { data: profiles } = ids.size
+    ? await supabase.from("profiles").select("id, full_name, username").in("id", [...ids])
+    : { data: [] }
+
+  const names = buildProfileNameMap(profiles)
+  const tickets = (rows ?? []).map((r) => serializeTicket(r as TicketRow, names))
+
+  return { success: true, tickets }
 }

@@ -1,5 +1,5 @@
 // Generado desde el proyecto Supabase (cafeteriacodex) tras la migración
-// fase0_cimientos. Regenerar con el MCP de Supabase (generate_typescript_types)
+// fase1_operacion_caja. Regenerar con el MCP de Supabase (generate_typescript_types)
 // o `supabase gen types typescript` después de cada migración.
 export type Json =
   | string
@@ -17,6 +17,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      cash_sessions: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          closing_notes: string | null
+          counted_cash: number | null
+          difference: number | null
+          expected_cash: number | null
+          id: string
+          opened_at: string
+          opened_by: string
+          opening_float: number
+          opening_notes: string | null
+          status: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_notes?: string | null
+          counted_cash?: number | null
+          difference?: number | null
+          expected_cash?: number | null
+          id?: string
+          opened_at?: string
+          opened_by: string
+          opening_float: number
+          opening_notes?: string | null
+          status?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_notes?: string | null
+          counted_cash?: number | null
+          difference?: number | null
+          expected_cash?: number | null
+          id?: string
+          opened_at?: string
+          opened_by?: string
+          opening_float?: number
+          opening_notes?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_sessions_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_sessions_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_categories: {
         Row: {
           created_at: string
@@ -374,7 +434,12 @@ export type Database = {
       }
       tickets: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cash_received: number | null
           cashier_id: string
+          change_due: number | null
           client_ref: string
           created_at: string
           discount_total: number
@@ -382,12 +447,19 @@ export type Database = {
           id: string
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          session_id: string
+          status: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
           tax_total: number
           total: number
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cash_received?: number | null
           cashier_id: string
+          change_due?: number | null
           client_ref: string
           created_at?: string
           discount_total?: number
@@ -395,12 +467,19 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          session_id: string
+          status?: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
           tax_total?: number
           total: number
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cash_received?: number | null
           cashier_id?: string
+          change_due?: number | null
           client_ref?: string
           created_at?: string
           discount_total?: number
@@ -408,16 +487,32 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          session_id?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
           subtotal?: number
           tax_total?: number
           total?: number
         }
         Relationships: [
           {
+            foreignKeyName: "tickets_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_cashier_id_fkey"
             columns: ["cashier_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -428,8 +523,18 @@ export type Database = {
     }
     Functions: {
       business_day: { Args: { ts: string }; Returns: string }
+      cancel_ticket: {
+        Args: { p_reason: string; p_ticket_id: string }
+        Returns: Json
+      }
+      cash_session_summary: { Args: { p_session_id: string }; Returns: Json }
+      close_cash_session: {
+        Args: { p_counted_cash: number; p_notes?: string }
+        Returns: Json
+      }
       create_ticket: {
         Args: {
+          p_cash_received?: number
           p_client_ref: string
           p_items: Json
           p_notes?: string
@@ -441,10 +546,15 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      open_cash_session: {
+        Args: { p_notes?: string; p_opening_float: number }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "cajero"
       payment_method: "efectivo" | "transferencia" | "tarjeta_clip"
+      ticket_status: "completado" | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -574,6 +684,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "cajero"],
       payment_method: ["efectivo", "transferencia", "tarjeta_clip"],
+      ticket_status: ["completado", "cancelado"],
     },
   },
 } as const

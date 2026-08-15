@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
-import { formatCurrency, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
+import { useState, useCallback, useEffect, useRef } from "react"
+import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS } from "@/lib/format"
+import { buildTicketLines, printLines, type ReceiptData } from "@/lib/receipt"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Trash2,
@@ -10,13 +11,13 @@ import {
   Minus,
   Plus,
   Settings,
-  Banknote,
-  CreditCard,
-  Smartphone,
   Printer,
   CheckCircle2,
   Search,
   X,
+  Receipt,
+  Lock,
+  Unlock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
+import { TicketHistoryDialog } from "./ticket-history-dialog"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -78,6 +81,8 @@ interface CompletedSale {
   paymentMethod: PaymentMethod
   date: Date
   notes?: string
+  cashReceived: number | null
+  changeDue: number | null
 }
 
 interface POSClientProps {
@@ -85,6 +90,14 @@ interface POSClientProps {
   products: Product[]
   isAdmin: boolean
   initialTotalSales: number
+  openSession: OpenSession | null
+}
+
+const CASH_QUICK_AMOUNTS = [50, 100, 200, 500]
+
+function parseCash(value: string): number | null {
+  const n = Number(value.replace(",", "."))
+  return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,65 +141,23 @@ function ReceiptView({
   const PaymentIcon = paymentInfo.icon
 
   const handlePrint = () => {
-    const lines = [
-      "================================",
-      "         EL CAFECITO",
-      "================================",
-      "",
-      `Folio: ${sale.folio}`,
-      `Fecha: ${sale.date.toLocaleDateString("es-MX")}`,
-      `Hora: ${sale.date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
-      `Pago: ${paymentLabel(sale.paymentMethod)}`,
-      ...(sale.notes ? [`Nota: ${sale.notes}`] : []),
-      "",
-      "--------------------------------",
-      ...sale.items.flatMap((item) => {
-        const price = getItemPrice(item)
-        const lineTotal = price * item.quantity
-        return [
-          `${item.quantity}x ${getItemLabel(item)}`,
-          `     ${formatCurrency(price)} c/u  = ${formatCurrency(lineTotal)}`,
-        ]
-      }),
-      "--------------------------------",
-      "",
-      `  TOTAL:  ${formatCurrency(sale.total)}`,
-      "",
-      "================================",
-      "    ¡Gracias por tu compra!",
-      "================================",
-    ]
-
-    const printWindow = window.open("", "_blank", "width=320,height=600")
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Ticket ${sale.folio}</title>
-            <style>
-              body {
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-                width: 280px;
-                margin: 0 auto;
-                padding: 10px 0;
-                line-height: 1.4;
-              }
-              pre { margin: 0; white-space: pre-wrap; }
-              @media print {
-                body { width: 72mm; font-size: 11px; }
-              }
-            </style>
-          </head>
-          <body>
-            <pre>${lines.join("\n")}</pre>
-            <script>
-              window.onload = function() { window.print(); };
-            <\/script>
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
+    const receipt: ReceiptData = {
+      folio: sale.folio,
+      date: sale.date,
+      paymentMethod: sale.paymentMethod,
+      notes: sale.notes,
+      items: sale.items.map((item) => ({
+        label: getItemLabel(item),
+        quantity: item.quantity,
+        unitPrice: getItemPrice(item),
+        lineTotal: getItemPrice(item) * item.quantity,
+      })),
+      total: sale.total,
+      cashReceived: sale.cashReceived,
+      changeDue: sale.changeDue,
+    }
+    if (!printLines(buildTicketLines(receipt), `Ticket ${sale.folio}`)) {
+      toast.error("El navegador bloqueó la ventana de impresión. Puedes reimprimir desde «Tickets».")
     }
   }
 
@@ -256,6 +227,18 @@ function ReceiptView({
             {formatCurrency(sale.total)}
           </span>
         </div>
+
+        {/* Cambio (solo efectivo con monto recibido) */}
+        {sale.paymentMethod === "efectivo" && sale.cashReceived != null && (
+          <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 flex items-center justify-between">
+            <span className="text-xs text-green-700">
+              Recibido {formatCurrency(sale.cashReceived)}
+            </span>
+            <span className="text-base font-bold text-green-700">
+              Cambio: {formatCurrency(sale.changeDue ?? 0)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -287,6 +270,7 @@ export default function POSClient({
   products,
   isAdmin,
   initialTotalSales,
+  openSession,
 }: POSClientProps) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [totalSales, setTotalSales] = useState<number>(initialTotalSales)
@@ -297,6 +281,15 @@ export default function POSClient({
   const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [ticketNotes, setTicketNotes] = useState("")
+  const [cashReceivedInput, setCashReceivedInput] = useState("")
+  const [showTickets, setShowTickets] = useState(false)
+  const [showCashDialog, setShowCashDialog] = useState(false)
+
+  // El total del día viene del servidor; tras vender/cancelar las actions
+  // revalidan /pos y esta prop se actualiza → se sincroniza aquí.
+  useEffect(() => {
+    setTotalSales(initialTotalSales)
+  }, [initialTotalSales])
 
   // Clave de idempotencia de la venta en curso: reintentar el mismo cobro
   // (p.ej. tras un timeout) no duplica el ticket. Se renueva al vender o
@@ -361,8 +354,13 @@ export default function POSClient({
 
   const total = cart.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0)
 
+  // Efectivo recibido / cambio (solo aplica al pago en efectivo)
+  const cashReceived = paymentMethod === "efectivo" ? parseCash(cashReceivedInput) : null
+  const changeDue = cashReceived !== null ? cashReceived - total : null
+  const cashInsufficient = cashReceived !== null && cashReceived < total
+
   const finalizeSale = async () => {
-    if (cart.length === 0 || isProcessing) return
+    if (cart.length === 0 || isProcessing || !openSession || cashInsufficient) return
     setIsProcessing(true)
 
     try {
@@ -371,6 +369,7 @@ export default function POSClient({
         clientRef: saleRef.current,
         paymentMethod,
         notes: ticketNotes.trim() || undefined,
+        cashReceived: cashReceived ?? undefined,
         items: cart.map((item) => ({
           variant_id: getItemVariantId(item) ?? "",
           quantity: item.quantity,
@@ -387,10 +386,13 @@ export default function POSClient({
           paymentMethod,
           date: new Date(),
           notes: ticketNotes.trim() || undefined,
+          cashReceived: result.cashReceived,
+          changeDue: result.changeDue,
         })
         setTotalSales((prev) => prev + result.total)
         setCart([])
         setTicketNotes("")
+        setCashReceivedInput("")
         saleRef.current = crypto.randomUUID()
       } else {
         toast.error(result.error || "Error al registrar la venta")
@@ -422,6 +424,28 @@ export default function POSClient({
     <div className="relative flex h-screen bg-stone-50 overflow-hidden">
       {/* ── Top-right actions ── */}
       <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
+        {/* Estado de caja */}
+        <Button
+          variant="outline"
+          onClick={() => setShowCashDialog(true)}
+          className={`backdrop-blur gap-1.5 font-semibold ${
+            openSession
+              ? "bg-green-50/90 border-green-300 text-green-700 hover:bg-green-100"
+              : "bg-red-50/90 border-red-300 text-red-700 hover:bg-red-100"
+          }`}
+          title={openSession ? "Cerrar caja (corte)" : "Abrir caja"}
+        >
+          {openSession ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          {openSession ? `Caja abierta · ${formatTime(openSession.openedAt)}` : "Caja cerrada"}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setShowTickets(true)}
+          className="bg-white/80 backdrop-blur gap-1.5"
+        >
+          <Receipt className="h-4 w-4" />
+          Tickets
+        </Button>
         {isAdmin && (
           <Link href="/admin">
             <Button
@@ -724,43 +748,83 @@ export default function POSClient({
 
           {/* Payment method selector */}
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("efectivo")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
-                paymentMethod === "efectivo"
+            {PAYMENT_METHOD_KEYS.map((key) => {
+              const info = PAYMENT_METHODS[key]
+              const Icon = info.icon
+              const active = paymentMethod === key
+              const activeClass =
+                key === "efectivo"
                   ? "border-green-500 bg-green-50 text-green-700"
-                  : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
-              }`}
-            >
-              <Banknote className="h-4 w-4" />
-              Efectivo
-            </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("transferencia")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
-                paymentMethod === "transferencia"
+                  : key === "transferencia"
                   ? "border-violet-500 bg-violet-50 text-violet-700"
-                  : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
-              }`}
-            >
-              <Smartphone className="h-4 w-4" />
-              Transfer
-            </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("tarjeta_clip")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
-                paymentMethod === "tarjeta_clip"
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
-              }`}
-            >
-              <CreditCard className="h-4 w-4" />
-              Tarjeta
-            </button>
+                  : "border-blue-500 bg-blue-50 text-blue-700"
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPaymentMethod(key)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                    active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {info.shortLabel}
+                </button>
+              )
+            })}
           </div>
+
+          {/* Efectivo recibido + cambio */}
+          {paymentMethod === "efectivo" && (
+            <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-green-800 shrink-0">Recibido</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="Opcional"
+                  value={cashReceivedInput}
+                  onChange={(e) => setCashReceivedInput(e.target.value)}
+                  className={`h-8 text-sm font-semibold bg-white ${
+                    cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
+                  }`}
+                />
+                <span
+                  className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
+                    cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
+                  }`}
+                >
+                  {cashInsufficient
+                    ? `Faltan ${formatCurrency(total - (cashReceived ?? 0))}`
+                    : changeDue !== null
+                    ? `Cambio ${formatCurrency(changeDue)}`
+                    : "Cambio —"}
+                </span>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCashReceivedInput(total > 0 ? String(total) : "")}
+                  className="flex-1 py-1 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
+                >
+                  Exacto
+                </button>
+                {CASH_QUICK_AMOUNTS.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setCashReceivedInput(String(amount))}
+                    className="flex-1 py-1 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
+                    disabled={amount < total}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Total */}
           <div className="flex justify-between items-center">
@@ -770,25 +834,40 @@ export default function POSClient({
             </span>
           </div>
 
-          {/* Cobrar button */}
-          <Button
-            className={`w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
-              paymentMethod === "efectivo"
-                ? "bg-green-600 hover:bg-green-700"
-                : paymentMethod === "transferencia"
-                ? "bg-violet-600 hover:bg-violet-700"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-            size="lg"
-            disabled={cart.length === 0 || isProcessing}
-            onClick={finalizeSale}
-          >
-            {isProcessing
-              ? "Procesando..."
-              : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
-          </Button>
+          {/* Cobrar button / gate de caja */}
+          {openSession ? (
+            <Button
+              className={`w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
+                paymentMethod === "efectivo"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : paymentMethod === "transferencia"
+                  ? "bg-violet-600 hover:bg-violet-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+              size="lg"
+              disabled={cart.length === 0 || isProcessing || cashInsufficient}
+              onClick={finalizeSale}
+            >
+              {isProcessing
+                ? "Procesando..."
+                : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
+            </Button>
+          ) : (
+            <Button
+              className="w-full py-6 text-lg font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2"
+              size="lg"
+              onClick={() => setShowCashDialog(true)}
+            >
+              <Lock className="h-5 w-5" />
+              Caja cerrada · Abrir caja para cobrar
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* ── Dialogs de caja e historial ── */}
+      <CashSessionDialog open={showCashDialog} onOpenChange={setShowCashDialog} session={openSession} />
+      <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
 
       {/* ── Receipt dialog ── */}
       <Dialog

@@ -9,6 +9,7 @@ import {
   createVariant,
   updateVariant,
   deleteVariant,
+  toggleVariantActive,
 } from "@/app/actions/menu"
 import { ActionForm } from "@/components/action-form"
 import { Button } from "@/components/ui/button"
@@ -51,6 +52,7 @@ interface Variant {
   sizeLabel: string
   price: number
   sortOrder: number
+  isActive: boolean
 }
 
 interface Product {
@@ -496,8 +498,15 @@ function EditProductSheet({
               {product.variants.map((variant) => (
                 <div
                   key={variant.id}
-                  className="rounded-lg border border-stone-200 p-3"
+                  className={`rounded-lg border p-3 ${
+                    variant.isActive ? "border-stone-200" : "border-amber-200 bg-amber-50/40"
+                  }`}
                 >
+                  {!variant.isActive && (
+                    <p className="text-[11px] font-medium text-amber-700 mb-2 flex items-center gap-1">
+                      <EyeOff className="h-3 w-3" /> Variante inactiva: no aparece en el POS
+                    </p>
+                  )}
                   {/* El form de eliminar vive FUERA del de editar (display:
                       contents mantiene el grid); anidarlos hacía que el botón
                       de borrar enviara el update */}
@@ -544,7 +553,8 @@ function EditProductSheet({
                       </Button>
                     </div>
                     </ActionForm>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1">
+                      <ToggleVariantInline variantId={variant.id} isActive={variant.isActive} />
                       <DeleteVariantInline variantId={variant.id} />
                     </div>
                   </div>
@@ -717,6 +727,31 @@ function CreateProductSheet({
         </div>
       </ScrollArea>
     </>
+  )
+}
+
+/* ================================================================== */
+/*  Toggle Variant Active Inline Button                                */
+/* ================================================================== */
+function ToggleVariantInline({ variantId, isActive }: { variantId: string; isActive: boolean }) {
+  return (
+    <ActionForm action={toggleVariantActive}>
+      <input type="hidden" name="id" value={variantId} />
+      <input type="hidden" name="is_active" value={isActive ? "false" : "true"} />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="sm"
+        title={isActive ? "Ocultar del POS" : "Mostrar en el POS"}
+        className={
+          isActive
+            ? "text-stone-400 hover:text-amber-700 hover:bg-amber-50 px-2"
+            : "text-amber-700 hover:text-emerald-700 hover:bg-emerald-50 px-2"
+        }
+      >
+        {isActive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </Button>
+    </ActionForm>
   )
 }
 

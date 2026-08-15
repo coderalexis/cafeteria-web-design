@@ -1,0 +1,213 @@
+import { formatCurrency, formatDate, formatTime, paymentLabel } from "@/lib/format"
+import type { TicketRecord } from "@/lib/tickets"
+import { ticketItemLabel } from "@/lib/tickets"
+
+/* ------------------------------------------------------------------ */
+/*  Impresión en impresora térmica de 72 mm vía popup + window.print   */
+/*  (32 columnas en Courier 11px). Lo usan el POS, el historial y el   */
+/*  corte de caja.                                                     */
+/* ------------------------------------------------------------------ */
+
+const WIDTH = 32
+const BUSINESS_NAME = "EL CAFECITO"
+const RULE = "=".repeat(WIDTH)
+const THIN = "-".repeat(WIDTH)
+
+function center(text: string): string {
+  const pad = Math.max(0, Math.floor((WIDTH - text.length) / 2))
+  return " ".repeat(pad) + text
+}
+
+/** Alinea `label` a la izquierda y `value` a la derecha en una línea. */
+function row(label: string, value: string): string {
+  const gap = WIDTH - label.length - value.length
+  return gap >= 1 ? label + " ".repeat(gap) + value : `${label} ${value}`
+}
+
+export interface ReceiptData {
+  folio: number
+  date: Date
+  paymentMethod: string
+  notes?: string | null
+  items: Array<{ label: string; quantity: number; unitPrice: number; lineTotal: number; notes?: string | null }>
+  total: number
+  cashReceived?: number | null
+  changeDue?: number | null
+  status?: "completado" | "cancelado"
+  cancelReason?: string | null
+  reprint?: boolean
+}
+
+export function receiptFromTicket(ticket: TicketRecord, reprint = false): ReceiptData {
+  return {
+    folio: ticket.folio,
+    date: new Date(ticket.createdAt),
+    paymentMethod: ticket.paymentMethod,
+    notes: ticket.notes,
+    items: ticket.items.map((i) => ({
+      label: ticketItemLabel(i),
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      lineTotal: i.lineTotal,
+      notes: i.notes,
+    })),
+    total: ticket.total,
+    cashReceived: ticket.cashReceived,
+    changeDue: ticket.changeDue,
+    status: ticket.status,
+    cancelReason: ticket.cancelReason,
+    reprint,
+  }
+}
+
+export function buildTicketLines(r: ReceiptData): string[] {
+  const lines: string[] = [
+    RULE,
+    center(BUSINESS_NAME),
+    RULE,
+    "",
+    `Folio: ${r.folio}`,
+    `Fecha: ${formatDate(r.date)}`,
+    `Hora: ${formatTime(r.date)}`,
+    `Pago: ${paymentLabel(r.paymentMethod)}`,
+  ]
+  if (r.notes) lines.push(`Nota: ${r.notes}`)
+  if (r.reprint) lines.push("(Reimpresión)")
+  lines.push("", THIN)
+
+  for (const item of r.items) {
+    lines.push(`${item.quantity}x ${item.label}`)
+    lines.push(row(`     ${formatCurrency(item.unitPrice)} c/u`, formatCurrency(item.lineTotal)))
+    if (item.notes) lines.push(`     * ${item.notes}`)
+  }
+
+  lines.push(THIN, "")
+  lines.push(row("  TOTAL:", formatCurrency(r.total)))
+  if (r.paymentMethod === "efectivo" && r.cashReceived != null) {
+    lines.push(row("  Recibido:", formatCurrency(r.cashReceived)))
+    lines.push(row("  Cambio:", formatCurrency(r.changeDue ?? 0)))
+  }
+  lines.push("")
+
+  if (r.status === "cancelado") {
+    lines.push(RULE, center("*** CANCELADO ***"))
+    if (r.cancelReason) lines.push(`Motivo: ${r.cancelReason}`)
+    lines.push(RULE)
+  } else {
+    lines.push(RULE, center("¡Gracias por tu compra!"), RULE)
+  }
+  return lines
+}
+
+/* ------------------------------------------------------------------ */
+/*  Corte de caja                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface CashSessionSummary {
+  session_id: string
+  status: "abierta" | "cerrada"
+  opened_at: string
+  closed_at: string | null
+  opened_by: string
+  closed_by: string | null
+  opening_float: number
+  opening_notes: string | null
+  closing_notes: string | null
+  expected_cash: number | null
+  counted_cash: number | null
+  difference: number | null
+  tickets_count: number
+  revenue: number
+  cash_sales: number
+  cancelled_count: number
+  cancelled_amount: number
+  by_method: Array<{ method: string; tickets: number; revenue: number }>
+}
+
+export function buildCorteLines(s: CashSessionSummary): string[] {
+  const opened = new Date(s.opened_at)
+  const closed = s.closed_at ? new Date(s.closed_at) : null
+  const lines: string[] = [
+    RULE,
+    center(BUSINESS_NAME),
+    center("CORTE DE CAJA"),
+    RULE,
+    "",
+    `Apertura: ${formatDate(opened)} ${formatTime(opened)}`,
+    `Abrió: ${s.opened_by}`,
+  ]
+  if (closed) {
+    lines.push(`Cierre: ${formatDate(closed)} ${formatTime(closed)}`)
+    if (s.closed_by) lines.push(`Cerró: ${s.closed_by}`)
+  }
+  lines.push("", THIN, "VENTAS POR MÉTODO")
+  for (const m of s.by_method) {
+    lines.push(row(`${paymentLabel(m.method)} (${m.tickets})`, formatCurrency(m.revenue)))
+  }
+  lines.push(THIN)
+  lines.push(row(`Ventas (${s.tickets_count})`, formatCurrency(s.revenue)))
+  if (s.cancelled_count > 0) {
+    lines.push(row(`Canceladas (${s.cancelled_count})`, formatCurrency(s.cancelled_amount)))
+  }
+  lines.push("", THIN, "EFECTIVO EN CAJA")
+  lines.push(row("Fondo inicial", formatCurrency(s.opening_float)))
+  lines.push(row("Ventas efectivo", formatCurrency(s.cash_sales)))
+  lines.push(row("Esperado", formatCurrency(s.expected_cash ?? s.opening_float + s.cash_sales)))
+  if (s.counted_cash != null) {
+    lines.push(row("Contado", formatCurrency(s.counted_cash)))
+    const diff = s.difference ?? 0
+    const sign = diff > 0 ? "+" : ""
+    lines.push(row("Diferencia", `${sign}${formatCurrency(diff)}`))
+  }
+  if (s.opening_notes) lines.push("", `Nota apertura: ${s.opening_notes}`)
+  if (s.closing_notes) lines.push(`Nota cierre: ${s.closing_notes}`)
+  lines.push("", RULE)
+  return lines
+}
+
+/* ------------------------------------------------------------------ */
+/*  Popup de impresión                                                 */
+/* ------------------------------------------------------------------ */
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+}
+
+/** Abre el popup e imprime. Devuelve false si el navegador lo bloqueó. */
+export function printLines(lines: string[], title: string): boolean {
+  const printWindow = window.open("", "_blank", "width=320,height=600")
+  if (!printWindow) return false
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            width: 280px;
+            margin: 0 auto;
+            padding: 10px 0;
+            line-height: 1.4;
+          }
+          pre { margin: 0; white-space: pre-wrap; }
+          @media print {
+            body { width: 72mm; font-size: 11px; }
+          }
+        </style>
+      </head>
+      <body>
+        <pre>${escapeHtml(lines.join("\n"))}</pre>
+        <script>
+          window.onload = function() { window.print(); };
+        <\/script>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  return true
+}

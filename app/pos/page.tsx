@@ -92,14 +92,22 @@ export default async function POSPage() {
     }
   })
 
-  /* ── Fetch today's sales total (día de operación CDMX) ──────────── */
+  /* ── Today's sales (día de operación CDMX, solo completadas) + caja ── */
   const { fromIso, toIso } = businessDayRange()
 
-  const { data: todayTickets } = await supabase
-    .from("tickets")
-    .select("total")
-    .gte("created_at", fromIso)
-    .lt("created_at", toIso)
+  const [{ data: todayTickets }, { data: session }] = await Promise.all([
+    supabase
+      .from("tickets")
+      .select("total")
+      .eq("status", "completado")
+      .gte("created_at", fromIso)
+      .lt("created_at", toIso),
+    supabase
+      .from("cash_sessions")
+      .select("id, opened_at, opening_float")
+      .eq("status", "abierta")
+      .maybeSingle(),
+  ])
 
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
@@ -109,6 +117,11 @@ export default async function POSPage() {
       products={products}
       isAdmin={isAdmin}
       initialTotalSales={dbTotalSales}
+      openSession={
+        session
+          ? { id: session.id, openedAt: session.opened_at, openingFloat: session.opening_float }
+          : null
+      }
     />
   )
 }

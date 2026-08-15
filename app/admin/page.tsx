@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Receipt,
   Star,
+  Wallet,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -41,17 +42,19 @@ export default async function AdminDashboard() {
     supabase
       .from("tickets")
       .select("id, total, payment_method")
+      .eq("status", "completado")
       .gte("created_at", fromIso)
       .lt("created_at", toIso),
     supabase
       .from("tickets")
-      .select("id, total, payment_method, created_at")
+      .select("id, folio, total, payment_method, created_at, status")
       .order("created_at", { ascending: false })
       .limit(5),
     // "Producto estrella" desde los snapshots de ticket_items (sin joins al menú)
     supabase
       .from("ticket_items")
-      .select("quantity, product_name, tickets!inner(created_at)")
+      .select("quantity, product_name, tickets!inner(created_at, status)")
+      .eq("tickets.status", "completado")
       .gte("tickets.created_at", fromIso)
       .lt("tickets.created_at", toIso),
   ])
@@ -293,11 +296,16 @@ export default async function AdminDashboard() {
                   className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0"
                 >
                   <div>
-                    <p className="text-sm font-medium text-stone-700">
-                      {formatCurrency(ticket.total ?? 0)}
+                    <p
+                      className={`text-sm font-medium ${
+                        ticket.status === "cancelado" ? "text-stone-400 line-through" : "text-stone-700"
+                      }`}
+                    >
+                      #{ticket.folio} · {formatCurrency(ticket.total ?? 0)}
                     </p>
                     <p className="text-xs text-stone-400">
                       {paymentLabel(ticket.payment_method)}
+                      {ticket.status === "cancelado" && <span className="text-red-500"> · cancelado</span>}
                     </p>
                   </div>
                   <p className="text-xs text-stone-400">
@@ -369,7 +377,21 @@ export default async function AdminDashboard() {
                   Historial de ventas
                 </p>
                 <p className="text-xs text-stone-400">
-                  Ver y gestionar ventas
+                  Ver, reimprimir y cancelar
+                </p>
+              </div>
+            </Link>
+            <Link
+              href="/admin/cortes"
+              className="flex items-center gap-3 p-4 rounded-xl border border-stone-200 hover:border-amber-300 hover:bg-amber-50/50 transition-all"
+            >
+              <Wallet className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-stone-800">
+                  Cortes de caja
+                </p>
+                <p className="text-xs text-stone-400">
+                  Turnos, esperado vs contado
                 </p>
               </div>
             </Link>
