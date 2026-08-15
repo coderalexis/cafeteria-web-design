@@ -576,6 +576,13 @@ export default function VentasClient({
                               .join(" - ")}
                           </p>
                         )}
+                        {item.modifiers.length > 0 && (
+                          <p className="text-xs text-amber-700 mt-0.5">
+                            {item.modifiers
+                              .map((m) => `+ ${m.name}${m.price > 0 ? ` (${formatCurrency(m.price)})` : ""}`)
+                              .join(", ")}
+                          </p>
+                        )}
                         {item.notes && (
                           <p className="text-xs text-amber-600 mt-0.5 italic">
                             {item.notes}
@@ -613,7 +620,19 @@ export default function VentasClient({
               <div className="border-t border-stone-200 px-6 py-4 space-y-4">
                 <Separator />
 
-                {/* Total */}
+                {/* Subtotal / descuento / total */}
+                {selectedTicket.discountTotal > 0 && (
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center justify-between text-stone-500">
+                      <p>Subtotal</p>
+                      <p>{formatCurrency(selectedTicket.subtotal)}</p>
+                    </div>
+                    <div className="flex items-center justify-between text-amber-700">
+                      <p>Descuento{selectedTicket.discountReason ? ` · ${selectedTicket.discountReason}` : ""}</p>
+                      <p>-{formatCurrency(selectedTicket.discountTotal)}</p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <p className="text-base font-semibold text-stone-800">
                     Total

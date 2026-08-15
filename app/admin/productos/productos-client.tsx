@@ -11,6 +11,7 @@ import {
   deleteVariant,
   toggleVariantActive,
 } from "@/app/actions/menu"
+import { setProductModifierGroups } from "@/app/actions/modifiers"
 import { ActionForm } from "@/components/action-form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  SlidersHorizontal,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -68,11 +70,20 @@ interface Product {
   maxPrice: number
   variantCount: number
   variants: Variant[]
+  modifierGroupIds: string[]
+}
+
+export interface ModifierGroupOption {
+  id: string
+  name: string
+  isActive: boolean
+  optionCount: number
 }
 
 interface ProductosClientProps {
   categories: Category[]
   products: Product[]
+  modifierGroups: ModifierGroupOption[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -90,6 +101,7 @@ function getPriceDisplay(p: Product): string {
 export default function ProductosClient({
   categories,
   products,
+  modifierGroups,
 }: ProductosClientProps) {
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState("todos")
@@ -306,6 +318,7 @@ export default function ProductosClient({
             <EditProductSheet
               product={selectedProduct}
               categories={categories}
+              modifierGroups={modifierGroups}
               onClose={() => setSheetOpen(false)}
             />
           ) : null}
@@ -321,15 +334,32 @@ export default function ProductosClient({
 function EditProductSheet({
   product,
   categories,
+  modifierGroups,
   onClose,
 }: {
   product: Product
   categories: Category[]
+  modifierGroups: ModifierGroupOption[]
   onClose: () => void
 }) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isToggling, setIsToggling] = useState(false)
+  const [savingGroups, setSavingGroups] = useState(false)
+
+  const handleToggleGroup = async (groupId: string, enabled: boolean) => {
+    setSavingGroups(true)
+    const next = enabled
+      ? [...product.modifierGroupIds, groupId]
+      : product.modifierGroupIds.filter((id) => id !== groupId)
+    const result = await setProductModifierGroups({ productId: product.id, groupIds: next })
+    setSavingGroups(false)
+    if (!result.success) {
+      toast.error(result.error)
+      return
+    }
+    router.refresh()
+  }
 
   const handleToggleActive = async () => {
     setIsToggling(true)
@@ -617,6 +647,60 @@ function EditProductSheet({
                 </div>
               </ActionForm>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* ── Modifier groups ── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-amber-600" />
+                Modificadores
+              </h3>
+              <span className="text-xs text-stone-400">
+                {product.modifierGroupIds.length === 0
+                  ? "ninguno"
+                  : `${product.modifierGroupIds.length} grupo${product.modifierGroupIds.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+            {modifierGroups.length === 0 ? (
+              <p className="text-xs text-stone-400">
+                No hay grupos de modificadores. Créalos en <strong>Modificadores</strong> y aparecerán aquí.
+              </p>
+            ) : (
+              <div className={`space-y-1.5 ${savingGroups ? "opacity-60 pointer-events-none" : ""}`}>
+                {modifierGroups.map((g) => {
+                  const on = product.modifierGroupIds.includes(g.id)
+                  return (
+                    <label
+                      key={g.id}
+                      className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                        on ? "border-amber-300 bg-amber-50" : "border-stone-200 hover:border-stone-300"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-amber-600"
+                          checked={on}
+                          onChange={(e) => handleToggleGroup(g.id, e.target.checked)}
+                        />
+                        <span className="truncate text-stone-700">{g.name}</span>
+                        {!g.isActive && (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 text-[10px]">
+                            inactivo
+                          </Badge>
+                        )}
+                      </span>
+                      <span className="text-xs text-stone-400 shrink-0">
+                        {g.optionCount} opci{g.optionCount === 1 ? "ón" : "ones"}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <Separator />

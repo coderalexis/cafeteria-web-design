@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
-import ProductosClient from "./productos-client"
+import ProductosClient, { type ModifierGroupOption } from "./productos-client"
 
 export default async function ProductosPage() {
   const supabase = await createClient()
 
-  const [{ data: categories }, { data: products }] = await Promise.all([
+  const [{ data: categories }, { data: products }, { data: groups }] = await Promise.all([
     supabase
       .from("menu_categories")
       .select("id, name, slug, sort_order")
@@ -14,9 +14,15 @@ export default async function ProductosPage() {
       .select(
         `id, name, description, category_id, sort_order, is_active,
          menu_categories(id, name, slug),
-         menu_variants(id, name, size_label, price, sort_order, is_active)`
+         menu_variants(id, name, size_label, price, sort_order, is_active),
+         product_modifier_groups(group_id)`
       )
       .order("sort_order"),
+    supabase
+      .from("modifier_groups")
+      .select("id, name, is_active, sort_order, modifiers(id)")
+      .order("sort_order")
+      .order("name"),
   ])
 
   // Serialize for client component
@@ -57,13 +63,22 @@ export default async function ProductosPage() {
         sortOrder: v.sort_order,
         isActive: v.is_active,
       })),
+      modifierGroupIds: (p.product_modifier_groups ?? []).map((l) => l.group_id),
     }
   })
+
+  const modifierGroups: ModifierGroupOption[] = (groups ?? []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    isActive: g.is_active,
+    optionCount: (g.modifiers ?? []).length,
+  }))
 
   return (
     <ProductosClient
       categories={serializedCategories}
       products={serializedProducts}
+      modifierGroups={modifierGroups}
     />
   )
 }

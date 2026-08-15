@@ -145,7 +145,17 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
                           )}
                         </div>
                         <p className="text-xs text-stone-500 mt-1 truncate">
-                          {ticket.items.map((i) => `${i.quantity}x ${ticketItemLabel(i)}`).join(", ")}
+                          {ticket.items
+                            .map(
+                              (i) =>
+                                `${i.quantity}x ${ticketItemLabel(i)}${
+                                  i.modifiers.length > 0 ? ` (+${i.modifiers.map((m) => m.name).join(", ")})` : ""
+                                }`,
+                            )
+                            .join(", ")}
+                          {ticket.discountTotal > 0 && (
+                            <span className="text-amber-700"> · desc. -{formatCurrency(ticket.discountTotal)}</span>
+                          )}
                         </p>
                         {cancelled && ticket.cancelReason && (
                           <p className="text-xs text-red-600 mt-1">Motivo: {ticket.cancelReason}</p>

@@ -14,6 +14,7 @@ import {
   Receipt,
   Star,
   Wallet,
+  SlidersHorizontal,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -95,7 +96,7 @@ export default async function AdminDashboard() {
       label: "Variantes",
       value: variantCount ?? 0,
       icon: Layers,
-      href: "/admin/variantes",
+      href: "/admin/productos",
       color: "text-purple-600",
       bg: "bg-purple-50",
     },
@@ -332,16 +333,16 @@ export default async function AdminDashboard() {
               </div>
             </Link>
             <Link
-              href="/admin/variantes"
+              href="/admin/modificadores"
               className="flex items-center gap-3 p-4 rounded-xl border border-stone-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all"
             >
-              <Layers className="h-5 w-5 text-purple-600" />
+              <SlidersHorizontal className="h-5 w-5 text-purple-600" />
               <div>
                 <p className="text-sm font-medium text-stone-800">
-                  Gestionar variantes
+                  Modificadores
                 </p>
                 <p className="text-xs text-stone-400">
-                  Precios y tamaños
+                  Tipo de leche, extras…
                 </p>
               </div>
             </Link>

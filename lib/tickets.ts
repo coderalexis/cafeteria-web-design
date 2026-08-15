@@ -6,6 +6,12 @@
 
 export type TicketStatus = "completado" | "cancelado"
 
+export interface TicketItemModifierRecord {
+  id: string
+  name: string
+  price: number
+}
+
 export interface TicketItemRecord {
   id: string
   quantity: number
@@ -15,6 +21,7 @@ export interface TicketItemRecord {
   productName: string
   variantName: string
   sizeLabel: string
+  modifiers: TicketItemModifierRecord[]
 }
 
 export interface TicketRecord {
@@ -22,6 +29,8 @@ export interface TicketRecord {
   folio: number
   paymentMethod: string
   subtotal: number
+  discountTotal: number
+  discountReason: string | null
   total: number
   notes: string
   createdAt: string
@@ -38,9 +47,12 @@ export interface TicketRecord {
 
 /** Columnas que necesita `serializeTicket`; usar en los `.select()`. */
 export const TICKET_SELECT = `
-  id, folio, payment_method, subtotal, total, notes, created_at, cashier_id,
+  id, folio, payment_method, subtotal, discount_total, discount_reason, total, notes, created_at, cashier_id,
   status, cancelled_at, cancelled_by, cancel_reason, cash_received, change_due,
-  ticket_items(id, quantity, unit_price, line_total, notes, product_name, variant_name, size_label)
+  ticket_items(
+    id, quantity, unit_price, line_total, notes, product_name, variant_name, size_label,
+    ticket_item_modifiers(id, modifier_name, modifier_price)
+  )
 ` as const
 
 /** Forma mínima de la fila que devuelve `TICKET_SELECT`. */
@@ -49,6 +61,8 @@ export interface TicketRow {
   folio: number
   payment_method: string
   subtotal: number
+  discount_total: number
+  discount_reason: string | null
   total: number
   notes: string | null
   created_at: string
@@ -68,6 +82,7 @@ export interface TicketRow {
     product_name: string
     variant_name: string
     size_label: string | null
+    ticket_item_modifiers?: Array<{ id: string; modifier_name: string; modifier_price: number }> | null
   }>
 }
 
@@ -90,6 +105,8 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
     folio: row.folio,
     paymentMethod: row.payment_method,
     subtotal: row.subtotal,
+    discountTotal: row.discount_total ?? 0,
+    discountReason: row.discount_reason ?? null,
     total: row.total,
     notes: row.notes || "",
     createdAt: row.created_at,
@@ -110,6 +127,11 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
       productName: item.product_name,
       variantName: item.variant_name,
       sizeLabel: item.size_label || "",
+      modifiers: (item.ticket_item_modifiers ?? []).map((m) => ({
+        id: m.id,
+        name: m.modifier_name,
+        price: m.modifier_price,
+      })),
     })),
   }
 }

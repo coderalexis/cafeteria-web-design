@@ -1,5 +1,5 @@
 // Generado desde el proyecto Supabase (cafeteriacodex) tras la migración
-// fase2_reportes. Regenerar con el MCP de Supabase (generate_typescript_types)
+// fase3_modificadores_descuentos. Regenerar con el MCP de Supabase (generate_typescript_types)
 // o `supabase gen types typescript` después de cada migración.
 export type Json =
   | string
@@ -442,6 +442,7 @@ export type Database = {
           change_due: number | null
           client_ref: string
           created_at: string
+          discount_reason: string | null
           discount_total: number
           folio: number
           id: string
@@ -462,6 +463,7 @@ export type Database = {
           change_due?: number | null
           client_ref: string
           created_at?: string
+          discount_reason?: string | null
           discount_total?: number
           folio?: never
           id?: string
@@ -482,6 +484,7 @@ export type Database = {
           change_due?: number | null
           client_ref?: string
           created_at?: string
+          discount_reason?: string | null
           discount_total?: number
           folio?: never
           id?: string
@@ -536,6 +539,7 @@ export type Database = {
         Args: {
           p_cash_received?: number
           p_client_ref: string
+          p_discount?: Json
           p_items: Json
           p_notes?: string
           p_payment_method: Database["public"]["Enums"]["payment_method"]

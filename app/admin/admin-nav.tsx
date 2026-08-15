@@ -2,14 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Tag, Package, Layers, Receipt, Users, Wallet } from "lucide-react"
+import { LayoutDashboard, Tag, Package, SlidersHorizontal, Receipt, Users, Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/categorias", label: "Categorías", icon: Tag },
   { href: "/admin/productos", label: "Productos", icon: Package },
-  { href: "/admin/variantes", label: "Variantes", icon: Layers },
+  { href: "/admin/modificadores", label: "Modificadores", icon: SlidersHorizontal },
   { href: "/admin/ventas", label: "Ventas", icon: Receipt },
   { href: "/admin/cortes", label: "Cortes de caja", icon: Wallet },
   { href: "/admin/cajeros", label: "Cajeros", icon: Users },

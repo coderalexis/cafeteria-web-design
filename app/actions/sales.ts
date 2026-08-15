@@ -24,17 +24,27 @@ function revalidateSales() {
 /*  transacción; el client_ref hace idempotente el reintento.          */
 /* ------------------------------------------------------------------ */
 
+const discountSchema = z.object({
+  type: z.enum(["percent", "amount"]),
+  value: z.number().finite().positive().max(9_999_999),
+  reason: z.string().trim().min(3, "Indica el motivo del descuento.").max(200),
+})
+
+export type TicketDiscountInput = z.infer<typeof discountSchema>
+
 const createTicketSchema = z.object({
   clientRef: z.string().uuid(),
   paymentMethod: z.enum(["efectivo", "transferencia", "tarjeta_clip"]),
   notes: z.string().trim().max(500).optional(),
   cashReceived: z.number().finite().nonnegative().max(9_999_999).optional(),
+  discount: discountSchema.optional(),
   items: z
     .array(
       z.object({
         variant_id: z.string().uuid(),
         quantity: z.number().int().min(1).max(99),
         notes: z.string().trim().max(200).optional(),
+        modifiers: z.array(z.string().uuid()).max(20).optional(),
       }),
     )
     .min(1, "El ticket debe incluir al menos un artículo.")
@@ -46,6 +56,8 @@ export type CreateTicketInput = z.infer<typeof createTicketSchema>
 interface CreateTicketData {
   ticketId: string
   folio: number
+  subtotal: number
+  discountTotal: number
   total: number
   cashReceived: number | null
   changeDue: number | null
@@ -56,10 +68,10 @@ export async function createTicket(
 ): Promise<ActionResult<CreateTicketData>> {
   const parsed = createTicketSchema.safeParse(input)
   if (!parsed.success) {
-    return { error: "Datos de venta inválidos." }
+    return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, paymentMethod, notes, items, cashReceived } = parsed.data
+  const { clientRef, paymentMethod, notes, items, cashReceived, discount } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("create_ticket", {
@@ -68,6 +80,7 @@ export async function createTicket(
     p_items: items,
     p_notes: notes,
     p_cash_received: paymentMethod === "efectivo" ? cashReceived : undefined,
+    p_discount: discount,
   })
 
   if (error) {
@@ -77,6 +90,8 @@ export async function createTicket(
   const ticket = data as {
     ticket_id: string
     folio: number
+    subtotal: number
+    discount_total: number
     total: number
     cash_received: number | null
     change_due: number | null
@@ -88,6 +103,8 @@ export async function createTicket(
     success: true,
     ticketId: ticket.ticket_id,
     folio: ticket.folio,
+    subtotal: ticket.subtotal,
+    discountTotal: ticket.discount_total ?? 0,
     total: ticket.total,
     cashReceived: ticket.cash_received ?? null,
     changeDue: ticket.change_due ?? null,

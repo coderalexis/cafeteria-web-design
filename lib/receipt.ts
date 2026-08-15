@@ -24,12 +24,25 @@ function row(label: string, value: string): string {
   return gap >= 1 ? label + " ".repeat(gap) + value : `${label} ${value}`
 }
 
+export interface ReceiptItem {
+  label: string
+  quantity: number
+  /** Precio unitario ya incluyendo modificadores. */
+  unitPrice: number
+  lineTotal: number
+  notes?: string | null
+  modifiers?: Array<{ name: string; price: number }>
+}
+
 export interface ReceiptData {
   folio: number
   date: Date
   paymentMethod: string
   notes?: string | null
-  items: Array<{ label: string; quantity: number; unitPrice: number; lineTotal: number; notes?: string | null }>
+  items: ReceiptItem[]
+  subtotal?: number
+  discountTotal?: number
+  discountReason?: string | null
   total: number
   cashReceived?: number | null
   changeDue?: number | null
@@ -50,7 +63,11 @@ export function receiptFromTicket(ticket: TicketRecord, reprint = false): Receip
       unitPrice: i.unitPrice,
       lineTotal: i.lineTotal,
       notes: i.notes,
+      modifiers: i.modifiers.map((m) => ({ name: m.name, price: m.price })),
     })),
+    subtotal: ticket.subtotal,
+    discountTotal: ticket.discountTotal,
+    discountReason: ticket.discountReason,
     total: ticket.total,
     cashReceived: ticket.cashReceived,
     changeDue: ticket.changeDue,
@@ -77,11 +94,20 @@ export function buildTicketLines(r: ReceiptData): string[] {
 
   for (const item of r.items) {
     lines.push(`${item.quantity}x ${item.label}`)
+    for (const m of item.modifiers ?? []) {
+      lines.push(row(`   + ${m.name}`, m.price > 0 ? `+${formatCurrency(m.price)}` : ""))
+    }
     lines.push(row(`     ${formatCurrency(item.unitPrice)} c/u`, formatCurrency(item.lineTotal)))
     if (item.notes) lines.push(`     * ${item.notes}`)
   }
 
   lines.push(THIN, "")
+  const hasDiscount = (r.discountTotal ?? 0) > 0
+  if (hasDiscount) {
+    lines.push(row("  Subtotal:", formatCurrency(r.subtotal ?? r.total + (r.discountTotal ?? 0))))
+    lines.push(row("  Descuento:", `-${formatCurrency(r.discountTotal ?? 0)}`))
+    if (r.discountReason) lines.push(`  (${r.discountReason})`)
+  }
   lines.push(row("  TOTAL:", formatCurrency(r.total)))
   if (r.paymentMethod === "efectivo" && r.cashReceived != null) {
     lines.push(row("  Recibido:", formatCurrency(r.cashReceived)))
@@ -121,6 +147,8 @@ export interface CashSessionSummary {
   cash_sales: number
   cancelled_count: number
   cancelled_amount: number
+  /** Suma de descuentos del turno (lo agrega cash_session_summary desde Fase 3; opcional por compatibilidad). */
+  discount_total?: number
   by_method: Array<{ method: string; tickets: number; revenue: number }>
 }
 
@@ -146,6 +174,9 @@ export function buildCorteLines(s: CashSessionSummary): string[] {
   }
   lines.push(THIN)
   lines.push(row(`Ventas (${s.tickets_count})`, formatCurrency(s.revenue)))
+  if ((s.discount_total ?? 0) > 0) {
+    lines.push(row("Descuentos aplicados", `-${formatCurrency(s.discount_total ?? 0)}`))
+  }
   if (s.cancelled_count > 0) {
     lines.push(row(`Canceladas (${s.cancelled_count})`, formatCurrency(s.cancelled_amount)))
   }

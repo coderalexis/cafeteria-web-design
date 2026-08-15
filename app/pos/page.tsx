@@ -35,7 +35,11 @@ export default async function POSPage() {
       .select(
         `id, name, description, sort_order, category_id,
          menu_categories(id, name, slug),
-         menu_variants(id, name, size_label, price, sort_order, is_active)`
+         menu_variants(id, name, size_label, price, sort_order, is_active),
+         product_modifier_groups(
+           modifier_groups(id, name, min_select, max_select, is_required, sort_order, is_active,
+             modifiers(id, name, price_delta, sort_order, is_active))
+         )`
       )
       .eq("is_active", true)
       .order("sort_order"),
@@ -65,24 +69,40 @@ export default async function POSPage() {
     const cardDescription =
       p.description && p.description !== categoryName ? p.description : undefined
 
-    if (isFlat) {
-      return {
-        id: p.id,
-        name: p.name,
-        category: categorySlug,
-        subcategory,
-        description: cardDescription,
-        price: variants[0].price,
-        variantId: variants[0].id,
-      }
-    }
+    // Grupos de modificadores activos con al menos una opción activa
+    const modifierGroups = (p.product_modifier_groups ?? [])
+      .map((link) => link.modifier_groups)
+      .filter((g): g is NonNullable<typeof g> => !!g && g.is_active)
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        minSelect: Math.max(g.min_select, g.is_required ? 1 : 0),
+        maxSelect: g.max_select,
+        sortOrder: g.sort_order,
+        options: [...(g.modifiers ?? [])]
+          .filter((m) => m.is_active)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+          .map((m) => ({ id: m.id, name: m.name, priceDelta: m.price_delta })),
+      }))
+      .filter((g) => g.options.length > 0)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((g) => ({ id: g.id, name: g.name, minSelect: g.minSelect, maxSelect: g.maxSelect, options: g.options }))
 
-    return {
+    const base = {
       id: p.id,
       name: p.name,
       category: categorySlug,
       subcategory,
       description: cardDescription,
+      modifierGroups: modifierGroups.length > 0 ? modifierGroups : undefined,
+    }
+
+    if (isFlat) {
+      return { ...base, price: variants[0].price, variantId: variants[0].id }
+    }
+
+    return {
+      ...base,
       sizes: variants.map((v) => ({
         variantId: v.id,
         label: v.name,

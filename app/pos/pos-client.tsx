@@ -18,6 +18,8 @@ import {
   Receipt,
   Lock,
   Unlock,
+  Percent,
+  SlidersHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,20 +38,36 @@ import {
 } from "@/components/ui/dialog"
 import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
+import { ModifierSheet } from "./modifier-sheet"
+import { DiscountDialog } from "./discount-dialog"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 type PaymentMethod = "efectivo" | "transferencia" | "tarjeta_clip"
 
-interface SizeOption {
+export interface SizeOption {
   variantId: string
   label: string
   oz: string
   price: number
 }
 
-interface Product {
+export interface ModifierOption {
+  id: string
+  name: string
+  priceDelta: number
+}
+
+export interface ModifierGroup {
+  id: string
+  name: string
+  minSelect: number
+  maxSelect: number | null
+  options: ModifierOption[]
+}
+
+export interface Product {
   id: string
   name: string
   price?: number
@@ -58,14 +76,22 @@ interface Product {
   category: string
   subcategory: string
   description?: string
+  modifierGroups?: ModifierGroup[]
 }
 
 interface CartItem {
   cartId: string
   product: Product
   size?: SizeOption
+  modifiers: ModifierOption[]
   quantity: number
   isNew?: boolean
+}
+
+export interface TicketDiscount {
+  type: "percent" | "amount"
+  value: number
+  reason: string
 }
 
 interface Category {
@@ -77,6 +103,9 @@ interface CompletedSale {
   ticketId: string
   folio: number
   items: CartItem[]
+  subtotal: number
+  discountTotal: number
+  discountReason: string | null
   total: number
   paymentMethod: PaymentMethod
   date: Date
@@ -113,8 +142,10 @@ function getDisplayPrice(p: Product): string {
   return ""
 }
 
+/** Precio unitario = variante + suma de modificadores. */
 function getItemPrice(item: CartItem): number {
-  return item.size ? item.size.price : item.product.price ?? 0
+  const base = item.size ? item.size.price : item.product.price ?? 0
+  return base + item.modifiers.reduce((s, m) => s + m.priceDelta, 0)
 }
 
 function getItemVariantId(item: CartItem): string | undefined {
@@ -125,6 +156,13 @@ function getItemLabel(item: CartItem): string {
   return item.size
     ? `${item.product.name} (${item.size.label})`
     : item.product.name
+}
+
+/** Descuento calculado en el cliente (el servidor lo recalcula y valida). */
+function computeDiscount(subtotal: number, discount: TicketDiscount | null): number {
+  if (!discount || subtotal <= 0) return 0
+  const raw = discount.type === "percent" ? (subtotal * discount.value) / 100 : discount.value
+  return Math.min(Math.round(raw * 100) / 100, subtotal)
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,7 +189,11 @@ function ReceiptView({
         quantity: item.quantity,
         unitPrice: getItemPrice(item),
         lineTotal: getItemPrice(item) * item.quantity,
+        modifiers: item.modifiers.map((m) => ({ name: m.name, price: m.priceDelta })),
       })),
+      subtotal: sale.subtotal,
+      discountTotal: sale.discountTotal,
+      discountReason: sale.discountReason,
       total: sale.total,
       cashReceived: sale.cashReceived,
       changeDue: sale.changeDue,
@@ -197,25 +239,43 @@ function ReceiptView({
           {sale.items.map((item) => {
             const price = getItemPrice(item)
             return (
-              <div
-                key={item.cartId}
-                className="flex items-center justify-between text-sm"
-              >
-                <div className="flex-1 min-w-0">
-                  <span className="text-stone-700 font-medium">
-                    {item.quantity}x{" "}
+              <div key={item.cartId} className="text-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-stone-700 font-medium">
+                      {item.quantity}x{" "}
+                    </span>
+                    <span className="text-stone-700">{getItemLabel(item)}</span>
+                  </div>
+                  <span className="font-semibold text-stone-800 ml-3">
+                    {formatCurrency(price * item.quantity)}
                   </span>
-                  <span className="text-stone-700">{getItemLabel(item)}</span>
                 </div>
-                <span className="font-semibold text-stone-800 ml-3">
-                  {formatCurrency(price * item.quantity)}
-                </span>
+                {item.modifiers.length > 0 && (
+                  <p className="text-xs text-stone-400 pl-6">
+                    {item.modifiers.map((m) => `+ ${m.name}`).join(", ")}
+                  </p>
+                )}
               </div>
             )
           })}
         </div>
 
         <Separator />
+
+        {/* Subtotal / descuento */}
+        {sale.discountTotal > 0 && (
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-stone-500">
+              <span>Subtotal</span>
+              <span>{formatCurrency(sale.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-amber-700">
+              <span>Descuento{sale.discountReason ? ` · ${sale.discountReason}` : ""}</span>
+              <span>-{formatCurrency(sale.discountTotal)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Total & payment */}
         <div className="flex justify-between items-center">
@@ -284,6 +344,10 @@ export default function POSClient({
   const [cashReceivedInput, setCashReceivedInput] = useState("")
   const [showTickets, setShowTickets] = useState(false)
   const [showCashDialog, setShowCashDialog] = useState(false)
+  const [discount, setDiscount] = useState<TicketDiscount | null>(null)
+  const [showDiscount, setShowDiscount] = useState(false)
+  // Producto/tamaño esperando elección de modificadores
+  const [pendingModifiers, setPendingModifiers] = useState<{ product: Product; size?: SizeOption } | null>(null)
 
   // El total del día viene del servidor; tras vender/cancelar las actions
   // revalidan /pos y esta prop se actualiza → se sincroniza aquí.
@@ -312,8 +376,10 @@ export default function POSClient({
   }, {})
 
   /* cart helpers */
-  const addToCart = useCallback((product: Product, size?: SizeOption) => {
-    const cartId = size ? `${product.id}__${size.label}` : product.id
+  const addToCart = useCallback((product: Product, size?: SizeOption, modifiers: ModifierOption[] = []) => {
+    // Misma línea solo si coinciden producto, tamaño y modificadores
+    const modKey = modifiers.map((m) => m.id).sort().join(",")
+    const cartId = [product.id, size?.label ?? "", modKey].join("__")
     saleRef.current = crypto.randomUUID()
 
     setCart((prev) => {
@@ -327,7 +393,7 @@ export default function POSClient({
       }
       return [
         ...prev.map((i) => ({ ...i, isNew: false })),
-        { cartId, product, size, quantity: 1, isNew: true },
+        { cartId, product, size, modifiers, quantity: 1, isNew: true },
       ]
     })
 
@@ -352,7 +418,11 @@ export default function POSClient({
     )
   }, [])
 
-  const total = cart.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0)
+  const subtotal = cart.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0)
+  const discountAmount = computeDiscount(subtotal, discount)
+  const total = Math.round((subtotal - discountAmount) * 100) / 100
+  // Un descuento fijo mayor al subtotal (p.ej. tras quitar artículos) no se puede cobrar
+  const discountInvalid = discount !== null && discount.type === "amount" && discount.value > subtotal && subtotal > 0
 
   // Efectivo recibido / cambio (solo aplica al pago en efectivo)
   const cashReceived = paymentMethod === "efectivo" ? parseCash(cashReceivedInput) : null
@@ -360,28 +430,34 @@ export default function POSClient({
   const cashInsufficient = cashReceived !== null && cashReceived < total
 
   const finalizeSale = async () => {
-    if (cart.length === 0 || isProcessing || !openSession || cashInsufficient) return
+    if (cart.length === 0 || isProcessing || !openSession || cashInsufficient || discountInvalid) return
     setIsProcessing(true)
 
     try {
-      // Los precios NO se mandan: el servidor los recalcula desde el menú.
+      // Los precios NO se mandan: el servidor los recalcula desde el menú
+      // (variante + modificadores) y valida el descuento.
       const result = await createTicket({
         clientRef: saleRef.current,
         paymentMethod,
         notes: ticketNotes.trim() || undefined,
         cashReceived: cashReceived ?? undefined,
+        discount: discount ?? undefined,
         items: cart.map((item) => ({
           variant_id: getItemVariantId(item) ?? "",
           quantity: item.quantity,
+          modifiers: item.modifiers.length > 0 ? item.modifiers.map((m) => m.id) : undefined,
         })),
       })
 
       if (result.success) {
-        // Store completed sale data for receipt (total = el del servidor)
+        // Store completed sale data for receipt (importes = los del servidor)
         setCompletedSale({
           ticketId: result.ticketId,
           folio: result.folio,
           items: [...cart],
+          subtotal: result.subtotal,
+          discountTotal: result.discountTotal,
+          discountReason: discount?.reason ?? null,
           total: result.total,
           paymentMethod,
           date: new Date(),
@@ -393,6 +469,7 @@ export default function POSClient({
         setCart([])
         setTicketNotes("")
         setCashReceivedInput("")
+        setDiscount(null)
         saleRef.current = crypto.randomUUID()
       } else {
         toast.error(result.error || "Error al registrar la venta")
@@ -404,12 +481,21 @@ export default function POSClient({
     }
   }
 
+  /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
+  const chooseProduct = (product: Product, size?: SizeOption) => {
+    setSizePickerFor(null)
+    if (product.modifierGroups && product.modifierGroups.length > 0) {
+      setPendingModifiers({ product, size })
+    } else {
+      addToCart(product, size)
+    }
+  }
+
   const handleProductClick = (product: Product) => {
     if (product.sizes && product.sizes.length > 0) {
       setSizePickerFor(sizePickerFor === product.id ? null : product.id)
     } else {
-      addToCart(product)
-      setSizePickerFor(null)
+      chooseProduct(product)
     }
   }
 
@@ -575,8 +661,11 @@ export default function POSClient({
                                 {product.description}
                               </p>
                             )}
-                          <p className="text-amber-700 font-bold text-base mt-1">
+                          <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
                             {getDisplayPrice(product)}
+                            {product.modifierGroups && (
+                              <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
+                            )}
                           </p>
                         </div>
                       </motion.button>
@@ -596,10 +685,7 @@ export default function POSClient({
                                 <motion.button
                                   key={size.label}
                                   whileTap={{ scale: 0.92 }}
-                                  onClick={() => {
-                                    addToCart(product, size)
-                                    setSizePickerFor(null)
-                                  }}
+                                  onClick={() => chooseProduct(product, size)}
                                   className="flex-1 py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
                                 >
                                   <span className="block text-xs font-bold">
@@ -692,6 +778,11 @@ export default function POSClient({
                           </Badge>
                         )}
                       </div>
+                      {item.modifiers.length > 0 && (
+                        <p className="text-[11px] text-amber-700 mt-0.5 truncate">
+                          {item.modifiers.map((m) => `+ ${m.name}`).join(" · ")}
+                        </p>
+                      )}
                     </div>
 
                     {/* Quantity controls */}
@@ -826,12 +917,40 @@ export default function POSClient({
             </div>
           )}
 
-          {/* Total */}
-          <div className="flex justify-between items-center">
-            <span className="text-base font-medium text-stone-500">Total</span>
-            <span className="text-2xl font-bold text-stone-800">
-              {formatCurrency(total)}
-            </span>
+          {/* Subtotal / descuento / total */}
+          <div className="space-y-1">
+            {(discount || subtotal > 0) && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-stone-500">Subtotal</span>
+                <span className="text-stone-600">{formatCurrency(subtotal)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm">
+              <button
+                type="button"
+                onClick={() => setShowDiscount(true)}
+                disabled={cart.length === 0}
+                className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 -ml-1.5 transition-colors disabled:opacity-40 ${
+                  discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
+                }`}
+              >
+                <Percent className="h-3.5 w-3.5" />
+                {discount
+                  ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
+                  : "Agregar descuento"}
+              </button>
+              {discount && (
+                <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
+                  {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
+                </span>
+              )}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-base font-medium text-stone-500">Total</span>
+              <span className="text-2xl font-bold text-stone-800">
+                {formatCurrency(total)}
+              </span>
+            </div>
           </div>
 
           {/* Cobrar button / gate de caja */}
@@ -845,7 +964,7 @@ export default function POSClient({
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
               size="lg"
-              disabled={cart.length === 0 || isProcessing || cashInsufficient}
+              disabled={cart.length === 0 || isProcessing || cashInsufficient || discountInvalid}
               onClick={finalizeSale}
             >
               {isProcessing
@@ -865,9 +984,24 @@ export default function POSClient({
         </div>
       </div>
 
-      {/* ── Dialogs de caja e historial ── */}
+      {/* ── Dialogs de caja, historial, modificadores y descuento ── */}
       <CashSessionDialog open={showCashDialog} onOpenChange={setShowCashDialog} session={openSession} />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
+      <ModifierSheet
+        pending={pendingModifiers}
+        onClose={() => setPendingModifiers(null)}
+        onConfirm={(product, size, modifiers) => {
+          addToCart(product, size, modifiers)
+          setPendingModifiers(null)
+        }}
+      />
+      <DiscountDialog
+        open={showDiscount}
+        onOpenChange={setShowDiscount}
+        subtotal={subtotal}
+        current={discount}
+        onApply={setDiscount}
+      />
 
       {/* ── Receipt dialog ── */}
       <Dialog

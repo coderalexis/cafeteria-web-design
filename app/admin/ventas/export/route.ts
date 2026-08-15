@@ -60,6 +60,7 @@ export async function GET(request: Request) {
     "Estado",
     "Subtotal",
     "Descuento",
+    "Motivo descuento",
     "Total",
     "Efectivo recibido",
     "Cambio",
@@ -80,12 +81,20 @@ export async function GET(request: Request) {
         paymentLabel(t.paymentMethod),
         t.status === "cancelado" ? "Cancelado" : "Completado",
         t.subtotal.toFixed(2),
-        (t.subtotal - t.total).toFixed(2),
+        t.discountTotal.toFixed(2),
+        t.discountReason ?? "",
         t.total.toFixed(2),
         t.cashReceived != null ? t.cashReceived.toFixed(2) : "",
         t.changeDue != null ? t.changeDue.toFixed(2) : "",
         t.items.reduce((sum, i) => sum + i.quantity, 0),
-        t.items.map((i) => `${i.quantity}x ${ticketItemLabel(i)}`).join("; "),
+        t.items
+          .map(
+            (i) =>
+              `${i.quantity}x ${ticketItemLabel(i)}${
+                i.modifiers.length > 0 ? ` [${i.modifiers.map((m) => m.name).join(", ")}]` : ""
+              }`,
+          )
+          .join("; "),
         t.notes,
         t.cancelReason ?? "",
       ]
