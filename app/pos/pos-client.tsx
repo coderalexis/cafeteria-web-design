@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
+import { formatCurrency, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Trash2,
@@ -71,6 +72,7 @@ interface Category {
 
 interface CompletedSale {
   ticketId: string
+  folio: number
   items: CartItem[]
   total: number
   paymentMethod: PaymentMethod
@@ -83,15 +85,6 @@ interface POSClientProps {
   products: Product[]
   isAdmin: boolean
   initialTotalSales: number
-}
-
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-const PAYMENT_LABELS: Record<PaymentMethod, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
-  tarjeta_clip: "Tarjeta",
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,16 +124,19 @@ function ReceiptView({
   sale: CompletedSale
   onClose: () => void
 }) {
+  const paymentInfo = PAYMENT_METHODS[sale.paymentMethod]
+  const PaymentIcon = paymentInfo.icon
+
   const handlePrint = () => {
     const lines = [
       "================================",
       "         EL CAFECITO",
       "================================",
       "",
-      `Ticket: ${sale.ticketId.slice(0, 8).toUpperCase()}`,
+      `Folio: ${sale.folio}`,
       `Fecha: ${sale.date.toLocaleDateString("es-MX")}`,
       `Hora: ${sale.date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
-      `Pago: ${PAYMENT_LABELS[sale.paymentMethod]}`,
+      `Pago: ${paymentLabel(sale.paymentMethod)}`,
       ...(sale.notes ? [`Nota: ${sale.notes}`] : []),
       "",
       "--------------------------------",
@@ -149,12 +145,12 @@ function ReceiptView({
         const lineTotal = price * item.quantity
         return [
           `${item.quantity}x ${getItemLabel(item)}`,
-          `     $${price.toFixed(2)} c/u  = $${lineTotal.toFixed(2)}`,
+          `     ${formatCurrency(price)} c/u  = ${formatCurrency(lineTotal)}`,
         ]
       }),
       "--------------------------------",
       "",
-      `  TOTAL:  $${sale.total.toFixed(2)}`,
+      `  TOTAL:  ${formatCurrency(sale.total)}`,
       "",
       "================================",
       "    ¡Gracias por tu compra!",
@@ -166,7 +162,7 @@ function ReceiptView({
       printWindow.document.write(`
         <html>
           <head>
-            <title>Ticket ${sale.ticketId.slice(0, 8)}</title>
+            <title>Ticket ${sale.folio}</title>
             <style>
               body {
                 font-family: 'Courier New', monospace;
@@ -202,9 +198,7 @@ function ReceiptView({
           <CheckCircle2 className="h-9 w-9 text-green-600" />
         </div>
         <h3 className="text-xl font-bold text-green-700">¡Venta registrada!</h3>
-        <p className="text-sm text-stone-500">
-          Ticket #{sale.ticketId.slice(0, 8).toUpperCase()}
-        </p>
+        <p className="text-sm text-stone-500">Folio #{sale.folio}</p>
       </div>
 
       {/* Ticket preview */}
@@ -243,7 +237,7 @@ function ReceiptView({
                   <span className="text-stone-700">{getItemLabel(item)}</span>
                 </div>
                 <span className="font-semibold text-stone-800 ml-3">
-                  ${(price * item.quantity).toFixed(2)}
+                  {formatCurrency(price * item.quantity)}
                 </span>
               </div>
             )
@@ -255,19 +249,11 @@ function ReceiptView({
         {/* Total & payment */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            {sale.paymentMethod === "efectivo" ? (
-              <Banknote className="h-4 w-4 text-green-600" />
-            ) : sale.paymentMethod === "transferencia" ? (
-              <Smartphone className="h-4 w-4 text-violet-600" />
-            ) : (
-              <CreditCard className="h-4 w-4 text-blue-600" />
-            )}
-            <span className="text-sm text-stone-500">
-              {PAYMENT_LABELS[sale.paymentMethod]}
-            </span>
+            <PaymentIcon className={`h-4 w-4 ${paymentInfo.iconColor}`} />
+            <span className="text-sm text-stone-500">{paymentInfo.label}</span>
           </div>
           <span className="text-xl font-bold text-stone-800">
-            ${sale.total.toFixed(2)}
+            {formatCurrency(sale.total)}
           </span>
         </div>
       </div>
@@ -312,6 +298,11 @@ export default function POSClient({
   const [searchQuery, setSearchQuery] = useState("")
   const [ticketNotes, setTicketNotes] = useState("")
 
+  // Clave de idempotencia de la venta en curso: reintentar el mismo cobro
+  // (p.ej. tras un timeout) no duplica el ticket. Se renueva al vender o
+  // al modificar el carrito.
+  const saleRef = useRef<string>(crypto.randomUUID())
+
   /* filtered & grouped products */
   const searchLower = searchQuery.toLowerCase().trim()
   const filtered = products.filter((p) => {
@@ -330,6 +321,7 @@ export default function POSClient({
   /* cart helpers */
   const addToCart = useCallback((product: Product, size?: SizeOption) => {
     const cartId = size ? `${product.id}__${size.label}` : product.id
+    saleRef.current = crypto.randomUUID()
 
     setCart((prev) => {
       const existing = prev.find((i) => i.cartId === cartId)
@@ -352,10 +344,12 @@ export default function POSClient({
   }, [])
 
   const removeFromCart = useCallback((cartId: string) => {
+    saleRef.current = crypto.randomUUID()
     setCart((prev) => prev.filter((i) => i.cartId !== cartId))
   }, [])
 
   const updateQuantity = useCallback((cartId: string, delta: number) => {
+    saleRef.current = crypto.randomUUID()
     setCart((prev) =>
       prev
         .map((i) =>
@@ -372,37 +366,37 @@ export default function POSClient({
     setIsProcessing(true)
 
     try {
-      const items = cart.map((item) => ({
-        variant_id: getItemVariantId(item) || "",
-        quantity: item.quantity,
-        unit_price: getItemPrice(item),
-      }))
-
-      const formData = new FormData()
-      formData.set("payment_method", paymentMethod)
-      formData.set("items", JSON.stringify(items))
-      if (ticketNotes.trim()) formData.set("notes", ticketNotes.trim())
-
-      const result = await createTicket(formData)
+      // Los precios NO se mandan: el servidor los recalcula desde el menú.
+      const result = await createTicket({
+        clientRef: saleRef.current,
+        paymentMethod,
+        notes: ticketNotes.trim() || undefined,
+        items: cart.map((item) => ({
+          variant_id: getItemVariantId(item) ?? "",
+          quantity: item.quantity,
+        })),
+      })
 
       if (result.success) {
-        // Store completed sale data for receipt
+        // Store completed sale data for receipt (total = el del servidor)
         setCompletedSale({
-          ticketId: result.ticketId || "",
+          ticketId: result.ticketId,
+          folio: result.folio,
           items: [...cart],
-          total,
+          total: result.total,
           paymentMethod,
           date: new Date(),
           notes: ticketNotes.trim() || undefined,
         })
-        setTotalSales((prev) => prev + total)
+        setTotalSales((prev) => prev + result.total)
         setCart([])
         setTicketNotes("")
+        saleRef.current = crypto.randomUUID()
       } else {
         toast.error(result.error || "Error al registrar la venta")
       }
     } catch {
-      toast.error("Error de conexión al registrar la venta")
+      toast.error("Error de conexión al registrar la venta. Intenta de nuevo.")
     } finally {
       setIsProcessing(false)
     }
@@ -466,7 +460,7 @@ export default function POSClient({
                 Total vendido hoy:
               </span>
               <span className="text-xl font-bold text-amber-800">
-                ${totalSales.toFixed(2)}
+                {formatCurrency(totalSales)}
               </span>
             </div>
           </div>
@@ -663,7 +657,7 @@ export default function POSClient({
                       </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-xs text-stone-400">
-                          ${getItemPrice(item).toFixed(2)}
+                          {formatCurrency(getItemPrice(item))}
                         </span>
                         {item.size && (
                           <Badge
@@ -700,7 +694,7 @@ export default function POSClient({
                     </div>
 
                     <span className="font-bold text-sm text-stone-800 w-16 text-right">
-                      ${(getItemPrice(item) * item.quantity).toFixed(2)}
+                      {formatCurrency(getItemPrice(item) * item.quantity)}
                     </span>
 
                     <Button
@@ -772,7 +766,7 @@ export default function POSClient({
           <div className="flex justify-between items-center">
             <span className="text-base font-medium text-stone-500">Total</span>
             <span className="text-2xl font-bold text-stone-800">
-              ${total.toFixed(2)}
+              {formatCurrency(total)}
             </span>
           </div>
 
@@ -791,7 +785,7 @@ export default function POSClient({
           >
             {isProcessing
               ? "Procesando..."
-              : `Cobrar $${total.toFixed(2)} · ${PAYMENT_LABELS[paymentMethod]}`}
+              : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
           </Button>
         </div>
       </div>

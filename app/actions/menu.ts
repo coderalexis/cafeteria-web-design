@@ -8,12 +8,20 @@ function revalidateAll() {
   revalidatePath("/pos")
 }
 
+// El POS filtra por slug en la URL/estado; un slug con espacios o "/" rompe
+// ese filtro silenciosamente.
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
 export async function createCategory(formData: FormData) {
   const name = String(formData.get("name") ?? "")
   const slug = String(formData.get("slug") ?? "")
 
   if (!name || !slug) {
     return { error: "Nombre y slug son obligatorios." }
+  }
+
+  if (!SLUG_PATTERN.test(slug)) {
+    return { error: "El slug solo puede llevar minúsculas, números y guiones (ej. crepas-dulces)." }
   }
 
   const supabase = await createClient()
@@ -32,6 +40,10 @@ export async function updateCategory(formData: FormData) {
 
   if (!id || !name || !slug) {
     return { error: "ID, nombre y slug son obligatorios." }
+  }
+
+  if (!SLUG_PATTERN.test(slug)) {
+    return { error: "El slug solo puede llevar minúsculas, números y guiones (ej. crepas-dulces)." }
   }
 
   const supabase = await createClient()
@@ -93,8 +105,8 @@ export async function createVariant(formData: FormData) {
   const price = Number(formData.get("price") ?? 0)
   const sizeLabel = String(formData.get("size_label") ?? "")
 
-  if (!productId || !name || Number.isNaN(price)) {
-    return { error: "Producto, nombre y precio son obligatorios." }
+  if (!productId || !name || !Number.isFinite(price) || price < 0) {
+    return { error: "Producto, nombre y precio (mayor o igual a 0) son obligatorios." }
   }
 
   const supabase = await createClient()
@@ -117,8 +129,8 @@ export async function updateVariant(formData: FormData) {
   const price = Number(formData.get("price") ?? 0)
   const sizeLabel = String(formData.get("size_label") ?? "")
 
-  if (!id || !name || Number.isNaN(price)) {
-    return { error: "ID, nombre y precio son obligatorios." }
+  if (!id || !name || !Number.isFinite(price) || price < 0) {
+    return { error: "ID, nombre y precio (mayor o igual a 0) son obligatorios." }
   }
 
   const supabase = await createClient()
@@ -141,7 +153,41 @@ export async function deleteVariant(formData: FormData) {
   }
 
   const supabase = await createClient()
+
+  // Borrar una variante con ventas dejaría su historial sin referencia
+  // (variant_id pasa a NULL). Con ventas, se desactiva en lugar de borrar.
+  const { count } = await supabase
+    .from("ticket_items")
+    .select("*", { count: "exact", head: true })
+    .eq("variant_id", id)
+
+  if (count && count > 0) {
+    return {
+      error: `Esta variante tiene ${count} venta(s) registradas. Desactívala en lugar de eliminarla.`,
+    }
+  }
+
   const { error } = await supabase.from("menu_variants").delete().eq("id", id)
+
+  if (error) return { error: error.message }
+
+  revalidateAll()
+  return { success: true }
+}
+
+export async function toggleVariantActive(formData: FormData) {
+  const id = String(formData.get("id") ?? "")
+  const isActive = formData.get("is_active") === "true"
+
+  if (!id) {
+    return { error: "ID es obligatorio." }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("menu_variants")
+    .update({ is_active: isActive })
+    .eq("id", id)
 
   if (error) return { error: error.message }
 
@@ -178,16 +224,23 @@ export async function deleteProduct(formData: FormData) {
 
   const supabase = await createClient()
 
+  // Borrar un producto con ventas dejaría su historial sin referencia
+  // (product_id pasa a NULL y las variantes se borran en cascada).
+  const { count } = await supabase
+    .from("ticket_items")
+    .select("*", { count: "exact", head: true })
+    .eq("product_id", id)
+
+  if (count && count > 0) {
+    return {
+      error: `Este producto tiene ${count} venta(s) registradas. Desactívalo en lugar de eliminarlo.`,
+    }
+  }
+
   // Variants cascade automatically (ON DELETE CASCADE)
   const { error } = await supabase.from("menu_products").delete().eq("id", id)
 
-  if (error) {
-    // Check for FK constraint (ticket_items referencing this product)
-    if (error.message.includes("violates foreign key")) {
-      return { error: "No se puede eliminar: este producto tiene ventas asociadas." }
-    }
-    return { error: error.message }
-  }
+  if (error) return { error: error.message }
 
   revalidateAll()
   return { success: true }

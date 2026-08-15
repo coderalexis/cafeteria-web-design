@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createCategory, updateCategory, deleteCategory } from "@/app/actions/menu"
+import { ActionForm } from "@/components/action-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -49,7 +50,7 @@ export default async function CategoriasPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createCategory} className="flex gap-3">
+          <ActionForm action={createCategory} className="flex gap-3">
             <Input
               name="name"
               placeholder="Nombre (ej: Bebidas calientes)"
@@ -65,7 +66,7 @@ export default async function CategoriasPage() {
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700 shrink-0">
               Crear
             </Button>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -91,7 +92,7 @@ export default async function CategoriasPage() {
               </span>
 
               {/* Edit form */}
-              <form
+              <ActionForm
                 action={updateCategory}
                 className="flex items-center gap-3 flex-1"
               >
@@ -111,7 +112,7 @@ export default async function CategoriasPage() {
                 <Button type="submit" variant="secondary" size="sm" className="shrink-0">
                   Guardar
                 </Button>
-              </form>
+              </ActionForm>
 
               {/* Product count */}
               <Badge
@@ -122,7 +123,7 @@ export default async function CategoriasPage() {
               </Badge>
 
               {/* Delete button (separate form) */}
-              <form action={deleteCategory}>
+              <ActionForm action={deleteCategory}>
                 <input type="hidden" name="id" value={category.id} />
                 <Button
                   type="submit"
@@ -138,7 +139,7 @@ export default async function CategoriasPage() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              </form>
+              </ActionForm>
             </div>
           ))}
         </CardContent>

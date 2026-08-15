@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createVariant, updateVariant, deleteVariant } from "@/app/actions/menu"
+import { ActionForm } from "@/components/action-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -30,7 +31,7 @@ export default async function VariantesPage() {
   > = {}
 
   variants?.forEach((v) => {
-    const product = v.menu_products as any
+    const product = v.menu_products
     const key = v.product_id
     if (!grouped[key]) {
       grouped[key] = {
@@ -65,7 +66,7 @@ export default async function VariantesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form
+          <ActionForm
             action={createVariant}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
           >
@@ -77,7 +78,7 @@ export default async function VariantesPage() {
               <option value="">Producto...</option>
               {products?.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} · {(p.menu_categories as any)?.name}
+                  {p.name} · {p.menu_categories?.name}
                 </option>
               ))}
             </select>
@@ -103,7 +104,7 @@ export default async function VariantesPage() {
                 Crear
               </Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -138,11 +139,15 @@ export default async function VariantesPage() {
 
             <div className="space-y-2">
               {group.items.map((variant) => (
-                <form
+                <div
                   key={variant.id}
-                  action={updateVariant}
                   className="grid sm:grid-cols-12 gap-2 items-center rounded-lg border border-stone-200 p-3 hover:border-stone-300 transition-colors"
                 >
+                  {/* display:contents — las celdas del form participan del grid
+                      del row sin anidar el form de eliminar dentro del de editar
+                      (HTML prohíbe forms anidados; antes el botón de borrar
+                      terminaba enviando el update) */}
+                  <ActionForm action={updateVariant} className="contents">
                   <input type="hidden" name="id" value={variant.id} />
 
                   {/* Color indicator + Name */}
@@ -215,7 +220,7 @@ export default async function VariantesPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="sm:col-span-3 flex items-center gap-2 justify-end">
+                  <div className="sm:col-span-2 flex items-center justify-end">
                     <Button
                       type="submit"
                       variant="secondary"
@@ -223,10 +228,12 @@ export default async function VariantesPage() {
                     >
                       Guardar
                     </Button>
-                    {/* Delete as a separate form so it doesn't interfere */}
+                  </div>
+                  </ActionForm>
+                  <div className="sm:col-span-1 flex items-center justify-end">
                     <DeleteVariantButton variantId={variant.id} />
                   </div>
-                </form>
+                </div>
               ))}
             </div>
           </CardContent>
@@ -238,7 +245,7 @@ export default async function VariantesPage() {
 
 function DeleteVariantButton({ variantId }: { variantId: string }) {
   return (
-    <form action={deleteVariant}>
+    <ActionForm action={deleteVariant}>
       <input type="hidden" name="id" value={variantId} />
       <Button
         type="submit"
@@ -248,6 +255,6 @@ function DeleteVariantButton({ variantId }: { variantId: string }) {
       >
         <Trash2 className="h-4 w-4" />
       </Button>
-    </form>
+    </ActionForm>
   )
 }

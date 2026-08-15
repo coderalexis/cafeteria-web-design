@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { businessDayRange } from "@/lib/dates"
+import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -11,19 +12,14 @@ import {
   ShoppingBag,
   Receipt,
   Star,
-  Banknote,
-  CreditCard,
-  Smartphone,
 } from "lucide-react"
 import Link from "next/link"
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
-  const admin = createAdminClient()
 
-  /* ── Fetch counts ───────────────────────────────────────────────── */
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  /* ── Fetch counts (día de operación CDMX) ───────────────────────── */
+  const { fromIso, toIso } = businessDayRange()
 
   const [
     { count: categoryCount },
@@ -45,24 +41,22 @@ export default async function AdminDashboard() {
     supabase
       .from("tickets")
       .select("id, total, payment_method")
-      .gte("created_at", todayStart.toISOString()),
+      .gte("created_at", fromIso)
+      .lt("created_at", toIso),
     supabase
       .from("tickets")
       .select("id, total, payment_method, created_at")
       .order("created_at", { ascending: false })
-      .limit(10),
-    // Fetch today's ticket items with product names for "best seller"
-    admin
+      .limit(5),
+    // "Producto estrella" desde los snapshots de ticket_items (sin joins al menú)
+    supabase
       .from("ticket_items")
-      .select(
-        `quantity,
-         menu_variants(name, menu_products(name)),
-         tickets!inner(created_at)`
-      )
-      .gte("tickets.created_at", todayStart.toISOString()),
+      .select("quantity, product_name, tickets!inner(created_at)")
+      .gte("tickets.created_at", fromIso)
+      .lt("tickets.created_at", toIso),
   ])
 
-  const todaySales = (todayTickets || []).reduce(
+  const todaySales = (todayTickets ?? []).reduce(
     (sum, t) => sum + (t.total || 0),
     0
   )
@@ -75,26 +69,24 @@ export default async function AdminDashboard() {
     tarjeta_clip: { count: 0, total: 0 },
   }
 
-  ;(todayTickets || []).forEach((t: any) => {
-    const method = t.payment_method as keyof typeof paymentBreakdown
-    if (paymentBreakdown[method]) {
-      paymentBreakdown[method].count += 1
-      paymentBreakdown[method].total += t.total || 0
+  for (const t of todayTickets ?? []) {
+    const data = paymentBreakdown[t.payment_method]
+    if (data) {
+      data.count += 1
+      data.total += t.total || 0
     }
-  })
+  }
 
   /* ── Best selling product today ────────────────────────────────── */
   const productSales: Record<string, { name: string; qty: number }> = {}
 
-  ;(todayItems || []).forEach((item: any) => {
-    const variant = item.menu_variants as any
-    const productName =
-      variant?.menu_products?.name || variant?.name || "Producto"
+  for (const item of todayItems ?? []) {
+    const productName = item.product_name || "Producto"
     if (!productSales[productName]) {
       productSales[productName] = { name: productName, qty: 0 }
     }
     productSales[productName].qty += item.quantity || 1
-  })
+  }
 
   const topProduct = Object.values(productSales).sort(
     (a, b) => b.qty - a.qty
@@ -136,31 +128,11 @@ export default async function AdminDashboard() {
     },
   ]
 
+  // Etiquetas e iconos desde lib/format; colores de barra propios del dashboard.
   const paymentMethods = [
-    {
-      key: "efectivo" as const,
-      label: "Efectivo",
-      icon: Banknote,
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-      barColor: "bg-emerald-500",
-    },
-    {
-      key: "transferencia" as const,
-      label: "Transferencia",
-      icon: Smartphone,
-      color: "text-violet-600",
-      bg: "bg-violet-50",
-      barColor: "bg-violet-500",
-    },
-    {
-      key: "tarjeta_clip" as const,
-      label: "Tarjeta",
-      icon: CreditCard,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      barColor: "bg-blue-500",
-    },
+    { ...PAYMENT_METHODS.efectivo, color: "text-emerald-600", barColor: "bg-emerald-500" },
+    { ...PAYMENT_METHODS.transferencia, color: "text-violet-600", barColor: "bg-violet-500" },
+    { ...PAYMENT_METHODS.tarjeta_clip, color: "text-blue-600", barColor: "bg-blue-500" },
   ]
 
   return (
@@ -210,7 +182,7 @@ export default async function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-4xl font-bold text-stone-800">
-              ${todaySales.toFixed(2)}
+              {formatCurrency(todaySales)}
             </p>
             <p className="text-sm text-stone-500 mt-1">
               {todayCount} {todayCount === 1 ? "venta" : "ventas"} registradas
@@ -282,7 +254,7 @@ export default async function AdminDashboard() {
                           </Badge>
                         </div>
                         <span className="font-semibold text-stone-700">
-                          ${data.total.toFixed(2)}
+                          {formatCurrency(data.total)}
                         </span>
                       </div>
                       <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
@@ -315,28 +287,21 @@ export default async function AdminDashboard() {
             </p>
           ) : (
             <div className="space-y-3">
-              {recentTickets?.slice(0, 5).map((ticket) => (
+              {recentTickets?.map((ticket) => (
                 <div
                   key={ticket.id}
                   className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0"
                 >
                   <div>
                     <p className="text-sm font-medium text-stone-700">
-                      ${ticket.total?.toFixed(2)}
+                      {formatCurrency(ticket.total ?? 0)}
                     </p>
                     <p className="text-xs text-stone-400">
-                      {ticket.payment_method === "efectivo"
-                        ? "Efectivo"
-                        : ticket.payment_method === "transferencia"
-                        ? "Transferencia"
-                        : "Tarjeta"}
+                      {paymentLabel(ticket.payment_method)}
                     </p>
                   </div>
                   <p className="text-xs text-stone-400">
-                    {new Date(ticket.created_at).toLocaleTimeString("es-MX", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatTime(ticket.created_at)}
                   </p>
                 </div>
               ))}

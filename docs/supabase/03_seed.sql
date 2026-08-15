@@ -1,4 +1,14 @@
 -- Seed completo del menú original de v0 (mismas categorías, productos y precios)
+
+-- Guardia: este seed TRUNCA ventas y menú. Solo puede correr en una base sin ventas.
+do $$
+begin
+  if exists (select 1 from public.tickets) then
+    raise exception 'Seed abortado: ya existen ventas registradas. Elimínalas manualmente si de verdad quieres reiniciar.';
+  end if;
+end;
+$$;
+
 truncate table public.product_modifier_groups, public.modifiers, public.modifier_groups, public.ticket_item_modifiers, public.ticket_items, public.tickets, public.menu_variants, public.menu_products, public.menu_categories restart identity cascade;
 
 -- Categorías

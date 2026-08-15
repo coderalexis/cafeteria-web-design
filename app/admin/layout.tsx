@@ -1,15 +1,7 @@
 import type React from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
-import {
-  Coffee,
-  LayoutDashboard,
-  Tag,
-  Package,
-  Layers,
-  Store,
-  LogOut,
-} from "lucide-react"
+import { Coffee, Store, LogOut } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { AdminNav } from "./admin-nav"
 

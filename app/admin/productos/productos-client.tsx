@@ -10,6 +10,7 @@ import {
   updateVariant,
   deleteVariant,
 } from "@/app/actions/menu"
+import { ActionForm } from "@/components/action-form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -387,7 +388,7 @@ function EditProductSheet({
       <ScrollArea className="flex-1">
         <div className="px-6 py-5 space-y-6">
           {/* ── Product info form ── */}
-          <form action={updateProduct} className="space-y-4">
+          <ActionForm action={updateProduct} className="space-y-4">
             <input type="hidden" name="id" value={product.id} />
 
             <div className="space-y-2">
@@ -432,7 +433,7 @@ function EditProductSheet({
             >
               Guardar producto
             </Button>
-          </form>
+          </ActionForm>
 
           {/* ── Active toggle ── */}
           <div className={`rounded-lg border p-4 flex items-center justify-between ${
@@ -495,12 +496,13 @@ function EditProductSheet({
               {product.variants.map((variant) => (
                 <div
                   key={variant.id}
-                  className="rounded-lg border border-stone-200 p-3 space-y-2"
+                  className="rounded-lg border border-stone-200 p-3"
                 >
-                  <form
-                    action={updateVariant}
-                    className="grid grid-cols-3 gap-2"
-                  >
+                  {/* El form de eliminar vive FUERA del de editar (display:
+                      contents mantiene el grid); anidarlos hacía que el botón
+                      de borrar enviara el update */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <ActionForm action={updateVariant} className="contents">
                     <input type="hidden" name="id" value={variant.id} />
                     <Input
                       name="name"
@@ -531,7 +533,7 @@ function EditProductSheet({
                         />
                       </div>
                     </div>
-                    <div className="col-span-3 flex gap-2">
+                    <div className="col-span-2 flex">
                       <Button
                         type="submit"
                         variant="secondary"
@@ -540,9 +542,12 @@ function EditProductSheet({
                       >
                         Guardar
                       </Button>
+                    </div>
+                    </ActionForm>
+                    <div className="flex justify-end">
                       <DeleteVariantInline variantId={variant.id} />
                     </div>
-                  </form>
+                  </div>
                 </div>
               ))}
             </div>
@@ -553,7 +558,7 @@ function EditProductSheet({
                 <Plus className="h-3 w-3" />
                 Agregar variante
               </p>
-              <form
+              <ActionForm
                 action={createVariant}
                 className="grid grid-cols-3 gap-2"
               >
@@ -600,7 +605,7 @@ function EditProductSheet({
                     Agregar
                   </Button>
                 </div>
-              </form>
+              </ActionForm>
             </div>
           </div>
 
@@ -637,7 +642,6 @@ function EditProductSheet({
 /* ================================================================== */
 function CreateProductSheet({
   categories,
-  onClose,
 }: {
   categories: Category[]
   onClose: () => void
@@ -656,7 +660,7 @@ function CreateProductSheet({
 
       <ScrollArea className="flex-1">
         <div className="px-6 py-5 space-y-6">
-          <form action={createProduct} className="space-y-4">
+          <ActionForm action={createProduct} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-stone-700">
                 Nombre *
@@ -702,7 +706,7 @@ function CreateProductSheet({
             >
               Crear producto
             </Button>
-          </form>
+          </ActionForm>
 
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
             <p className="text-sm text-amber-800">
@@ -721,7 +725,7 @@ function CreateProductSheet({
 /* ================================================================== */
 function DeleteVariantInline({ variantId }: { variantId: string }) {
   return (
-    <form action={deleteVariant}>
+    <ActionForm action={deleteVariant}>
       <input type="hidden" name="id" value={variantId} />
       <Button
         type="submit"
@@ -731,6 +735,6 @@ function DeleteVariantInline({ variantId }: { variantId: string }) {
       >
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
-    </form>
+    </ActionForm>
   )
 }

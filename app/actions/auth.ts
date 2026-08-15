@@ -4,16 +4,26 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth"
+import type { ActionResult } from "./types"
 
 /* ── Domain used for username-based auth ─────────────────────────── */
 const EMAIL_DOMAIN = "cafecitojaral.com"
+
+// Solo minúsculas/números/punto/guiones: el username forma la parte local
+// del email sintético, y así también evita enumeración por variantes.
+const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/
+
+// Mensaje único para usuario inexistente y contraseña incorrecta:
+// no revelar cuál de los dos falló (enumeración de usuarios).
+const LOGIN_ERROR = "Usuario o contraseña incorrectos."
 
 function usernameToEmail(username: string): string {
   return `${username.toLowerCase().trim()}@${EMAIL_DOMAIN}`
 }
 
 /* ── Login ────────────────────────────────────────────────────────── */
-export async function login(formData: FormData) {
+export async function login(formData: FormData): Promise<ActionResult> {
   const username = String(formData.get("username") ?? "").trim()
   const password = String(formData.get("password") ?? "")
 
@@ -30,7 +40,7 @@ export async function login(formData: FormData) {
     .maybeSingle()
 
   if (!profile) {
-    return { error: "Usuario no encontrado." }
+    return { error: LOGIN_ERROR }
   }
 
   // Get their actual auth email (whatever it is)
@@ -38,7 +48,7 @@ export async function login(formData: FormData) {
   const email = authData?.user?.email
 
   if (!email) {
-    return { error: "Error al obtener datos del usuario." }
+    return { error: LOGIN_ERROR }
   }
 
   // Sign in with their real email + the password provided
@@ -46,7 +56,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    return { error: "Contraseña incorrecta." }
+    return { error: LOGIN_ERROR }
   }
 
   // Redirect based on role
@@ -67,8 +77,13 @@ export async function logout() {
 }
 
 /* ── Create cajero (admin only) ───────────────────────────────────── */
-export async function createCajero(formData: FormData) {
-  const username = String(formData.get("username") ?? "").trim()
+export async function createCajero(formData: FormData): Promise<ActionResult> {
+  const { error: authError } = await requireAdmin()
+  if (authError) {
+    return { error: authError }
+  }
+
+  const username = String(formData.get("username") ?? "").trim().toLowerCase()
   const fullName = String(formData.get("full_name") ?? "").trim()
   const password = String(formData.get("password") ?? "")
   const role = String(formData.get("role") ?? "cajero")
@@ -79,6 +94,10 @@ export async function createCajero(formData: FormData) {
 
   if (username.length < 3) {
     return { error: "El usuario debe tener al menos 3 caracteres." }
+  }
+
+  if (!USERNAME_PATTERN.test(username)) {
+    return { error: "El usuario solo puede llevar letras, números, punto y guiones." }
   }
 
   if (password.length < 6) {
@@ -96,7 +115,7 @@ export async function createCajero(formData: FormData) {
   const { data: existing } = await admin
     .from("profiles")
     .select("id")
-    .eq("username", username.toLowerCase())
+    .eq("username", username)
     .maybeSingle()
 
   if (existing) {
@@ -104,15 +123,15 @@ export async function createCajero(formData: FormData) {
   }
 
   // Create auth user
-  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+  const { data: authUser, error: createError } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: { full_name: fullName },
   })
 
-  if (authError || !authUser.user) {
-    return { error: authError?.message ?? "No se pudo crear el usuario." }
+  if (createError || !authUser.user) {
+    return { error: createError?.message ?? "No se pudo crear el usuario." }
   }
 
   // Update profile with role and username
@@ -120,8 +139,8 @@ export async function createCajero(formData: FormData) {
     .from("profiles")
     .update({
       full_name: fullName,
-      username: username.toLowerCase(),
-      role,
+      username,
+      role: role as "admin" | "cajero",
     })
     .eq("id", authUser.user.id)
 
@@ -135,8 +154,13 @@ export async function createCajero(formData: FormData) {
   return { success: true }
 }
 
-/* ── Update cajero ────────────────────────────────────────────────── */
-export async function updateCajero(formData: FormData) {
+/* ── Update cajero (admin only) ───────────────────────────────────── */
+export async function updateCajero(formData: FormData): Promise<ActionResult> {
+  const { error: authError } = await requireAdmin()
+  if (authError) {
+    return { error: authError }
+  }
+
   const id = String(formData.get("id") ?? "")
   const fullName = String(formData.get("full_name") ?? "").trim()
   const role = String(formData.get("role") ?? "cajero")
@@ -150,12 +174,17 @@ export async function updateCajero(formData: FormData) {
     return { error: "Rol inválido." }
   }
 
+  // Validar todo antes de escribir, para no dejar el perfil a medio actualizar.
+  if (newPassword && newPassword.length < 6) {
+    return { error: "La contraseña debe tener al menos 6 caracteres." }
+  }
+
   const admin = createAdminClient()
 
   // Update profile
   const { error: profileError } = await admin
     .from("profiles")
-    .update({ full_name: fullName, role })
+    .update({ full_name: fullName, role: role as "admin" | "cajero" })
     .eq("id", id)
 
   if (profileError) {
@@ -164,10 +193,6 @@ export async function updateCajero(formData: FormData) {
 
   // Update password if provided
   if (newPassword) {
-    if (newPassword.length < 6) {
-      return { error: "La contraseña debe tener al menos 6 caracteres." }
-    }
-
     const { error: passError } = await admin.auth.admin.updateUserById(id, {
       password: newPassword,
     })
@@ -181,8 +206,13 @@ export async function updateCajero(formData: FormData) {
   return { success: true }
 }
 
-/* ── Delete cajero ────────────────────────────────────────────────── */
-export async function deleteCajero(formData: FormData) {
+/* ── Delete cajero (admin only) ───────────────────────────────────── */
+export async function deleteCajero(formData: FormData): Promise<ActionResult> {
+  const { user, error: authError } = await requireAdmin()
+  if (authError || !user) {
+    return { error: authError ?? "Sesión inválida." }
+  }
+
   const id = String(formData.get("id") ?? "")
 
   if (!id) {
@@ -190,10 +220,7 @@ export async function deleteCajero(formData: FormData) {
   }
 
   // Prevent deleting yourself
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (user?.id === id) {
+  if (user.id === id) {
     return { error: "No puedes eliminar tu propia cuenta." }
   }
 

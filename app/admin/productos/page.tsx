@@ -20,41 +20,41 @@ export default async function ProductosPage() {
   ])
 
   // Serialize for client component
-  const serializedCategories = (categories || []).map((c) => ({
+  const serializedCategories = (categories ?? []).map((c) => ({
     id: c.id,
     name: c.name,
     slug: c.slug,
   }))
 
-  const serializedProducts = (products || []).map((p: any) => {
-    const cat = p.menu_categories as { id: string; name: string; slug: string } | null
-    const variants = [...(p.menu_variants || [])].sort(
-      (a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)
+  const serializedProducts = (products ?? []).map((p) => {
+    const cat = p.menu_categories
+    const variants = [...(p.menu_variants ?? [])].sort(
+      (a, b) => (a.sort_order || 0) - (b.sort_order || 0)
     )
 
     // Calculate price range from variants
-    const prices = variants.map((v: any) => v.price as number)
+    const prices = variants.map((v) => v.price)
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0
     const maxPrice = prices.length > 0 ? Math.max(...prices) : 0
 
     return {
-      id: p.id as string,
-      name: p.name as string,
-      description: (p.description || "") as string,
-      categoryId: (p.category_id || "") as string,
+      id: p.id,
+      name: p.name,
+      description: p.description || "",
+      categoryId: p.category_id || "",
       categoryName: cat?.name || "",
       categorySlug: cat?.slug || "",
-      sortOrder: p.sort_order as number,
-      isActive: p.is_active as boolean,
+      sortOrder: p.sort_order,
+      isActive: p.is_active,
       minPrice,
       maxPrice,
       variantCount: variants.length,
-      variants: variants.map((v: any) => ({
-        id: v.id as string,
-        name: v.name as string,
-        sizeLabel: (v.size_label || "") as string,
-        price: v.price as number,
-        sortOrder: v.sort_order as number,
+      variants: variants.map((v) => ({
+        id: v.id,
+        name: v.name,
+        sizeLabel: v.size_label || "",
+        price: v.price,
+        sortOrder: v.sort_order,
       })),
     }
   })

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { businessDayRange } from "@/lib/dates"
 import POSClient from "./pos-client"
 
 /* ------------------------------------------------------------------ */
@@ -43,18 +44,15 @@ export default async function POSPage() {
   /* ── Transform categories ───────────────────────────────────────── */
   const categories = [
     { id: "todos", label: "Todos" },
-    ...(dbCategories || []).map((c: any) => ({
-      id: c.slug as string,
-      label: c.name as string,
-    })),
+    ...(dbCategories ?? []).map((c) => ({ id: c.slug, label: c.name })),
   ]
 
   /* ── Transform products ─────────────────────────────────────────── */
-  const products = (dbProducts || []).map((p: any) => {
-    const cat = p.menu_categories as { id: string; name: string; slug: string } | null
-    const variants = [...(p.menu_variants || [])]
-      .filter((v: any) => v.is_active !== false)
-      .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+  const products = (dbProducts ?? []).map((p) => {
+    const cat = p.menu_categories
+    const variants = [...(p.menu_variants ?? [])]
+      .filter((v) => v.is_active)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
     const isFlat = variants.length === 1 && variants[0].name === "Único"
     const categorySlug = cat?.slug || ""
@@ -69,44 +67,41 @@ export default async function POSPage() {
 
     if (isFlat) {
       return {
-        id: p.id as string,
-        name: p.name as string,
+        id: p.id,
+        name: p.name,
         category: categorySlug,
         subcategory,
         description: cardDescription,
-        price: variants[0].price as number,
-        variantId: variants[0].id as string,
+        price: variants[0].price,
+        variantId: variants[0].id,
       }
     }
 
     return {
-      id: p.id as string,
-      name: p.name as string,
+      id: p.id,
+      name: p.name,
       category: categorySlug,
       subcategory,
       description: cardDescription,
-      sizes: variants.map((v: any) => ({
-        variantId: v.id as string,
-        label: v.name as string,
-        oz: (v.size_label || "") as string,
-        price: v.price as number,
+      sizes: variants.map((v) => ({
+        variantId: v.id,
+        label: v.name,
+        oz: v.size_label || "",
+        price: v.price,
       })),
     }
   })
 
-  /* ── Fetch today's sales total ──────────────────────────────────── */
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  /* ── Fetch today's sales total (día de operación CDMX) ──────────── */
+  const { fromIso, toIso } = businessDayRange()
 
   const { data: todayTickets } = await supabase
     .from("tickets")
     .select("total")
-    .gte("created_at", todayStart.toISOString())
+    .gte("created_at", fromIso)
+    .lt("created_at", toIso)
 
-  const dbTotalSales = (todayTickets || []).reduce(
-    (sum: number, t: any) => sum + (t.total || 0),
-    0
-  )
+  const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
   return (
     <POSClient
