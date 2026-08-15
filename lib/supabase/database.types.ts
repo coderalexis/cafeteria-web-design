@@ -1,5 +1,5 @@
 // Generado desde el proyecto Supabase (cafeteriacodex) tras la migración
-// fase1_operacion_caja. Regenerar con el MCP de Supabase (generate_typescript_types)
+// fase2_reportes. Regenerar con el MCP de Supabase (generate_typescript_types)
 // o `supabase gen types typescript` después de cada migración.
 export type Json =
   | string
@@ -548,6 +548,15 @@ export type Database = {
       }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }
+        Returns: Json
+      }
+      sales_report: {
+        Args: {
+          p_cashier?: string
+          p_from: string
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_to: string
+        }
         Returns: Json
       }
     }

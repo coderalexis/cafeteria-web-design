@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
-import { businessDayRange } from "@/lib/dates"
+import { cdmxDateString } from "@/lib/dates"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
+import type { SalesReport } from "@/app/admin/ventas/params"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -19,16 +20,15 @@ import Link from "next/link"
 export default async function AdminDashboard() {
   const supabase = await createClient()
 
-  /* ── Fetch counts (día de operación CDMX) ───────────────────────── */
-  const { fromIso, toIso } = businessDayRange()
+  /* ── Datos: conteos del menú + reporte de hoy (agregado en SQL) ─── */
+  const today = cdmxDateString()
 
   const [
     { count: categoryCount },
     { count: productCount },
     { count: variantCount },
-    { data: todayTickets },
+    { data: reportData },
     { data: recentTickets },
-    { data: todayItems },
   ] = await Promise.all([
     supabase
       .from("menu_categories")
@@ -39,31 +39,17 @@ export default async function AdminDashboard() {
     supabase
       .from("menu_variants")
       .select("*", { count: "exact", head: true }),
-    supabase
-      .from("tickets")
-      .select("id, total, payment_method")
-      .eq("status", "completado")
-      .gte("created_at", fromIso)
-      .lt("created_at", toIso),
+    supabase.rpc("sales_report", { p_from: today, p_to: today }),
     supabase
       .from("tickets")
       .select("id, folio, total, payment_method, created_at, status")
       .order("created_at", { ascending: false })
       .limit(5),
-    // "Producto estrella" desde los snapshots de ticket_items (sin joins al menú)
-    supabase
-      .from("ticket_items")
-      .select("quantity, product_name, tickets!inner(created_at, status)")
-      .eq("tickets.status", "completado")
-      .gte("tickets.created_at", fromIso)
-      .lt("tickets.created_at", toIso),
   ])
 
-  const todaySales = (todayTickets ?? []).reduce(
-    (sum, t) => sum + (t.total || 0),
-    0
-  )
-  const todayCount = todayTickets?.length || 0
+  const report = (reportData as unknown as SalesReport | null) ?? null
+  const todaySales = report?.totals.revenue ?? 0
+  const todayCount = report?.totals.tickets ?? 0
 
   /* ── Payment method breakdown ──────────────────────────────────── */
   const paymentBreakdown = {
@@ -71,29 +57,21 @@ export default async function AdminDashboard() {
     transferencia: { count: 0, total: 0 },
     tarjeta_clip: { count: 0, total: 0 },
   }
-
-  for (const t of todayTickets ?? []) {
-    const data = paymentBreakdown[t.payment_method]
+  for (const m of report?.by_method ?? []) {
+    const data = paymentBreakdown[m.method as keyof typeof paymentBreakdown]
     if (data) {
-      data.count += 1
-      data.total += t.total || 0
+      data.count = m.tickets
+      data.total = m.revenue
     }
   }
 
-  /* ── Best selling product today ────────────────────────────────── */
+  /* ── Best selling product today (agrupado por producto) ───────── */
   const productSales: Record<string, { name: string; qty: number }> = {}
-
-  for (const item of todayItems ?? []) {
-    const productName = item.product_name || "Producto"
-    if (!productSales[productName]) {
-      productSales[productName] = { name: productName, qty: 0 }
-    }
-    productSales[productName].qty += item.quantity || 1
+  for (const p of report?.top_products ?? []) {
+    productSales[p.product_name] ??= { name: p.product_name, qty: 0 }
+    productSales[p.product_name].qty += p.qty
   }
-
-  const topProduct = Object.values(productSales).sort(
-    (a, b) => b.qty - a.qty
-  )[0]
+  const topProduct = Object.values(productSales).sort((a, b) => b.qty - a.qty)[0]
 
   /* ── Stats cards ───────────────────────────────────────────────── */
   const stats = [

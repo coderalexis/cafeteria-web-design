@@ -1,7 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 import {
   Sheet,
   SheetContent,
@@ -26,14 +35,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { cancelTicket } from "@/app/actions/sales"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, type PaymentMethodKey } from "@/lib/format"
+import { formatDateString } from "@/lib/dates"
 import { buildTicketLines, printLines, receiptFromTicket } from "@/lib/receipt"
 import type { TicketRecord } from "@/lib/tickets"
 import { toast } from "sonner"
 import {
   Receipt,
-  Banknote,
   CreditCard,
-  Smartphone,
   Ban,
   Printer,
   Clock,
@@ -43,45 +51,31 @@ import {
   User,
   StickyNote,
   Flame,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  Users,
 } from "lucide-react"
+import { VentasFiltersBar } from "./filters"
+import { PAGE_SIZE, filtersToSearchParams, type SalesReport, type VentasFilters } from "./params"
 
 /* ────────────────────────────────────────────────────── Types */
 
-type Ticket = TicketRecord
-
 interface VentasClientProps {
-  tickets: Ticket[]
-}
-
-function PaymentIcon({ method, className }: { method: string; className?: string }) {
-  const Icon = PAYMENT_METHODS[method as PaymentMethodKey]?.icon ?? CreditCard
-  return <Icon className={className} />
+  filters: VentasFilters
+  report: SalesReport | null
+  reportError: string | null
+  tickets: TicketRecord[]
+  totalCount: number
+  pageCount: number
+  cashiers: Array<{ id: string; name: string }>
 }
 
 /* ────────────────────────────────────────────────────── Helpers */
 
-type DateFilter = "hoy" | "ayer" | "7dias" | "30dias" | "todo"
-type PaymentFilter = "todos" | "efectivo" | "transferencia" | "tarjeta"
-
-const dateFilterLabels: { key: DateFilter; label: string }[] = [
-  { key: "hoy", label: "Hoy" },
-  { key: "ayer", label: "Ayer" },
-  { key: "7dias", label: "7 dias" },
-  { key: "30dias", label: "30 dias" },
-  { key: "todo", label: "Todo" },
-]
-
-const paymentFilterLabels: { key: PaymentFilter; label: string }[] = [
-  { key: "todos", label: "Todos" },
-  { key: "efectivo", label: "Efectivo" },
-  { key: "transferencia", label: "Transfer" },
-  { key: "tarjeta", label: "Tarjeta" },
-]
-
-function startOfDay(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
+function PaymentIcon({ method, className }: { method: string; className?: string }) {
+  const Icon = PAYMENT_METHODS[method as PaymentMethodKey]?.icon ?? CreditCard
+  return <Icon className={className} />
 }
 
 function paymentColor(method: string): string {
@@ -119,123 +113,49 @@ function formatDateTime(dateStr: string): string {
 
 /* ────────────────────────────────────────────────────── Component */
 
-export default function VentasClient({ tickets }: VentasClientProps) {
+export default function VentasClient({
+  filters,
+  report,
+  reportError,
+  tickets,
+  totalCount,
+  pageCount,
+  cashiers,
+}: VentasClientProps) {
   const router = useRouter()
-  const [dateFilter, setDateFilter] = useState<DateFilter>("hoy")
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("todos")
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const pathname = usePathname()
+  const [selectedTicket, setSelectedTicket] = useState<TicketRecord | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
   const [cancelling, setCancelling] = useState(false)
 
-  /* ── Filter tickets ───────────────────────────────── */
+  const isSingleDay = filters.from === filters.to
+  const periodLabel = isSingleDay
+    ? formatDateString(filters.from, { weekday: "long", day: "numeric", month: "long" })
+    : `${formatDateString(filters.from, { day: "numeric", month: "short" })} – ${formatDateString(filters.to)}`
 
-  const filteredTickets = tickets.filter((ticket) => {
-    // Date filter
-    const ticketDate = new Date(ticket.createdAt)
-    const now = new Date()
-    const todayStart = startOfDay(now)
-
-    if (dateFilter === "hoy") {
-      if (ticketDate < todayStart) return false
-    } else if (dateFilter === "ayer") {
-      const yesterdayStart = new Date(todayStart)
-      yesterdayStart.setDate(yesterdayStart.getDate() - 1)
-      if (ticketDate < yesterdayStart || ticketDate >= todayStart) return false
-    } else if (dateFilter === "7dias") {
-      const weekAgo = new Date(todayStart)
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      if (ticketDate < weekAgo) return false
-    } else if (dateFilter === "30dias") {
-      const monthAgo = new Date(todayStart)
-      monthAgo.setDate(monthAgo.getDate() - 30)
-      if (ticketDate < monthAgo) return false
-    }
-
-    // Payment filter
-    if (paymentFilter === "efectivo" && ticket.paymentMethod !== "efectivo") {
-      return false
-    }
-    if (paymentFilter === "transferencia" && ticket.paymentMethod !== "transferencia") {
-      return false
-    }
-    if (paymentFilter === "tarjeta" && ticket.paymentMethod !== "tarjeta_clip") {
-      return false
-    }
-
-    return true
-  })
-
-  /* ── Stats (solo ventas completadas) ──────────────── */
-
-  const todayStart = startOfDay(new Date())
-  const todayTickets = tickets.filter(
-    (t) => t.status === "completado" && new Date(t.createdAt) >= todayStart
+  const totals = report?.totals
+  const revenue = totals?.revenue ?? 0
+  const topHour = (report?.by_hour ?? []).reduce<{ hour: number; tickets: number; revenue: number } | null>(
+    (best, h) => (!best || h.revenue > best.revenue ? h : best),
+    null,
   )
-  const todayCancelled = tickets.filter(
-    (t) => t.status === "cancelado" && new Date(t.createdAt) >= todayStart
-  )
-  const todayCount = todayTickets.length
-  const todayRevenue = todayTickets.reduce((sum, t) => sum + t.total, 0)
-  const avgTicket = todayCount > 0 ? todayRevenue / todayCount : 0
-  const todayItemsSold = todayTickets.reduce(
-    (sum, ticket) => sum + ticket.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
-    0
-  )
-
-  const salesByHour = Array.from({ length: 24 }, (_, hour) => {
-    const hourTickets = todayTickets.filter(
-      (ticket) => new Date(ticket.createdAt).getHours() === hour
-    )
-    const revenue = hourTickets.reduce((sum, ticket) => sum + ticket.total, 0)
-
-    return {
-      hour,
-      count: hourTickets.length,
-      revenue,
-    }
-  })
-
-  const topHour = salesByHour.reduce(
-    (best, current) => (current.revenue > best.revenue ? current : best),
-    { hour: 0, count: 0, revenue: 0 }
-  )
-
-  const methodTotals = {
-    efectivo: todayTickets
-      .filter((ticket) => ticket.paymentMethod === "efectivo")
-      .reduce((sum, ticket) => sum + ticket.total, 0),
-    transferencia: todayTickets
-      .filter((ticket) => ticket.paymentMethod === "transferencia")
-      .reduce((sum, ticket) => sum + ticket.total, 0),
-    tarjeta: todayTickets
-      .filter((ticket) => ticket.paymentMethod === "tarjeta_clip")
-      .reduce((sum, ticket) => sum + ticket.total, 0),
-  }
-
-  const productSales = new Map<string, { quantity: number; revenue: number }>()
-
-  todayTickets.forEach((ticket) => {
-    ticket.items.forEach((item) => {
-      const key = `${item.productName} ${item.sizeLabel || item.variantName}`.trim()
-      const current = productSales.get(key) || { quantity: 0, revenue: 0 }
-
-      productSales.set(key, {
-        quantity: current.quantity + item.quantity,
-        revenue: current.revenue + item.lineTotal,
-      })
-    })
-  })
-
-  const topProducts = Array.from(productSales.entries())
-    .map(([name, values]) => ({ name, ...values }))
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 5)
+  const chartData = (report?.by_day ?? []).map((d) => ({
+    day: d.day,
+    label: formatDateString(d.day, { day: "numeric", month: "short" }),
+    revenue: d.revenue,
+    tickets: d.tickets,
+  }))
 
   /* ── Handlers ─────────────────────────────────────── */
 
-  function openTicket(ticket: Ticket) {
+  function goToPage(page: number) {
+    const qs = filtersToSearchParams({ ...filters, page }).toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+  }
+
+  function openTicket(ticket: TicketRecord) {
     setSelectedTicket(ticket)
     setSheetOpen(true)
   }
@@ -271,114 +191,114 @@ export default function VentasClient({ tickets }: VentasClientProps) {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-            <Receipt className="h-6 w-6 text-amber-600" />
-            Historial de Ventas
-          </h1>
-          <p className="text-sm text-stone-500 mt-1">
-            {tickets.filter((t) => t.status === "completado").length} ventas registradas en total
-            {todayCancelled.length > 0 && ` · ${todayCancelled.length} cancelada${todayCancelled.length === 1 ? "" : "s"} hoy`}
-          </p>
+      <div>
+        <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+          <Receipt className="h-6 w-6 text-amber-600" />
+          Historial de Ventas
+        </h1>
+        <p className="text-sm text-stone-500 mt-1 capitalize">{periodLabel}</p>
+      </div>
+
+      {/* Filters */}
+      <VentasFiltersBar filters={filters} cashiers={cashiers} />
+
+      {reportError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          No se pudo calcular el reporte: {reportError}
         </div>
-      </div>
+      )}
 
-      {/* Stats row */}
+      {/* Stats row — del rango filtrado */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-stone-500">
-                  Ventas de Hoy
-                </p>
-                <p className="text-3xl font-bold text-stone-800 mt-1">
-                  {todayCount}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-amber-50">
-                <ShoppingBag className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-stone-500">
-                  Ingresos de Hoy
-                </p>
-                <p className="text-3xl font-bold text-stone-800 mt-1">
-                  {formatCurrency(todayRevenue)}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-emerald-50">
-                <DollarSign className="h-6 w-6 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-stone-500">
-                  Ticket Promedio
-                </p>
-                <p className="text-3xl font-bold text-stone-800 mt-1">
-                  {formatCurrency(avgTicket)}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-50">
-                <Receipt className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-stone-500">
-                  Items Vendidos Hoy
-                </p>
-                <p className="text-3xl font-bold text-stone-800 mt-1">
-                  {todayItemsSold}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-violet-50">
-                <ShoppingBag className="h-6 w-6 text-violet-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Ventas"
+          value={String(totals?.tickets ?? 0)}
+          hint={totals && totals.cancelled_count > 0 ? `${totals.cancelled_count} cancelada${totals.cancelled_count === 1 ? "" : "s"}` : undefined}
+          icon={ShoppingBag}
+          color="text-amber-600"
+          bg="bg-amber-50"
+        />
+        <StatCard
+          label="Ingresos"
+          value={formatCurrency(revenue)}
+          hint={totals && totals.cancelled_amount > 0 ? `${formatCurrency(totals.cancelled_amount)} en canceladas` : undefined}
+          icon={DollarSign}
+          color="text-emerald-600"
+          bg="bg-emerald-50"
+        />
+        <StatCard
+          label="Ticket promedio"
+          value={formatCurrency(totals?.avg_ticket ?? 0)}
+          icon={Receipt}
+          color="text-blue-600"
+          bg="bg-blue-50"
+        />
+        <StatCard
+          label="Artículos vendidos"
+          value={String(totals?.items_sold ?? 0)}
+          icon={ShoppingBag}
+          color="text-violet-600"
+          bg="bg-violet-50"
+        />
       </div>
+
+      {/* Chart por día (solo si el rango tiene más de un día) */}
+      {chartData.length > 1 && (
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-stone-700">Ingresos por día</p>
+              <p className="text-xs text-stone-400">{chartData.length} días</p>
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e7e5e4" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "#78716c" }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={chartData.length > 14 ? Math.ceil(chartData.length / 10) - 1 : 0}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#78716c" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={56}
+                    tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `$${v}`)}
+                  />
+                  <Tooltip cursor={{ fill: "#fef3c7", opacity: 0.5 }} content={<DayTooltip />} />
+                  <Bar dataKey="revenue" fill="#d97706" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Por método */}
         <Card className="xl:col-span-2">
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-stone-700">Ventas por metodo (hoy)</p>
-              <p className="text-xs text-stone-400">Total: {formatCurrency(todayRevenue)}</p>
+              <p className="text-sm font-semibold text-stone-700">Ventas por método</p>
+              <p className="text-xs text-stone-400">Total: {formatCurrency(revenue)}</p>
             </div>
             <div className="space-y-3">
-              {[
-                { label: "Efectivo", value: methodTotals.efectivo, icon: Banknote },
-                { label: "Transferencia", value: methodTotals.transferencia, icon: Smartphone },
-                { label: "Tarjeta", value: methodTotals.tarjeta, icon: CreditCard },
-              ].map(({ label, value, icon: Icon }) => {
-                const percentage = todayRevenue > 0 ? (value / todayRevenue) * 100 : 0
+              {(["efectivo", "transferencia", "tarjeta_clip"] as PaymentMethodKey[]).map((key) => {
+                const row = report?.by_method.find((m) => m.method === key)
+                const value = row?.revenue ?? 0
+                const percentage = revenue > 0 ? (value / revenue) * 100 : 0
+                const Icon = PAYMENT_METHODS[key].icon
                 return (
-                  <div key={label}>
+                  <div key={key}>
                     <div className="flex items-center justify-between mb-1.5 text-sm">
                       <div className="flex items-center gap-2 text-stone-700">
-                        <Icon className="h-4 w-4 text-stone-500" />
-                        {label}
+                        <Icon className={`h-4 w-4 ${PAYMENT_METHODS[key].iconColor}`} />
+                        {PAYMENT_METHODS[key].label}
+                        <span className="text-xs text-stone-400">({row?.tickets ?? 0})</span>
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-stone-800">{formatCurrency(value)}</p>
@@ -398,97 +318,108 @@ export default function VentasClient({ tickets }: VentasClientProps) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-5 space-y-3">
-            <p className="text-sm font-semibold text-stone-700">Hora pico (hoy)</p>
-            <div>
-              <p className="text-3xl font-bold text-stone-800">
-                {`${topHour.hour.toString().padStart(2, "0")}:00`}
-              </p>
-              <p className="text-sm text-stone-500 mt-1">
-                {topHour.count} ventas · {formatCurrency(topHour.revenue)}
-              </p>
-            </div>
-            <p className="text-xs text-stone-400">
-              Basado en la hora con mayor ingreso acumulado del dia.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Hora pico + cajeros */}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-5 space-y-2">
+              <p className="text-sm font-semibold text-stone-700">Hora pico</p>
+              {topHour ? (
+                <div>
+                  <p className="text-3xl font-bold text-stone-800">
+                    {`${String(topHour.hour).padStart(2, "0")}:00`}
+                  </p>
+                  <p className="text-sm text-stone-500 mt-1">
+                    {topHour.tickets} ventas · {formatCurrency(topHour.revenue)}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-stone-400">Sin ventas en el periodo.</p>
+              )}
+              <p className="text-xs text-stone-400">Hora con mayor ingreso acumulado del periodo (hora de México).</p>
+            </CardContent>
+          </Card>
+
+          {report && report.by_cashier.length > 0 && !filters.cajero && (
+            <Card>
+              <CardContent className="p-5 space-y-2">
+                <p className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-stone-400" /> Por cajero
+                </p>
+                <div className="space-y-1.5">
+                  {report.by_cashier.map((c) => (
+                    <div key={c.cashier_id} className="flex items-center justify-between text-sm">
+                      <span className="text-stone-600 truncate">
+                        {c.name} <span className="text-xs text-stone-400">({c.tickets})</span>
+                      </span>
+                      <span className="font-medium text-stone-800 ml-2">{formatCurrency(c.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
 
+      {/* Top productos */}
       <Card>
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
               <Flame className="h-4 w-4 text-amber-600" />
-              Productos top del dia
+              Productos más vendidos
             </h2>
           </div>
 
-          {topProducts.length === 0 ? (
-            <p className="text-sm text-stone-500">Aun no hay ventas registradas hoy.</p>
+          {!report || report.top_products.length === 0 ? (
+            <p className="text-sm text-stone-500">Aún no hay ventas en el periodo.</p>
           ) : (
-            <div className="space-y-3">
-              {topProducts.map((product, index) => (
-                <div key={product.name} className="flex items-center justify-between border-b border-stone-100 pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-7 w-7 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold flex items-center justify-center shrink-0">
-                      #{index + 1}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+              {report.top_products.map((product, index) => {
+                const label =
+                  product.variant_name && product.variant_name !== "Único"
+                    ? `${product.product_name} · ${product.variant_name}${product.size_label ? ` (${product.size_label})` : ""}`
+                    : product.product_name
+                return (
+                  <div
+                    key={`${product.product_name}-${product.variant_name}-${product.size_label ?? ""}`}
+                    className="flex items-center justify-between border-b border-stone-100 pb-3 last:border-0 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-7 w-7 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold flex items-center justify-center shrink-0">
+                        #{index + 1}
+                      </div>
+                      <p className="text-sm text-stone-700 truncate">{label}</p>
                     </div>
-                    <p className="text-sm text-stone-700 truncate">{product.name}</p>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-sm font-semibold text-stone-800">{product.qty} uds</p>
+                      <p className="text-xs text-stone-500">{formatCurrency(product.revenue)}</p>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0 ml-3">
-                    <p className="text-sm font-semibold text-stone-800">{product.quantity} uds</p>
-                    <p className="text-xs text-stone-500">{formatCurrency(product.revenue)}</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Date filters */}
-        <div className="flex gap-1.5 flex-wrap">
-          {dateFilterLabels.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setDateFilter(key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                dateFilter === key
-                  ? "bg-amber-100 text-amber-800 border border-amber-300"
-                  : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Payment filters */}
-        <div className="flex gap-1.5 flex-wrap sm:ml-auto">
-          {paymentFilterLabels.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setPaymentFilter(key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                paymentFilter === key
-                  ? "bg-amber-100 text-amber-800 border border-amber-300"
-                  : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Table */}
       <Card>
         <CardContent className="p-0">
-          {filteredTickets.length === 0 ? (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
+            <p className="text-sm font-semibold text-stone-700">
+              Tickets{" "}
+              <span className="font-normal text-stone-400">
+                ({totalCount.toLocaleString("es-MX")}
+                {totalCount > PAGE_SIZE && ` · mostrando ${(filters.page - 1) * PAGE_SIZE + 1}–${Math.min(filters.page * PAGE_SIZE, totalCount)}`})
+              </span>
+            </p>
+            {pageCount > 1 && (
+              <Pager page={filters.page} pageCount={pageCount} onChange={goToPage} />
+            )}
+          </div>
+
+          {tickets.length === 0 ? (
             <div className="py-16 text-center">
               <Receipt className="h-10 w-10 text-stone-300 mx-auto mb-3" />
               <p className="text-sm text-stone-400">
@@ -500,28 +431,16 @@ export default function VentasClient({ tickets }: VentasClientProps) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-stone-200 bg-stone-50/50">
-                    <th className="text-left px-4 py-3 font-medium text-stone-500">
-                      Folio
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-stone-500">
-                      Hora
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-stone-500">
-                      Items
-                    </th>
-                    <th className="text-right px-4 py-3 font-medium text-stone-500">
-                      Total
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-stone-500">
-                      Pago
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-stone-500">
-                      Cajero
-                    </th>
+                    <th className="text-left px-4 py-3 font-medium text-stone-500">Folio</th>
+                    <th className="text-left px-4 py-3 font-medium text-stone-500">Hora</th>
+                    <th className="text-left px-4 py-3 font-medium text-stone-500">Items</th>
+                    <th className="text-right px-4 py-3 font-medium text-stone-500">Total</th>
+                    <th className="text-left px-4 py-3 font-medium text-stone-500">Pago</th>
+                    <th className="text-left px-4 py-3 font-medium text-stone-500">Cajero</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTickets.map((ticket) => (
+                  {tickets.map((ticket) => (
                     <tr
                       key={ticket.id}
                       onClick={() => openTicket(ticket)}
@@ -584,6 +503,12 @@ export default function VentasClient({ tickets }: VentasClientProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {pageCount > 1 && (
+            <div className="flex justify-end px-4 py-3 border-t border-stone-200">
+              <Pager page={filters.page} pageCount={pageCount} onChange={goToPage} />
             </div>
           )}
         </CardContent>
@@ -783,6 +708,84 @@ export default function VentasClient({ tickets }: VentasClientProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+/* ────────────────────────────────────────────────────── Subcomponentes */
+
+function DayTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload?: { day?: string; revenue?: number; tickets?: number } }>
+}) {
+  const d = payload?.[0]?.payload
+  if (!active || !d?.day) return null
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
+      <p className="font-medium text-stone-700 capitalize">
+        {formatDateString(d.day, { weekday: "short", day: "numeric", month: "short" })}
+      </p>
+      <p className="text-stone-500">
+        {d.tickets ?? 0} ventas · <span className="font-semibold text-stone-800">{formatCurrency(d.revenue ?? 0)}</span>
+      </p>
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  color,
+  bg,
+}: {
+  label: string
+  value: string
+  hint?: string
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+  bg: string
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-stone-500">{label}</p>
+            <p className="text-3xl font-bold text-stone-800 mt-1 truncate">{value}</p>
+            {hint && <p className="text-xs text-stone-400 mt-0.5">{hint}</p>}
+          </div>
+          <div className={`p-3 rounded-xl ${bg} shrink-0`}>
+            <Icon className={`h-6 w-6 ${color}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Pager({ page, pageCount, onChange }: { page: number; pageCount: number; onChange: (p: number) => void }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-stone-500 tabular-nums">
+        Página {page} de {pageCount}
+      </span>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
+        disabled={page >= pageCount}
+        onClick={() => onChange(page + 1)}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </div>
   )
 }
