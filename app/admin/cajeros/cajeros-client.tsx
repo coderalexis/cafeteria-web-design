@@ -294,10 +294,13 @@ function CreateCajeroSheet({
             <Input
               name="password"
               type="password"
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mínimo 8 caracteres, con letras y números"
               required
-              minLength={6}
+              minLength={8}
             />
+            <p className="text-xs text-stone-400">
+              Al menos 8 caracteres e incluir letras y números.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -421,10 +424,10 @@ function EditCajeroSheet({
                 name="new_password"
                 type="password"
                 placeholder="Dejar vacío para no cambiar"
-                minLength={6}
+                minLength={8}
               />
               <p className="text-xs text-stone-400">
-                Solo completa si deseas cambiar la contraseña
+                Solo completa si deseas cambiar la contraseña (mínimo 8 caracteres, con letras y números)
               </p>
             </div>
 

@@ -18,6 +18,21 @@ const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/
 // no revelar cuál de los dos falló (enumeración de usuarios).
 const LOGIN_ERROR = "Usuario o contraseña incorrectos."
 
+// Debe coincidir con la política de Supabase Auth (Sign In / Providers → Email):
+// mínimo 8 caracteres, al menos una letra y un dígito. Se valida aquí para
+// que el error salga en español desde el formulario y no desde Supabase.
+const PASSWORD_MIN_LENGTH = 8
+
+function validatePassword(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`
+  }
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    return "La contraseña debe incluir al menos una letra y un número."
+  }
+  return null
+}
+
 function usernameToEmail(username: string): string {
   return `${username.toLowerCase().trim()}@${EMAIL_DOMAIN}`
 }
@@ -100,8 +115,9 @@ export async function createCajero(formData: FormData): Promise<ActionResult> {
     return { error: "El usuario solo puede llevar letras, números, punto y guiones." }
   }
 
-  if (password.length < 6) {
-    return { error: "La contraseña debe tener al menos 6 caracteres." }
+  const passwordError = validatePassword(password)
+  if (passwordError) {
+    return { error: passwordError }
   }
 
   if (!["admin", "cajero"].includes(role)) {
@@ -175,8 +191,11 @@ export async function updateCajero(formData: FormData): Promise<ActionResult> {
   }
 
   // Validar todo antes de escribir, para no dejar el perfil a medio actualizar.
-  if (newPassword && newPassword.length < 6) {
-    return { error: "La contraseña debe tener al menos 6 caracteres." }
+  if (newPassword) {
+    const passwordError = validatePassword(newPassword)
+    if (passwordError) {
+      return { error: passwordError }
+    }
   }
 
   const admin = createAdminClient()
