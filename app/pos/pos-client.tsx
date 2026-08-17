@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS } from "@/lib/format"
-import { buildTicketLines, printLines, type ReceiptData } from "@/lib/receipt"
+import { buildKitchenLines, buildTicketLines, printLines, type ReceiptData } from "@/lib/receipt"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Trash2,
@@ -20,9 +20,13 @@ import {
   Unlock,
   Percent,
   SlidersHorizontal,
+  StickyNote,
+  ChefHat,
+  Keyboard,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Kbd } from "@/components/kbd"
 import { logout } from "@/app/actions/auth"
 import { createTicket } from "@/app/actions/sales"
 import { Badge } from "@/components/ui/badge"
@@ -36,73 +40,48 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { ModifierSheet } from "./modifier-sheet"
 import { DiscountDialog } from "./discount-dialog"
+import { ShortcutsDialog } from "./shortcuts-dialog"
+import { usePosCart } from "./use-pos-cart"
+import {
+  cartItemCount,
+  cartSubtotal,
+  computeDiscount,
+  getDisplayPrice,
+  getLineLabel,
+  getLinePrice,
+  getLineVariantId,
+  parseCash,
+  type CartLine,
+  type Category,
+  type PaymentMethod,
+  type Product,
+  type SizeOption,
+} from "./cart"
+
+// Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
+export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
-type PaymentMethod = "efectivo" | "transferencia" | "tarjeta_clip"
-
-export interface SizeOption {
-  variantId: string
-  label: string
-  oz: string
-  price: number
-}
-
-export interface ModifierOption {
-  id: string
-  name: string
-  priceDelta: number
-}
-
-export interface ModifierGroup {
-  id: string
-  name: string
-  minSelect: number
-  maxSelect: number | null
-  options: ModifierOption[]
-}
-
-export interface Product {
-  id: string
-  name: string
-  price?: number
-  variantId?: string
-  sizes?: SizeOption[]
-  category: string
-  subcategory: string
-  description?: string
-  modifierGroups?: ModifierGroup[]
-}
-
-interface CartItem {
-  cartId: string
-  product: Product
-  size?: SizeOption
-  modifiers: ModifierOption[]
-  quantity: number
-  isNew?: boolean
-}
-
-export interface TicketDiscount {
-  type: "percent" | "amount"
-  value: number
-  reason: string
-}
-
-interface Category {
-  id: string
-  label: string
-}
-
 interface CompletedSale {
   ticketId: string
   folio: number
-  items: CartItem[]
+  lines: CartLine[]
   subtotal: number
   discountTotal: number
   discountReason: string | null
@@ -118,88 +97,58 @@ interface POSClientProps {
   categories: Category[]
   products: Product[]
   isAdmin: boolean
+  cashierId: string
   initialTotalSales: number
   openSession: OpenSession | null
 }
 
 const CASH_QUICK_AMOUNTS = [50, 100, 200, 500]
 
-function parseCash(value: string): number | null {
-  const n = Number(value.replace(",", "."))
-  return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
-}
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-function getDisplayPrice(p: Product): string {
-  if (p.price !== undefined) return `$${p.price}`
-  if (p.sizes && p.sizes.length > 0) {
-    const min = Math.min(...p.sizes.map((s) => s.price))
-    const max = Math.max(...p.sizes.map((s) => s.price))
-    return min === max ? `$${min}` : `$${min} - $${max}`
-  }
-  return ""
-}
-
-/** Precio unitario = variante + suma de modificadores. */
-function getItemPrice(item: CartItem): number {
-  const base = item.size ? item.size.price : item.product.price ?? 0
-  return base + item.modifiers.reduce((s, m) => s + m.priceDelta, 0)
-}
-
-function getItemVariantId(item: CartItem): string | undefined {
-  return item.size ? item.size.variantId : item.product.variantId
-}
-
-function getItemLabel(item: CartItem): string {
-  return item.size
-    ? `${item.product.name} (${item.size.label})`
-    : item.product.name
-}
-
-/** Descuento calculado en el cliente (el servidor lo recalcula y valida). */
-function computeDiscount(subtotal: number, discount: TicketDiscount | null): number {
-  if (!discount || subtotal <= 0) return 0
-  const raw = discount.type === "percent" ? (subtotal * discount.value) / 100 : discount.value
-  return Math.min(Math.round(raw * 100) / 100, subtotal)
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable
 }
 
 /* ------------------------------------------------------------------ */
 /*  Receipt / Ticket View                                              */
 /* ------------------------------------------------------------------ */
-function ReceiptView({
-  sale,
-  onClose,
-}: {
-  sale: CompletedSale
-  onClose: () => void
-}) {
+function saleToReceipt(sale: CompletedSale): ReceiptData {
+  return {
+    folio: sale.folio,
+    date: sale.date,
+    paymentMethod: sale.paymentMethod,
+    notes: sale.notes,
+    items: sale.lines.map((line) => ({
+      label: getLineLabel(line),
+      quantity: line.quantity,
+      unitPrice: getLinePrice(line),
+      lineTotal: getLinePrice(line) * line.quantity,
+      notes: line.notes || undefined,
+      modifiers: line.modifiers.map((m) => ({ name: m.name, price: m.priceDelta })),
+    })),
+    subtotal: sale.subtotal,
+    discountTotal: sale.discountTotal,
+    discountReason: sale.discountReason,
+    total: sale.total,
+    cashReceived: sale.cashReceived,
+    changeDue: sale.changeDue,
+  }
+}
+
+function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => void }) {
   const paymentInfo = PAYMENT_METHODS[sale.paymentMethod]
   const PaymentIcon = paymentInfo.icon
 
   const handlePrint = () => {
-    const receipt: ReceiptData = {
-      folio: sale.folio,
-      date: sale.date,
-      paymentMethod: sale.paymentMethod,
-      notes: sale.notes,
-      items: sale.items.map((item) => ({
-        label: getItemLabel(item),
-        quantity: item.quantity,
-        unitPrice: getItemPrice(item),
-        lineTotal: getItemPrice(item) * item.quantity,
-        modifiers: item.modifiers.map((m) => ({ name: m.name, price: m.priceDelta })),
-      })),
-      subtotal: sale.subtotal,
-      discountTotal: sale.discountTotal,
-      discountReason: sale.discountReason,
-      total: sale.total,
-      cashReceived: sale.cashReceived,
-      changeDue: sale.changeDue,
-    }
-    if (!printLines(buildTicketLines(receipt), `Ticket ${sale.folio}`)) {
+    if (!printLines(buildTicketLines(saleToReceipt(sale)), `Ticket ${sale.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión. Puedes reimprimir desde «Tickets».")
+    }
+  }
+
+  const handleKitchen = () => {
+    if (!printLines(buildKitchenLines(saleToReceipt(sale)), `Comanda ${sale.folio}`)) {
+      toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }
 
@@ -218,12 +167,7 @@ function ReceiptView({
       <div className="w-full bg-stone-50 rounded-xl border border-stone-200 p-4 space-y-3">
         <div className="flex justify-between text-sm text-stone-500">
           <span>{sale.date.toLocaleDateString("es-MX")}</span>
-          <span>
-            {sale.date.toLocaleTimeString("es-MX", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
+          <span>{formatTime(sale.date)}</span>
         </div>
 
         {sale.notes && (
@@ -236,26 +180,25 @@ function ReceiptView({
 
         {/* Items */}
         <div className="space-y-2">
-          {sale.items.map((item) => {
-            const price = getItemPrice(item)
+          {sale.lines.map((line) => {
+            const price = getLinePrice(line)
             return (
-              <div key={item.cartId} className="text-sm">
+              <div key={line.lineId} className="text-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <span className="text-stone-700 font-medium">
-                      {item.quantity}x{" "}
-                    </span>
-                    <span className="text-stone-700">{getItemLabel(item)}</span>
+                    <span className="text-stone-700 font-medium">{line.quantity}x </span>
+                    <span className="text-stone-700">{getLineLabel(line)}</span>
                   </div>
                   <span className="font-semibold text-stone-800 ml-3">
-                    {formatCurrency(price * item.quantity)}
+                    {formatCurrency(price * line.quantity)}
                   </span>
                 </div>
-                {item.modifiers.length > 0 && (
+                {line.modifiers.length > 0 && (
                   <p className="text-xs text-stone-400 pl-6">
-                    {item.modifiers.map((m) => `+ ${m.name}`).join(", ")}
+                    {line.modifiers.map((m) => `+ ${m.name}`).join(", ")}
                   </p>
                 )}
+                {line.notes && <p className="text-xs text-amber-700 pl-6 italic">{line.notes}</p>}
               </div>
             )
           })}
@@ -283,38 +226,29 @@ function ReceiptView({
             <PaymentIcon className={`h-4 w-4 ${paymentInfo.iconColor}`} />
             <span className="text-sm text-stone-500">{paymentInfo.label}</span>
           </div>
-          <span className="text-xl font-bold text-stone-800">
-            {formatCurrency(sale.total)}
-          </span>
+          <span className="text-xl font-bold text-stone-800">{formatCurrency(sale.total)}</span>
         </div>
 
         {/* Cambio (solo efectivo con monto recibido) */}
         {sale.paymentMethod === "efectivo" && sale.cashReceived != null && (
           <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 flex items-center justify-between">
-            <span className="text-xs text-green-700">
-              Recibido {formatCurrency(sale.cashReceived)}
-            </span>
-            <span className="text-base font-bold text-green-700">
-              Cambio: {formatCurrency(sale.changeDue ?? 0)}
-            </span>
+            <span className="text-xs text-green-700">Recibido {formatCurrency(sale.cashReceived)}</span>
+            <span className="text-base font-bold text-green-700">Cambio: {formatCurrency(sale.changeDue ?? 0)}</span>
           </div>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3 mt-5 w-full">
-        <Button
-          variant="outline"
-          className="flex-1 gap-2"
-          onClick={handlePrint}
-        >
+      <div className="grid grid-cols-2 gap-2 mt-5 w-full">
+        <Button variant="outline" className="gap-2" onClick={handlePrint}>
           <Printer className="h-4 w-4" />
-          Imprimir ticket
+          Ticket
         </Button>
-        <Button
-          className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
-          onClick={onClose}
-        >
+        <Button variant="outline" className="gap-2" onClick={handleKitchen} title="Imprimir comanda para barra (sin precios)">
+          <ChefHat className="h-4 w-4" />
+          Comanda
+        </Button>
+        <Button className="col-span-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={onClose} autoFocus>
           Nueva venta
         </Button>
       </div>
@@ -329,25 +263,47 @@ export default function POSClient({
   categories,
   products,
   isAdmin,
+  cashierId,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
-  const [cart, setCart] = useState<CartItem[]>([])
+  const cart = usePosCart(`pos-cart:${cashierId}`, products)
+  const {
+    lines,
+    paymentMethod,
+    setPaymentMethod,
+    ticketNotes,
+    setTicketNotes,
+    cashReceivedInput,
+    setCashReceivedInput,
+    discount,
+    setDiscount,
+    saleRef,
+    addLine,
+    removeLine,
+    updateQuantity,
+    setLineNotes,
+    clearCart,
+    resetAfterSale,
+  } = cart
+
   const [totalSales, setTotalSales] = useState<number>(initialTotalSales)
   const [activeCategory, setActiveCategory] = useState<string>("todos")
   const [sizePickerFor, setSizePickerFor] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("efectivo")
   const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [ticketNotes, setTicketNotes] = useState("")
-  const [cashReceivedInput, setCashReceivedInput] = useState("")
   const [showTickets, setShowTickets] = useState(false)
   const [showCashDialog, setShowCashDialog] = useState(false)
-  const [discount, setDiscount] = useState<TicketDiscount | null>(null)
   const [showDiscount, setShowDiscount] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
   // Producto/tamaño esperando elección de modificadores
   const [pendingModifiers, setPendingModifiers] = useState<{ product: Product; size?: SizeOption } | null>(null)
+
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const cashInputRef = useRef<HTMLInputElement>(null)
 
   // El total del día viene del servidor; tras vender/cancelar las actions
   // revalidan /pos y esta prop se actualiza → se sincroniza aquí.
@@ -355,10 +311,13 @@ export default function POSClient({
     setTotalSales(initialTotalSales)
   }, [initialTotalSales])
 
-  // Clave de idempotencia de la venta en curso: reintentar el mismo cobro
-  // (p.ej. tras un timeout) no duplica el ticket. Se renueva al vender o
-  // al modificar el carrito.
-  const saleRef = useRef<string>(crypto.randomUUID())
+  // Aviso único si se restauró un carrito guardado
+  useEffect(() => {
+    if (cart.hydrated && cart.restoredCount > 0) {
+      toast.info(`Se restauró la venta en curso (${cart.restoredCount} línea${cart.restoredCount === 1 ? "" : "s"}).`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.hydrated])
 
   /* filtered & grouped products */
   const searchLower = searchQuery.toLowerCase().trim()
@@ -375,50 +334,7 @@ export default function POSClient({
     return acc
   }, {})
 
-  /* cart helpers */
-  const addToCart = useCallback((product: Product, size?: SizeOption, modifiers: ModifierOption[] = []) => {
-    // Misma línea solo si coinciden producto, tamaño y modificadores
-    const modKey = modifiers.map((m) => m.id).sort().join(",")
-    const cartId = [product.id, size?.label ?? "", modKey].join("__")
-    saleRef.current = crypto.randomUUID()
-
-    setCart((prev) => {
-      const existing = prev.find((i) => i.cartId === cartId)
-      if (existing) {
-        return prev.map((i) =>
-          i.cartId === cartId
-            ? { ...i, quantity: i.quantity + 1, isNew: true }
-            : { ...i, isNew: false }
-        )
-      }
-      return [
-        ...prev.map((i) => ({ ...i, isNew: false })),
-        { cartId, product, size, modifiers, quantity: 1, isNew: true },
-      ]
-    })
-
-    setTimeout(() => {
-      setCart((prev) => prev.map((i) => ({ ...i, isNew: false })))
-    }, 350)
-  }, [])
-
-  const removeFromCart = useCallback((cartId: string) => {
-    saleRef.current = crypto.randomUUID()
-    setCart((prev) => prev.filter((i) => i.cartId !== cartId))
-  }, [])
-
-  const updateQuantity = useCallback((cartId: string, delta: number) => {
-    saleRef.current = crypto.randomUUID()
-    setCart((prev) =>
-      prev
-        .map((i) =>
-          i.cartId === cartId ? { ...i, quantity: i.quantity + delta } : i
-        )
-        .filter((i) => i.quantity > 0)
-    )
-  }, [])
-
-  const subtotal = cart.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0)
+  const subtotal = cartSubtotal(lines)
   const discountAmount = computeDiscount(subtotal, discount)
   const total = Math.round((subtotal - discountAmount) * 100) / 100
   // Un descuento fijo mayor al subtotal (p.ej. tras quitar artículos) no se puede cobrar
@@ -429,32 +345,35 @@ export default function POSClient({
   const changeDue = cashReceived !== null ? cashReceived - total : null
   const cashInsufficient = cashReceived !== null && cashReceived < total
 
-  const finalizeSale = async () => {
-    if (cart.length === 0 || isProcessing || !openSession || cashInsufficient || discountInvalid) return
+  const canCharge =
+    lines.length > 0 && !isProcessing && !!openSession && !cashInsufficient && !discountInvalid
+
+  const finalizeSale = useCallback(async () => {
+    if (!canCharge) return
     setIsProcessing(true)
 
     try {
       // Los precios NO se mandan: el servidor los recalcula desde el menú
       // (variante + modificadores) y valida el descuento.
       const result = await createTicket({
-        clientRef: saleRef.current,
+        clientRef: saleRef,
         paymentMethod,
         notes: ticketNotes.trim() || undefined,
         cashReceived: cashReceived ?? undefined,
         discount: discount ?? undefined,
-        items: cart.map((item) => ({
-          variant_id: getItemVariantId(item) ?? "",
-          quantity: item.quantity,
-          modifiers: item.modifiers.length > 0 ? item.modifiers.map((m) => m.id) : undefined,
+        items: lines.map((line) => ({
+          variant_id: getLineVariantId(line) ?? "",
+          quantity: line.quantity,
+          notes: line.notes.trim() || undefined,
+          modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
         })),
       })
 
       if (result.success) {
-        // Store completed sale data for receipt (importes = los del servidor)
         setCompletedSale({
           ticketId: result.ticketId,
           folio: result.folio,
-          items: [...cart],
+          lines: [...lines],
           subtotal: result.subtotal,
           discountTotal: result.discountTotal,
           discountReason: discount?.reason ?? null,
@@ -466,11 +385,7 @@ export default function POSClient({
           changeDue: result.changeDue,
         })
         setTotalSales((prev) => prev + result.total)
-        setCart([])
-        setTicketNotes("")
-        setCashReceivedInput("")
-        setDiscount(null)
-        saleRef.current = crypto.randomUUID()
+        resetAfterSale()
       } else {
         toast.error(result.error || "Error al registrar la venta")
       }
@@ -479,17 +394,20 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }
+  }, [canCharge, saleRef, paymentMethod, ticketNotes, cashReceived, discount, lines, resetAfterSale])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
-  const chooseProduct = (product: Product, size?: SizeOption) => {
-    setSizePickerFor(null)
-    if (product.modifierGroups && product.modifierGroups.length > 0) {
-      setPendingModifiers({ product, size })
-    } else {
-      addToCart(product, size)
-    }
-  }
+  const chooseProduct = useCallback(
+    (product: Product, size?: SizeOption) => {
+      setSizePickerFor(null)
+      if (product.modifierGroups && product.modifierGroups.length > 0) {
+        setPendingModifiers({ product, size })
+      } else {
+        addLine(product, size)
+      }
+    },
+    [addLine],
+  )
 
   const handleProductClick = (product: Product) => {
     if (product.sizes && product.sizes.length > 0) {
@@ -499,9 +417,144 @@ export default function POSClient({
     }
   }
 
-  const handleCloseReceipt = () => {
-    setCompletedSale(null)
-  }
+  const focusCash = useCallback(() => {
+    setPaymentMethod("efectivo")
+    // el input aparece al cambiar de método; enfocar en el siguiente frame
+    requestAnimationFrame(() => cashInputRef.current?.focus())
+  }, [setPaymentMethod])
+
+  /* ── Atajos de teclado ─────────────────────────────────────────── */
+  const anyDialogOpen =
+    completedSale !== null ||
+    showTickets ||
+    showCashDialog ||
+    showDiscount ||
+    showShortcuts ||
+    confirmClear ||
+    pendingModifiers !== null
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (anyDialogOpen) return
+      const typing = isTypingTarget(e.target)
+      const inSearch = e.target === searchInputRef.current
+
+      // Globales (funcionan aunque estés escribiendo)
+      if (e.key === "F2") {
+        e.preventDefault()
+        if (canCharge) finalizeSale()
+        else if (!openSession) setShowCashDialog(true)
+        return
+      }
+      if (e.key === "F4") {
+        e.preventDefault()
+        focusCash()
+        return
+      }
+
+      // Selector de tamaños abierto: 1-9 eligen tamaño, Esc cierra
+      if (sizePickerFor) {
+        const product = products.find((p) => p.id === sizePickerFor)
+        if (product?.sizes && /^[1-9]$/.test(e.key)) {
+          const size = product.sizes[Number(e.key) - 1]
+          if (size) {
+            e.preventDefault()
+            chooseProduct(product, size)
+          }
+          return
+        }
+        if (e.key === "Escape") {
+          e.preventDefault()
+          setSizePickerFor(null)
+          return
+        }
+      }
+
+      if (inSearch) {
+        if (e.key === "Enter") {
+          e.preventDefault()
+          const first = filtered[0]
+          if (!first) return
+          if (first.sizes && first.sizes.length > 0) setSizePickerFor(first.id)
+          else chooseProduct(first)
+          return
+        }
+        if (e.key === "Escape") {
+          e.preventDefault()
+          setSearchQuery("")
+          searchInputRef.current?.blur()
+          return
+        }
+        return
+      }
+
+      if (typing) {
+        if (e.key === "Escape") (e.target as HTMLElement).blur()
+        return
+      }
+
+      // Fuera de campos de texto
+      if (e.key === "/") {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+      if (e.key === "?") {
+        e.preventDefault()
+        setShowShortcuts(true)
+        return
+      }
+      if (e.ctrlKey && e.key === "Backspace") {
+        e.preventDefault()
+        if (lines.length > 0) setConfirmClear(true)
+        return
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      switch (e.key) {
+        case "1":
+          setPaymentMethod("efectivo")
+          break
+        case "2":
+          setPaymentMethod("transferencia")
+          break
+        case "3":
+          setPaymentMethod("tarjeta_clip")
+          break
+        case "t":
+        case "T":
+          setShowTickets(true)
+          break
+        case "k":
+        case "K":
+          setShowCashDialog(true)
+          break
+        case "d":
+        case "D":
+          if (lines.length > 0) setShowDiscount(true)
+          break
+        default:
+          return
+      }
+      e.preventDefault()
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [
+    anyDialogOpen,
+    canCharge,
+    finalizeSale,
+    openSession,
+    focusCash,
+    sizePickerFor,
+    products,
+    chooseProduct,
+    filtered,
+    lines.length,
+    setPaymentMethod,
+  ])
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
@@ -523,6 +576,7 @@ export default function POSClient({
         >
           {openSession ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           {openSession ? `Caja abierta · ${formatTime(openSession.openedAt)}` : "Caja cerrada"}
+          <Kbd>K</Kbd>
         </Button>
         <Button
           variant="outline"
@@ -531,24 +585,28 @@ export default function POSClient({
         >
           <Receipt className="h-4 w-4" />
           Tickets
+          <Kbd>T</Kbd>
         </Button>
         {isAdmin && (
           <Link href="/admin">
-            <Button
-              variant="outline"
-              className="bg-white/80 backdrop-blur gap-1.5"
-            >
+            <Button variant="outline" className="bg-white/80 backdrop-blur gap-1.5">
               <Settings className="h-4 w-4" />
               Administrar
             </Button>
           </Link>
         )}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowShortcuts(true)}
+          className="bg-white/80 backdrop-blur"
+          title="Atajos y ayuda (?)"
+          aria-label="Atajos y ayuda"
+        >
+          <Keyboard className="h-4 w-4" />
+        </Button>
         <form action={logout}>
-          <Button
-            type="submit"
-            variant="outline"
-            className="bg-white/80 backdrop-blur"
-          >
+          <Button type="submit" variant="outline" className="bg-white/80 backdrop-blur">
             Cerrar sesión
           </Button>
         </form>
@@ -561,17 +619,11 @@ export default function POSClient({
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Coffee className="h-6 w-6 text-amber-700" />
-              <h1 className="text-2xl font-bold text-stone-800 tracking-tight">
-                El Cafecito
-              </h1>
+              <h1 className="text-2xl font-bold text-stone-800 tracking-tight">El Cafecito</h1>
             </div>
             <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl flex items-center gap-2">
-              <span className="text-sm text-amber-800 font-medium">
-                Total vendido hoy:
-              </span>
-              <span className="text-xl font-bold text-amber-800">
-                {formatCurrency(totalSales)}
-              </span>
+              <span className="text-sm text-amber-800 font-medium">Total vendido hoy:</span>
+              <span className="text-xl font-bold text-amber-800">{formatCurrency(totalSales)}</span>
             </div>
           </div>
 
@@ -579,22 +631,31 @@ export default function POSClient({
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
             <Input
-              placeholder="Buscar producto..."
+              ref={searchInputRef}
+              placeholder="Buscar producto…  (Enter agrega el primero)"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 setSizePickerFor(null)
               }}
-              className="pl-9 bg-stone-50 border-stone-200 h-9 text-sm"
+              className="pl-9 pr-16 bg-stone-50 border-stone-200 h-9 text-sm"
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {searchQuery ? (
+                <button
+                  onClick={() => {
+                    setSearchQuery("")
+                    searchInputRef.current?.focus()
+                  }}
+                  className="text-stone-400 hover:text-stone-600"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <Kbd className="text-stone-400">/</Kbd>
+              )}
+            </div>
           </div>
 
           {/* Categories scroll */}
@@ -626,12 +687,14 @@ export default function POSClient({
             {products.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-stone-400">
                 <Coffee className="h-12 w-12 mb-3 opacity-40" />
-                <p className="text-base font-medium">
-                  No hay productos en el menú
-                </p>
-                <p className="text-sm">
-                  Agrega productos desde el panel de administración
-                </p>
+                <p className="text-base font-medium">No hay productos en el menú</p>
+                <p className="text-sm">Agrega productos desde el panel de administración</p>
+              </div>
+            )}
+            {products.length > 0 && filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-stone-400">
+                <Search className="h-10 w-10 mb-3 opacity-40" />
+                <p className="text-sm">Sin resultados para «{searchQuery}»</p>
               </div>
             )}
             {Object.entries(grouped).map(([subcategory, items]) => (
@@ -655,12 +718,9 @@ export default function POSClient({
                           <p className="font-semibold text-stone-800 text-sm leading-tight line-clamp-2">
                             {product.name}
                           </p>
-                          {product.description &&
-                            product.description !== subcategory && (
-                              <p className="text-xs text-stone-400 mt-0.5 truncate">
-                                {product.description}
-                              </p>
-                            )}
+                          {product.description && product.description !== subcategory && (
+                            <p className="text-xs text-stone-400 mt-0.5 truncate">{product.description}</p>
+                          )}
                           <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
                             {getDisplayPrice(product)}
                             {product.modifierGroups && (
@@ -681,22 +741,21 @@ export default function POSClient({
                             className="overflow-hidden"
                           >
                             <div className="flex gap-1.5 mt-1.5">
-                              {product.sizes.map((size) => (
+                              {product.sizes.map((size, index) => (
                                 <motion.button
                                   key={size.label}
                                   whileTap={{ scale: 0.92 }}
                                   onClick={() => chooseProduct(product, size)}
-                                  className="flex-1 py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
+                                  className="relative flex-1 py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
                                 >
-                                  <span className="block text-xs font-bold">
-                                    {size.label}
-                                  </span>
-                                  <span className="block text-[10px] opacity-80">
-                                    {size.oz}
-                                  </span>
-                                  <span className="block text-xs font-bold mt-0.5">
-                                    ${size.price}
-                                  </span>
+                                  {index < 9 && (
+                                    <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
+                                      {index + 1}
+                                    </Kbd>
+                                  )}
+                                  <span className="block text-xs font-bold">{size.label}</span>
+                                  <span className="block text-[10px] opacity-80">{size.oz}</span>
+                                  <span className="block text-xs font-bold mt-0.5">${size.price}</span>
                                 </motion.button>
                               ))}
                             </div>
@@ -718,108 +777,160 @@ export default function POSClient({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShoppingBag className="h-5 w-5 text-amber-700" />
-              <h2 className="text-lg font-bold text-stone-800">
-                Venta Actual
-              </h2>
+              <h2 className="text-lg font-bold text-stone-800">Venta Actual</h2>
             </div>
-            {cart.length > 0 && (
-              <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
-                {cart.reduce((s, i) => s + i.quantity, 0)} items
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {lines.length > 0 && (
+                <>
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+                    {cartItemCount(lines)} items
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-stone-400 hover:text-red-600 hover:bg-red-50 gap-1"
+                    onClick={() => setConfirmClear(true)}
+                    title="Vaciar carrito (Ctrl+⌫)"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Vaciar
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
         {/* Cart items */}
         <ScrollArea className="flex-1">
           <div className="p-4">
-            {cart.length === 0 ? (
+            {lines.length === 0 ? (
               <div className="h-64 flex flex-col items-center justify-center text-stone-300">
                 <ShoppingBag className="h-14 w-14 mb-3 opacity-40" />
-                <p className="text-base font-medium text-stone-400">
-                  No hay productos
-                </p>
-                <p className="text-sm text-stone-300">
-                  Toca un producto para agregarlo
-                </p>
+                <p className="text-base font-medium text-stone-400">No hay productos</p>
+                <p className="text-sm text-stone-300">Toca un producto para agregarlo</p>
               </div>
             ) : (
               <AnimatePresence mode="popLayout">
-                {cart.map((item) => (
+                {lines.map((line) => (
                   <motion.div
-                    key={item.cartId}
+                    key={line.lineId}
                     layout
                     initial={{ opacity: 0, x: 20 }}
                     animate={{
                       opacity: 1,
                       x: 0,
-                      backgroundColor: item.isNew
-                        ? "rgba(251,191,36,0.12)"
-                        : "rgba(255,255,255,0)",
+                      backgroundColor: line.isNew ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0)",
                     }}
                     exit={{ opacity: 0, x: -20, height: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="flex items-center justify-between py-3 border-b border-stone-100 rounded-lg px-2 gap-2"
+                    className="py-3 border-b border-stone-100 rounded-lg px-2"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-stone-800 text-sm truncate">
-                        {item.product.name}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-stone-400">
-                          {formatCurrency(getItemPrice(item))}
-                        </span>
-                        {item.size && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] px-1.5 py-0 h-4 border-stone-300 text-stone-500"
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-stone-800 text-sm truncate">{line.product.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-stone-400">{formatCurrency(getLinePrice(line))}</span>
+                          {line.size && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 h-4 border-stone-300 text-stone-500"
+                            >
+                              {line.size.label}
+                            </Badge>
+                          )}
+                        </div>
+                        {line.modifiers.length > 0 && (
+                          <p className="text-[11px] text-amber-700 mt-0.5 truncate">
+                            {line.modifiers.map((m) => `+ ${m.name}`).join(" · ")}
+                          </p>
+                        )}
+                        {line.notes && editingNoteFor !== line.lineId && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingNoteFor(line.lineId)}
+                            className="text-[11px] text-stone-500 italic mt-0.5 truncate max-w-full text-left hover:text-amber-700"
+                            title="Editar nota"
                           >
-                            {item.size.label}
-                          </Badge>
+                            📝 {line.notes}
+                          </button>
                         )}
                       </div>
-                      {item.modifiers.length > 0 && (
-                        <p className="text-[11px] text-amber-700 mt-0.5 truncate">
-                          {item.modifiers.map((m) => `+ ${m.name}`).join(" · ")}
-                        </p>
-                      )}
-                    </div>
 
-                    {/* Quantity controls */}
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 rounded-full border-stone-300 text-stone-500"
-                        onClick={() => updateQuantity(item.cartId, -1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-6 text-center text-sm font-bold text-stone-700">
-                        {item.quantity}
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border-stone-300 text-stone-500"
+                          onClick={() => updateQuantity(line.lineId, -1)}
+                          aria-label="Quitar uno"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-6 text-center text-sm font-bold text-stone-700">{line.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border-stone-300 text-stone-500"
+                          onClick={() => updateQuantity(line.lineId, 1)}
+                          aria-label="Agregar uno"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      <span className="font-bold text-sm text-stone-800 w-16 text-right">
+                        {formatCurrency(getLinePrice(line) * line.quantity)}
                       </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 rounded-full border-stone-300 text-stone-500"
-                        onClick={() => updateQuantity(item.cartId, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+
+                      <div className="flex items-center shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 ${
+                            line.notes ? "text-amber-600" : "text-stone-300"
+                          } hover:text-amber-700 hover:bg-amber-50`}
+                          onClick={() => setEditingNoteFor(editingNoteFor === line.lineId ? null : line.lineId)}
+                          title="Nota para este artículo"
+                          aria-label="Nota para este artículo"
+                        >
+                          <StickyNote className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-stone-300 hover:text-red-500 hover:bg-red-50"
+                          onClick={() => removeLine(line.lineId)}
+                          aria-label="Quitar línea"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
 
-                    <span className="font-bold text-sm text-stone-800 w-16 text-right">
-                      {formatCurrency(getItemPrice(item) * item.quantity)}
-                    </span>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-stone-300 hover:text-red-500 hover:bg-red-50 shrink-0"
-                      onClick={() => removeFromCart(item.cartId)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {/* Nota por artículo */}
+                    {editingNoteFor === line.lineId && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Input
+                          autoFocus
+                          placeholder="ej. sin azúcar, extra caliente…"
+                          defaultValue={line.notes}
+                          maxLength={200}
+                          className="h-8 text-sm bg-amber-50/50 border-amber-200"
+                          onBlur={(e) => {
+                            setLineNotes(line.lineId, e.target.value.trim())
+                            setEditingNoteFor(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === "Escape") {
+                              e.preventDefault()
+                              ;(e.target as HTMLInputElement).blur()
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -831,15 +942,16 @@ export default function POSClient({
         <div className="shrink-0 p-4 border-t border-stone-200 bg-stone-50/80 space-y-3">
           {/* Ticket notes */}
           <Input
-            placeholder="Nota: mesa, nombre, para llevar..."
+            placeholder="Nota del ticket: mesa, nombre, para llevar..."
             value={ticketNotes}
             onChange={(e) => setTicketNotes(e.target.value)}
+            maxLength={500}
             className="bg-white border-stone-200 h-8 text-sm"
           />
 
           {/* Payment method selector */}
           <div className="flex gap-2">
-            {PAYMENT_METHOD_KEYS.map((key) => {
+            {PAYMENT_METHOD_KEYS.map((key, index) => {
               const info = PAYMENT_METHODS[key]
               const Icon = info.icon
               const active = paymentMethod === key
@@ -854,12 +966,13 @@ export default function POSClient({
                   key={key}
                   type="button"
                   onClick={() => setPaymentMethod(key)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
                     active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
                   {info.shortLabel}
+                  <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
                 </button>
               )
             })}
@@ -869,8 +982,11 @@ export default function POSClient({
           {paymentMethod === "efectivo" && (
             <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-green-800 shrink-0">Recibido</span>
+                <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
+                  Recibido <Kbd>F4</Kbd>
+                </span>
                 <Input
+                  ref={cashInputRef}
                   type="number"
                   inputMode="decimal"
                   min="0"
@@ -929,7 +1045,7 @@ export default function POSClient({
               <button
                 type="button"
                 onClick={() => setShowDiscount(true)}
-                disabled={cart.length === 0}
+                disabled={lines.length === 0}
                 className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 -ml-1.5 transition-colors disabled:opacity-40 ${
                   discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
                 }`}
@@ -938,6 +1054,7 @@ export default function POSClient({
                 {discount
                   ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
                   : "Agregar descuento"}
+                <Kbd>D</Kbd>
               </button>
               {discount && (
                 <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
@@ -947,16 +1064,14 @@ export default function POSClient({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-base font-medium text-stone-500">Total</span>
-              <span className="text-2xl font-bold text-stone-800">
-                {formatCurrency(total)}
-              </span>
+              <span className="text-2xl font-bold text-stone-800">{formatCurrency(total)}</span>
             </div>
           </div>
 
           {/* Cobrar button / gate de caja */}
           {openSession ? (
             <Button
-              className={`w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
+              className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
                 paymentMethod === "efectivo"
                   ? "bg-green-600 hover:bg-green-700"
                   : paymentMethod === "transferencia"
@@ -964,12 +1079,11 @@ export default function POSClient({
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
               size="lg"
-              disabled={cart.length === 0 || isProcessing || cashInsufficient || discountInvalid}
+              disabled={!canCharge}
               onClick={finalizeSale}
             >
-              {isProcessing
-                ? "Procesando..."
-                : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
+              {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
+              <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
             </Button>
           ) : (
             <Button
@@ -984,14 +1098,15 @@ export default function POSClient({
         </div>
       </div>
 
-      {/* ── Dialogs de caja, historial, modificadores y descuento ── */}
+      {/* ── Dialogs ── */}
       <CashSessionDialog open={showCashDialog} onOpenChange={setShowCashDialog} session={openSession} />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
+      <ShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
       <ModifierSheet
         pending={pendingModifiers}
         onClose={() => setPendingModifiers(null)}
         onConfirm={(product, size, modifiers) => {
-          addToCart(product, size, modifiers)
+          addLine(product, size, modifiers)
           setPendingModifiers(null)
         }}
       />
@@ -1003,20 +1118,43 @@ export default function POSClient({
         onApply={setDiscount}
       />
 
+      {/* Confirmar vaciar carrito */}
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Vaciar el carrito?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se quitarán {cartItemCount(lines)} artículo{cartItemCount(lines) === 1 ? "" : "s"}, la nota y el
+              descuento de esta venta. No se registra nada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                clearCart()
+                setConfirmClear(false)
+              }}
+            >
+              Vaciar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ── Receipt dialog ── */}
       <Dialog
         open={completedSale !== null}
         onOpenChange={(open) => {
-          if (!open) handleCloseReceipt()
+          if (!open) setCompletedSale(null)
         }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="sr-only">Ticket de venta</DialogTitle>
           </DialogHeader>
-          {completedSale && (
-            <ReceiptView sale={completedSale} onClose={handleCloseReceipt} />
-          )}
+          {completedSale && <ReceiptView sale={completedSale} onClose={() => setCompletedSale(null)} />}
         </DialogContent>
       </Dialog>
     </div>

@@ -1,7 +1,7 @@
 import type React from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
-import { Coffee, Store, LogOut } from "lucide-react"
+import { Coffee, Store, LogOut, BookOpen } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { AdminNav } from "./admin-nav"
 
@@ -55,6 +55,14 @@ export default async function AdminLayout({
           >
             <Store className="h-4 w-4" />
             Ir al POS
+          </Link>
+          <Link
+            href="/ayuda"
+            target="_blank"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100 transition-colors"
+          >
+            <BookOpen className="h-4 w-4" />
+            Guía de uso
           </Link>
           <form action={logout}>
             <button

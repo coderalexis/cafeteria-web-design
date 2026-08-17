@@ -136,6 +136,7 @@ export default async function POSPage() {
       categories={categories}
       products={products}
       isAdmin={isAdmin}
+      cashierId={user?.id ?? "anon"}
       initialTotalSales={dbTotalSales}
       openSession={
         session

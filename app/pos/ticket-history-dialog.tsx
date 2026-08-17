@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Ban, Printer, Receipt, RefreshCw } from "lucide-react"
+import { Ban, ChefHat, Printer, Receipt, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { cancelTicket, getTodayTickets } from "@/app/actions/sales"
 import { formatCurrency, formatTime, PAYMENT_METHODS, type PaymentMethodKey } from "@/lib/format"
-import { buildTicketLines, printLines, receiptFromTicket } from "@/lib/receipt"
+import { buildKitchenLines, buildTicketLines, printLines, receiptFromTicket } from "@/lib/receipt"
 import { ticketItemLabel, type TicketRecord } from "@/lib/tickets"
 
 interface Props {
@@ -61,6 +61,12 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
 
   const reprint = (ticket: TicketRecord) => {
     if (!printLines(buildTicketLines(receiptFromTicket(ticket, true)), `Ticket ${ticket.folio}`)) {
+      toast.error("El navegador bloqueó la ventana de impresión.")
+    }
+  }
+
+  const printKitchen = (ticket: TicketRecord) => {
+    if (!printLines(buildKitchenLines(receiptFromTicket(ticket)), `Comanda ${ticket.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }
@@ -169,10 +175,19 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
                           variant="outline"
                           size="icon"
                           className="h-8 w-8"
-                          title="Reimprimir"
+                          title="Reimprimir ticket"
                           onClick={() => reprint(ticket)}
                         >
                           <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Imprimir comanda (sin precios)"
+                          onClick={() => printKitchen(ticket)}
+                        >
+                          <ChefHat className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="outline"

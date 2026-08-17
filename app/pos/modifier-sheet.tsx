@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { formatCurrency } from "@/lib/format"
-import type { ModifierGroup, ModifierOption, Product, SizeOption } from "./pos-client"
+import type { ModifierGroup, ModifierOption, Product, SizeOption } from "./cart"
 
 interface Props {
   pending: { product: Product; size?: SizeOption } | null

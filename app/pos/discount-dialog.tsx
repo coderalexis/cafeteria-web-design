@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { formatCurrency } from "@/lib/format"
-import type { TicketDiscount } from "./pos-client"
+import type { TicketDiscount } from "./cart"
 
 interface Props {
   open: boolean

@@ -126,6 +126,30 @@ export function buildTicketLines(r: ReceiptData): string[] {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Comanda para barra/cocina (sin precios: qué preparar y cómo)       */
+/* ------------------------------------------------------------------ */
+
+export function buildKitchenLines(r: ReceiptData): string[] {
+  const lines: string[] = [
+    RULE,
+    center("COMANDA"),
+    RULE,
+    row(`Folio: ${r.folio}`, formatTime(r.date)),
+  ]
+  if (r.notes) lines.push(`Nota: ${r.notes}`)
+  lines.push(THIN)
+  for (const item of r.items) {
+    lines.push(`${item.quantity}x ${item.label.toUpperCase()}`)
+    for (const m of item.modifiers ?? []) lines.push(`   + ${m.name}`)
+    if (item.notes) lines.push(`   * ${item.notes.toUpperCase()}`)
+    lines.push("")
+  }
+  lines.push(THIN)
+  if (r.status === "cancelado") lines.push(center("*** CANCELADO ***"))
+  return lines
+}
+
+/* ------------------------------------------------------------------ */
 /*  Corte de caja                                                      */
 /* ------------------------------------------------------------------ */
 
