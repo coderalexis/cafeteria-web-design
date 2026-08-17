@@ -1,5 +1,5 @@
 // Generado desde el proyecto Supabase (cafeteriacodex) tras la migración
-// fase3_modificadores_descuentos. Regenerar con el MCP de Supabase (generate_typescript_types)
+// fase4b_movimientos_caja. Regenerar con el MCP de Supabase (generate_typescript_types)
 // o `supabase gen types typescript` después de cada migración.
 export type Json =
   | string
@@ -17,6 +17,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      cash_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          id: string
+          kind: string
+          reason: string
+          session_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          id?: string
+          kind: string
+          reason: string
+          session_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          kind?: string
+          reason?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_sessions: {
         Row: {
           closed_at: string | null
@@ -525,6 +570,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_cash_movement: {
+        Args: { p_amount: number; p_kind: string; p_reason: string }
+        Returns: Json
+      }
       business_day: { Args: { ts: string }; Returns: string }
       cancel_ticket: {
         Args: { p_reason: string; p_ticket_id: string }

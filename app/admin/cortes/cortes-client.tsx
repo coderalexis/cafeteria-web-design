@@ -23,6 +23,8 @@ export interface CashSessionRecord {
   countedCash: number | null
   difference: number | null
   closingNotes: string | null
+  movementsIn: number
+  movementsOut: number
 }
 
 function DifferenceBadge({ value }: { value: number | null }) {
@@ -141,6 +143,7 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                     <th className="text-left px-4 py-3 font-medium text-stone-500">Abrió / Cerró</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Fondo</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Efectivo vendido</th>
+                    <th className="text-right px-4 py-3 font-medium text-stone-500">Entradas / Salidas</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Esperado</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Contado</th>
                     <th className="text-left px-4 py-3 font-medium text-stone-500">Diferencia</th>
@@ -149,7 +152,8 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                 </thead>
                 <tbody>
                   {closed.map((s) => {
-                    const cashSales = (s.expectedCash ?? 0) - s.openingFloat
+                    // esperado = fondo + efectivo vendido + entradas − salidas
+                    const cashSales = (s.expectedCash ?? 0) - s.openingFloat - s.movementsIn + s.movementsOut
                     return (
                       <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-amber-50/40">
                         <td className="px-4 py-3 text-stone-700">
@@ -169,6 +173,17 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                         </td>
                         <td className="px-4 py-3 text-right text-stone-600">{formatCurrency(s.openingFloat)}</td>
                         <td className="px-4 py-3 text-right text-stone-600">{formatCurrency(cashSales)}</td>
+                        <td className="px-4 py-3 text-right text-xs">
+                          {s.movementsIn === 0 && s.movementsOut === 0 ? (
+                            <span className="text-stone-300">—</span>
+                          ) : (
+                            <span>
+                              {s.movementsIn > 0 && <span className="text-emerald-700">+{formatCurrency(s.movementsIn)}</span>}
+                              {s.movementsIn > 0 && s.movementsOut > 0 && <span className="text-stone-300"> / </span>}
+                              {s.movementsOut > 0 && <span className="text-red-700">-{formatCurrency(s.movementsOut)}</span>}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right font-medium text-stone-800">
                           {s.expectedCash != null ? formatCurrency(s.expectedCash) : "—"}
                         </td>

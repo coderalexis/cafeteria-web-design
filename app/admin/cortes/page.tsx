@@ -18,7 +18,21 @@ export default async function CortesPage() {
 
   const names = buildProfileNameMap(profiles)
 
+  // Entradas/salidas de efectivo por sesión (solo las sesiones listadas)
+  const sessionIds = (sessions ?? []).map((s) => s.id)
+  const { data: movements } = sessionIds.length
+    ? await supabase.from("cash_movements").select("session_id, kind, amount").in("session_id", sessionIds)
+    : { data: [] }
+  const movementTotals: Record<string, { in: number; out: number }> = {}
+  for (const m of movements ?? []) {
+    const t = (movementTotals[m.session_id] ??= { in: 0, out: 0 })
+    if (m.kind === "entrada") t.in += m.amount
+    else t.out += m.amount
+  }
+
   const serialized: CashSessionRecord[] = (sessions ?? []).map((s) => ({
+    movementsIn: movementTotals[s.id]?.in ?? 0,
+    movementsOut: movementTotals[s.id]?.out ?? 0,
     id: s.id,
     status: s.status === "abierta" ? "abierta" : "cerrada",
     openedAt: s.opened_at,

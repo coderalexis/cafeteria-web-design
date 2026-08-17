@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Lock, Unlock, Printer, Wallet } from "lucide-react"
+import { Lock, Unlock, Printer, Wallet, ArrowDownToLine, ArrowUpFromLine, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { closeCashSession, getCashSessionSummary, openCashSession } from "@/app/actions/cash"
+import { addCashMovement, closeCashSession, getCashSessionSummary, openCashSession } from "@/app/actions/cash"
 import { formatCurrency, formatTime, paymentLabel } from "@/lib/format"
 import { buildCorteLines, printLines, type CashSessionSummary } from "@/lib/receipt"
 
@@ -153,6 +153,17 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
   const [countedValue, setCountedValue] = useState("")
   const [notes, setNotes] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Movimiento de efectivo en captura
+  const [movementKind, setMovementKind] = useState<"entrada" | "salida" | null>(null)
+  const [movementAmount, setMovementAmount] = useState("")
+  const [movementReason, setMovementReason] = useState("")
+  const [isSavingMovement, setIsSavingMovement] = useState(false)
+
+  const loadSummary = useCallback(async () => {
+    const result = await getCashSessionSummary(session.id)
+    if (result.success) setSummary(result.summary)
+    else setLoadError(result.error)
+  }, [session.id])
 
   useEffect(() => {
     let cancelled = false
@@ -166,9 +177,31 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
     }
   }, [session.id])
 
-  const expected = summary ? summary.opening_float + summary.cash_sales : null
+  const movIn = summary?.movements_in ?? 0
+  const movOut = summary?.movements_out ?? 0
+  const expected = summary ? summary.opening_float + summary.cash_sales + movIn - movOut : null
   const counted = parseMoney(countedValue)
   const difference = expected !== null && counted !== null ? counted - expected : null
+
+  const movementAmountNum = parseMoney(movementAmount)
+  const canSaveMovement =
+    movementKind !== null && movementAmountNum !== null && movementAmountNum > 0 && movementReason.trim().length >= 2
+
+  const saveMovement = async () => {
+    if (!canSaveMovement || movementKind === null || movementAmountNum === null || isSavingMovement) return
+    setIsSavingMovement(true)
+    const result = await addCashMovement({ kind: movementKind, amount: movementAmountNum, reason: movementReason.trim() })
+    setIsSavingMovement(false)
+    if (!result.success) {
+      toast.error(result.error)
+      return
+    }
+    toast.success(`${movementKind === "entrada" ? "Entrada" : "Salida"} de ${formatCurrency(result.amount)} registrada`)
+    setMovementKind(null)
+    setMovementAmount("")
+    setMovementReason("")
+    await loadSummary()
+  }
 
   const submit = async (print: boolean) => {
     if (counted === null || isSubmitting) return
@@ -200,7 +233,8 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
           Cerrar caja
         </DialogTitle>
         <DialogDescription>
-          Abierta desde las {formatTime(session.openedAt)} con fondo de {formatCurrency(session.openingFloat)}.
+          Abierta desde las {formatTime(session.openedAt)} con fondo de {formatCurrency(session.openingFloat)}. Aquí
+          también registras entradas y salidas de efectivo del turno.
         </DialogDescription>
       </DialogHeader>
 
@@ -239,6 +273,106 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
             </div>
           </div>
 
+          {/* Movimientos de efectivo del turno */}
+          <div className="rounded-lg border border-stone-200 p-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Movimientos de efectivo</p>
+              {movementKind === null && (
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                    onClick={() => setMovementKind("entrada")}
+                  >
+                    <ArrowDownToLine className="h-3.5 w-3.5" /> Entrada
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-red-700 border-red-200 hover:bg-red-50"
+                    onClick={() => setMovementKind("salida")}
+                  >
+                    <ArrowUpFromLine className="h-3.5 w-3.5" /> Salida
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {movementKind !== null && (
+              <div
+                className={`rounded-md border p-2 space-y-2 ${
+                  movementKind === "entrada" ? "border-emerald-200 bg-emerald-50/50" : "border-red-200 bg-red-50/50"
+                }`}
+              >
+                <p className="text-xs font-medium text-stone-700">
+                  {movementKind === "entrada" ? "Entrada de efectivo a la caja" : "Salida de efectivo de la caja"}
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="Monto"
+                    value={movementAmount}
+                    onChange={(e) => setMovementAmount(e.target.value)}
+                    className="h-9 w-28 bg-white font-semibold"
+                    autoFocus
+                  />
+                  <Input
+                    placeholder={movementKind === "entrada" ? "Motivo (ej. cambio en monedas)" : "Motivo (ej. compra de leche)"}
+                    value={movementReason}
+                    onChange={(e) => setMovementReason(e.target.value)}
+                    maxLength={200}
+                    className="h-9 bg-white"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        saveMovement()
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setMovementKind(null)} disabled={isSavingMovement}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={movementKind === "entrada" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-red-600 hover:bg-red-700 text-white"}
+                    disabled={!canSaveMovement || isSavingMovement}
+                    onClick={saveMovement}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    {isSavingMovement ? "Guardando..." : "Registrar"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {(summary.movements ?? []).length === 0 ? (
+              <p className="text-xs text-stone-400">Sin entradas ni salidas en este turno.</p>
+            ) : (
+              <ul className="space-y-1">
+                {(summary.movements ?? []).map((m) => (
+                  <li key={m.id} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-stone-600">
+                      <span className="text-stone-400 text-xs">{formatTime(m.created_at)}</span> {m.reason}
+                    </span>
+                    <span className={`shrink-0 font-medium ${m.kind === "entrada" ? "text-emerald-700" : "text-red-700"}`}>
+                      {m.kind === "entrada" ? "+" : "-"}
+                      {formatCurrency(m.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Efectivo esperado */}
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1.5 text-sm">
             <div className="flex justify-between text-stone-600">
@@ -249,6 +383,18 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
               <span>+ Ventas en efectivo</span>
               <span>{formatCurrency(summary.cash_sales)}</span>
             </div>
+            {movIn > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>+ Entradas</span>
+                <span>{formatCurrency(movIn)}</span>
+              </div>
+            )}
+            {movOut > 0 && (
+              <div className="flex justify-between text-red-700">
+                <span>− Salidas</span>
+                <span>{formatCurrency(movOut)}</span>
+              </div>
+            )}
             <Separator className="my-1 bg-amber-200" />
             <div className="flex justify-between font-bold text-amber-900">
               <span>Efectivo esperado</span>

@@ -173,6 +173,17 @@ export interface CashSessionSummary {
   cancelled_amount: number
   /** Suma de descuentos del turno (lo agrega cash_session_summary desde Fase 3; opcional por compatibilidad). */
   discount_total?: number
+  /** Entradas/salidas de efectivo a mitad de turno (Fase 4b). */
+  movements_in?: number
+  movements_out?: number
+  movements?: Array<{
+    id: string
+    kind: "entrada" | "salida"
+    amount: number
+    reason: string
+    created_at: string
+    created_by: string
+  }>
   by_method: Array<{ method: string; tickets: number; revenue: number }>
 }
 
@@ -204,10 +215,21 @@ export function buildCorteLines(s: CashSessionSummary): string[] {
   if (s.cancelled_count > 0) {
     lines.push(row(`Canceladas (${s.cancelled_count})`, formatCurrency(s.cancelled_amount)))
   }
+  const movIn = s.movements_in ?? 0
+  const movOut = s.movements_out ?? 0
+  if ((s.movements ?? []).length > 0) {
+    lines.push("", THIN, "MOVIMIENTOS DE EFECTIVO")
+    for (const m of s.movements ?? []) {
+      const sign = m.kind === "entrada" ? "+" : "-"
+      lines.push(row(`${formatTime(new Date(m.created_at))} ${m.reason}`.slice(0, 22), `${sign}${formatCurrency(m.amount)}`))
+    }
+  }
   lines.push("", THIN, "EFECTIVO EN CAJA")
   lines.push(row("Fondo inicial", formatCurrency(s.opening_float)))
   lines.push(row("Ventas efectivo", formatCurrency(s.cash_sales)))
-  lines.push(row("Esperado", formatCurrency(s.expected_cash ?? s.opening_float + s.cash_sales)))
+  if (movIn > 0) lines.push(row("Entradas", `+${formatCurrency(movIn)}`))
+  if (movOut > 0) lines.push(row("Salidas", `-${formatCurrency(movOut)}`))
+  lines.push(row("Esperado", formatCurrency(s.expected_cash ?? s.opening_float + s.cash_sales + movIn - movOut)))
   if (s.counted_cash != null) {
     lines.push(row("Contado", formatCurrency(s.counted_cash)))
     const diff = s.difference ?? 0

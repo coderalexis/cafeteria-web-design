@@ -172,13 +172,19 @@ export default function AyudaPage() {
             <ol className="space-y-3">
               <Step n={1} title="Toca el botón verde «Caja abierta»">
                 Verás las ventas del turno por método de pago y el <strong>efectivo esperado</strong> = fondo inicial +
-                ventas en efectivo (las canceladas no cuentan).
+                ventas en efectivo + entradas − salidas (las canceladas no cuentan).
               </Step>
-              <Step n={2} title="Cuenta el efectivo y escríbelo">
+              <Step n={2} title="Registra entradas y salidas de efectivo (si las hubo)">
+                En esa misma ventana, <strong>Entrada</strong> (metiste efectivo, ej. cambio en monedas) o{" "}
+                <strong>Salida</strong> (sacaste efectivo, ej. compra de leche), con monto y motivo. Hazlo en el momento, no al
+                final: así el corte cuadra y queda quién y cuándo. Un movimiento no se borra; si te equivocas, registra el
+                contrario.
+              </Step>
+              <Step n={3} title="Cuenta el efectivo y escríbelo">
                 El sistema calcula la diferencia al momento: <em>cuadra</em>, <em>sobrante</em> o <em>faltante</em>. Puedes
                 agregar una nota de cierre.
               </Step>
-              <Step n={3} title="Cerrar e imprimir">
+              <Step n={4} title="Cerrar e imprimir">
                 Imprime el corte para el archivo. Los cortes quedan guardados en el panel (Cortes de caja) y se pueden reimprimir.
               </Step>
             </ol>

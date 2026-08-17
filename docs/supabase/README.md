@@ -37,6 +37,7 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 5. `05_fase1.sql` — `cash_sessions`, estado de ticket y cancelación, RPCs `open_cash_session` / `close_cash_session` / `cash_session_summary` / `cancel_ticket`; se eliminan INSERT/DELETE directos en tickets (solo RPC)
 6. `06_fase2.sql` — RPC `sales_report` (agregación de reportes en SQL, día de operación CDMX)
 7. `07_fase3.sql` — modificadores en la venta y descuento por ticket (`create_ticket` v3), `discount_reason`
+8. `08_fase4b.sql` — `cash_movements` (entradas/salidas de efectivo del turno), RPC `add_cash_movement`; el corte los considera
 
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 

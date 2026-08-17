@@ -73,6 +73,39 @@ export async function closeCashSession(
   return { success: true, summary: data as unknown as CashSessionSummary }
 }
 
+const movementSchema = z.object({
+  kind: z.enum(["entrada", "salida"]),
+  amount: z.number().finite().positive().max(9_999_999),
+  reason: z.string().trim().min(2, "Indica el motivo del movimiento.").max(200),
+})
+
+export type CashMovementInput = z.infer<typeof movementSchema>
+
+/** Entrada o salida de efectivo a mitad de turno (exige caja abierta). */
+export async function addCashMovement(
+  input: CashMovementInput,
+): Promise<ActionResult<{ id: string; amount: number }>> {
+  const parsed = movementSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("add_cash_movement", {
+    p_kind: parsed.data.kind,
+    p_amount: parsed.data.amount,
+    p_reason: parsed.data.reason,
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  const row = data as { id: string; amount: number }
+  revalidateCash()
+  return { success: true, id: row.id, amount: row.amount }
+}
+
 export async function getCashSessionSummary(
   sessionId: string,
 ): Promise<ActionResult<{ summary: CashSessionSummary }>> {
