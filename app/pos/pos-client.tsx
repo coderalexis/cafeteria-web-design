@@ -23,10 +23,23 @@ import {
   StickyNote,
   ChefHat,
   Keyboard,
+  MoreVertical,
+  LogOut,
+  BookOpen,
+  ChevronUp,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/kbd"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { logout } from "@/app/actions/auth"
 import { createTicket } from "@/app/actions/sales"
 import { Badge } from "@/components/ui/badge"
@@ -301,6 +314,9 @@ export default function POSClient({
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
   // Producto/tamaño esperando elección de modificadores
   const [pendingModifiers, setPendingModifiers] = useState<{ product: Product; size?: SizeOption } | null>(null)
+  // Layout: en pantallas chicas el carrito vive en una hoja inferior
+  const isMobile = useIsMobile()
+  const [cartOpen, setCartOpen] = useState(false)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
   const cashInputRef = useRef<HTMLInputElement>(null)
@@ -386,6 +402,7 @@ export default function POSClient({
         })
         setTotalSales((prev) => prev + result.total)
         resetAfterSale()
+        setCartOpen(false)
       } else {
         toast.error(result.error || "Error al registrar la venta")
       }
@@ -559,86 +576,475 @@ export default function POSClient({
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
-  return (
-    <div className="relative flex h-screen bg-stone-50 overflow-hidden">
-      {/* ── Top-right actions ── */}
-      <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
-        {/* Estado de caja */}
-        <Button
-          variant="outline"
-          onClick={() => setShowCashDialog(true)}
-          className={`backdrop-blur gap-1.5 font-semibold ${
-            openSession
-              ? "bg-green-50/90 border-green-300 text-green-700 hover:bg-green-100"
-              : "bg-red-50/90 border-red-300 text-red-700 hover:bg-red-100"
-          }`}
-          title={openSession ? "Cerrar caja (corte)" : "Abrir caja"}
-        >
-          {openSession ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-          {openSession ? `Caja abierta · ${formatTime(openSession.openedAt)}` : "Caja cerrada"}
-          <Kbd>K</Kbd>
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setShowTickets(true)}
-          className="bg-white/80 backdrop-blur gap-1.5"
-        >
-          <Receipt className="h-4 w-4" />
-          Tickets
-          <Kbd>T</Kbd>
-        </Button>
-        {isAdmin && (
-          <Link href="/admin">
-            <Button variant="outline" className="bg-white/80 backdrop-blur gap-1.5">
-              <Settings className="h-4 w-4" />
-              Administrar
-            </Button>
-          </Link>
-        )}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowShortcuts(true)}
-          className="bg-white/80 backdrop-blur"
-          title="Atajos y ayuda (?)"
-          aria-label="Atajos y ayuda"
-        >
-          <Keyboard className="h-4 w-4" />
-        </Button>
-        <form action={logout}>
-          <Button type="submit" variant="outline" className="bg-white/80 backdrop-blur">
-            Cerrar sesión
-          </Button>
-        </form>
-      </div>
+  const itemCount = cartItemCount(lines)
 
-      {/* ───── LEFT PANEL (Products) ───── */}
-      <div className="w-3/5 flex flex-col h-full border-r border-stone-200">
-        {/* Header */}
-        <header className="shrink-0 px-5 pt-4 pb-3 bg-white border-b border-stone-200 shadow-sm">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Coffee className="h-6 w-6 text-amber-700" />
-              <h1 className="text-2xl font-bold text-stone-800 tracking-tight">El Cafecito</h1>
+  /* Panel del carrito (header + líneas + cobro). Se monta una sola vez:
+     como columna derecha en escritorio o dentro de una hoja inferior en
+     móvil, para que refs y foco apunten al panel visible. */
+  const cartPanel = (
+    <div className="flex flex-col h-full bg-white">
+      <header className="shrink-0 px-5 py-3 md:py-4 border-b border-stone-200 bg-amber-50/60">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5 text-amber-700" />
+            <h2 className="text-lg font-bold text-stone-800">Venta Actual</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {lines.length > 0 && (
+              <>
+                <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+                  {itemCount} items
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-stone-400 hover:text-red-600 hover:bg-red-50 gap-1"
+                  onClick={() => setConfirmClear(true)}
+                  title="Vaciar carrito (Ctrl+⌫)"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Vaciar
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Cart items */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-4">
+          {lines.length === 0 ? (
+            <div className="h-64 flex flex-col items-center justify-center text-stone-300">
+              <ShoppingBag className="h-14 w-14 mb-3 opacity-40" />
+              <p className="text-base font-medium text-stone-400">No hay productos</p>
+              <p className="text-sm text-stone-300">Toca un producto para agregarlo</p>
             </div>
-            <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl flex items-center gap-2">
-              <span className="text-sm text-amber-800 font-medium">Total vendido hoy:</span>
-              <span className="text-xl font-bold text-amber-800">{formatCurrency(totalSales)}</span>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {lines.map((line) => (
+                <motion.div
+                  key={line.lineId}
+                  layout
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                    backgroundColor: line.isNew ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0)",
+                  }}
+                  exit={{ opacity: 0, x: -20, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="py-3 border-b border-stone-100 rounded-lg px-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-stone-800 text-sm truncate">{line.product.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-stone-400">{formatCurrency(getLinePrice(line))}</span>
+                        {line.size && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 border-stone-300 text-stone-500"
+                          >
+                            {line.size.label}
+                          </Badge>
+                        )}
+                      </div>
+                      {line.modifiers.length > 0 && (
+                        <p className="text-[11px] text-amber-700 mt-0.5 truncate">
+                          {line.modifiers.map((m) => `+ ${m.name}`).join(" · ")}
+                        </p>
+                      )}
+                      {line.notes && editingNoteFor !== line.lineId && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingNoteFor(line.lineId)}
+                          className="text-[11px] text-stone-500 italic mt-0.5 truncate max-w-full text-left hover:text-amber-700"
+                          title="Editar nota"
+                        >
+                          📝 {line.notes}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quantity controls (táctiles: 40px en móvil) */}
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 md:h-8 md:w-8 rounded-full border-stone-300 text-stone-500"
+                        onClick={() => updateQuantity(line.lineId, -1)}
+                        aria-label="Quitar uno"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="w-6 text-center text-sm font-bold text-stone-700">{line.quantity}</span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 md:h-8 md:w-8 rounded-full border-stone-300 text-stone-500"
+                        onClick={() => updateQuantity(line.lineId, 1)}
+                        aria-label="Agregar uno"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    <span className="font-bold text-sm text-stone-800 w-16 text-right">
+                      {formatCurrency(getLinePrice(line) * line.quantity)}
+                    </span>
+
+                    <div className="flex items-center shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-10 w-10 md:h-8 md:w-8 ${
+                          line.notes ? "text-amber-600" : "text-stone-300"
+                        } hover:text-amber-700 hover:bg-amber-50`}
+                        onClick={() => setEditingNoteFor(editingNoteFor === line.lineId ? null : line.lineId)}
+                        title="Nota para este artículo"
+                        aria-label="Nota para este artículo"
+                      >
+                        <StickyNote className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 md:h-8 md:w-8 text-stone-300 hover:text-red-500 hover:bg-red-50"
+                        onClick={() => removeLine(line.lineId)}
+                        aria-label="Quitar línea"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Nota por artículo */}
+                  {editingNoteFor === line.lineId && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        autoFocus
+                        placeholder="ej. sin azúcar, extra caliente…"
+                        defaultValue={line.notes}
+                        maxLength={200}
+                        className="h-9 text-sm bg-amber-50/50 border-amber-200"
+                        onBlur={(e) => {
+                          setLineNotes(line.lineId, e.target.value.trim())
+                          setEditingNoteFor(null)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "Escape") {
+                            e.preventDefault()
+                            ;(e.target as HTMLInputElement).blur()
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Checkout */}
+      <div className="shrink-0 p-4 border-t border-stone-200 bg-stone-50/80 space-y-3">
+        {/* Ticket notes */}
+        <Input
+          placeholder="Nota del ticket: mesa, nombre, para llevar..."
+          value={ticketNotes}
+          onChange={(e) => setTicketNotes(e.target.value)}
+          maxLength={500}
+          className="bg-white border-stone-200 h-9 text-sm"
+        />
+
+        {/* Payment method selector */}
+        <div className="flex gap-2">
+          {PAYMENT_METHOD_KEYS.map((key, index) => {
+            const info = PAYMENT_METHODS[key]
+            const Icon = info.icon
+            const active = paymentMethod === key
+            const activeClass =
+              key === "efectivo"
+                ? "border-green-500 bg-green-50 text-green-700"
+                : key === "transferencia"
+                ? "border-violet-500 bg-violet-50 text-violet-700"
+                : "border-blue-500 bg-blue-50 text-blue-700"
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPaymentMethod(key)}
+                className={`relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {info.shortLabel}
+                <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Efectivo recibido + cambio */}
+        {paymentMethod === "efectivo" && (
+          <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
+                Recibido <Kbd>F4</Kbd>
+              </span>
+              <Input
+                ref={cashInputRef}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="Opcional"
+                value={cashReceivedInput}
+                onChange={(e) => setCashReceivedInput(e.target.value)}
+                className={`h-9 text-sm font-semibold bg-white ${
+                  cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
+                }`}
+              />
+              <span
+                className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
+                  cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
+                }`}
+              >
+                {cashInsufficient
+                  ? `Faltan ${formatCurrency(total - (cashReceived ?? 0))}`
+                  : changeDue !== null
+                  ? `Cambio ${formatCurrency(changeDue)}`
+                  : "Cambio —"}
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCashReceivedInput(total > 0 ? String(total) : "")}
+                className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
+              >
+                Exacto
+              </button>
+              {CASH_QUICK_AMOUNTS.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => setCashReceivedInput(String(amount))}
+                  className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
+                  disabled={amount < total}
+                >
+                  ${amount}
+                </button>
+              ))}
             </div>
           </div>
+        )}
+
+        {/* Subtotal / descuento / total */}
+        <div className="space-y-1">
+          {(discount || subtotal > 0) && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-stone-500">Subtotal</span>
+              <span className="text-stone-600">{formatCurrency(subtotal)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center text-sm">
+            <button
+              type="button"
+              onClick={() => setShowDiscount(true)}
+              disabled={lines.length === 0}
+              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 -ml-1.5 transition-colors disabled:opacity-40 ${
+                discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
+              }`}
+            >
+              <Percent className="h-3.5 w-3.5" />
+              {discount
+                ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
+                : "Agregar descuento"}
+              <Kbd>D</Kbd>
+            </button>
+            {discount && (
+              <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
+                {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
+              </span>
+            )}
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-base font-medium text-stone-500">Total</span>
+            <span className="text-2xl font-bold text-stone-800">{formatCurrency(total)}</span>
+          </div>
+        </div>
+
+        {/* Cobrar button / gate de caja */}
+        {openSession ? (
+          <Button
+            className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
+              paymentMethod === "efectivo"
+                ? "bg-green-600 hover:bg-green-700"
+                : paymentMethod === "transferencia"
+                ? "bg-violet-600 hover:bg-violet-700"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+            size="lg"
+            disabled={!canCharge}
+            onClick={finalizeSale}
+          >
+            {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
+            <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
+          </Button>
+        ) : (
+          <Button
+            className="w-full py-6 text-lg font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2"
+            size="lg"
+            onClick={() => setShowCashDialog(true)}
+          >
+            <Lock className="h-5 w-5" />
+            Caja cerrada · Abrir caja para cobrar
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+
+  /* Chip de estado de caja (compartido entre escritorio y móvil) */
+  const cashChip = (compact: boolean) => (
+    <Button
+      variant="outline"
+      size={compact ? "sm" : "default"}
+      onClick={() => setShowCashDialog(true)}
+      className={`backdrop-blur gap-1.5 font-semibold ${
+        openSession
+          ? "bg-green-50/90 border-green-300 text-green-700 hover:bg-green-100"
+          : "bg-red-50/90 border-red-300 text-red-700 hover:bg-red-100"
+      }`}
+      title={openSession ? "Cerrar caja (corte) · movimientos de efectivo" : "Abrir caja"}
+    >
+      {openSession ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+      {compact
+        ? openSession
+          ? "Caja"
+          : "Cerrada"
+        : openSession
+        ? `Caja abierta · ${formatTime(openSession.openedAt)}`
+        : "Caja cerrada"}
+      {!compact && <Kbd>K</Kbd>}
+    </Button>
+  )
+
+  return (
+    <div className="relative flex h-[100dvh] bg-stone-50 overflow-hidden">
+      {/* ── Top-right actions (escritorio) ── */}
+      {!isMobile && (
+        <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
+          {cashChip(false)}
+          <Button
+            variant="outline"
+            onClick={() => setShowTickets(true)}
+            className="bg-white/80 backdrop-blur gap-1.5"
+          >
+            <Receipt className="h-4 w-4" />
+            Tickets
+            <Kbd>T</Kbd>
+          </Button>
+          {isAdmin && (
+            <Link href="/admin">
+              <Button variant="outline" className="bg-white/80 backdrop-blur gap-1.5">
+                <Settings className="h-4 w-4" />
+                Administrar
+              </Button>
+            </Link>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowShortcuts(true)}
+            className="bg-white/80 backdrop-blur"
+            title="Atajos y ayuda (?)"
+            aria-label="Atajos y ayuda"
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
+          <form action={logout}>
+            <Button type="submit" variant="outline" className="bg-white/80 backdrop-blur">
+              Cerrar sesión
+            </Button>
+          </form>
+        </div>
+      )}
+
+      {/* ───── LEFT PANEL (Products) ───── */}
+      <div className={`flex flex-col h-full ${isMobile ? "w-full" : "w-3/5 border-r border-stone-200"}`}>
+        {/* Header */}
+        <header className="shrink-0 px-4 md:px-5 pt-3 md:pt-4 pb-3 bg-white border-b border-stone-200 shadow-sm">
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
+              <h1 className="text-xl md:text-2xl font-bold text-stone-800 tracking-tight truncate">El Cafecito</h1>
+            </div>
+            {isMobile ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {cashChip(true)}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Menú">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem onSelect={() => setShowTickets(true)}>
+                      <Receipt className="h-4 w-4 mr-2" /> Tickets del día
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setShowCashDialog(true)}>
+                      {openSession ? <Unlock className="h-4 w-4 mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
+                      {openSession ? "Caja · corte y movimientos" : "Abrir caja"}
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin">
+                          <Settings className="h-4 w-4 mr-2" /> Administrar
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem asChild>
+                      <Link href="/ayuda" target="_blank">
+                        <BookOpen className="h-4 w-4 mr-2" /> Guía de uso
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => logout()} className="text-red-600 focus:text-red-700">
+                      <LogOut className="h-4 w-4 mr-2" /> Cerrar sesión
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl flex items-center gap-2">
+                <span className="text-sm text-amber-800 font-medium">Total vendido hoy:</span>
+                <span className="text-xl font-bold text-amber-800">{formatCurrency(totalSales)}</span>
+              </div>
+            )}
+          </div>
+          {isMobile && (
+            <p className="text-xs text-amber-800 mt-1">
+              Vendido hoy: <span className="font-bold">{formatCurrency(totalSales)}</span>
+            </p>
+          )}
 
           {/* Search bar */}
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
             <Input
               ref={searchInputRef}
-              placeholder="Buscar producto…  (Enter agrega el primero)"
+              placeholder={isMobile ? "Buscar producto…" : "Buscar producto…  (Enter agrega el primero)"}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 setSizePickerFor(null)
               }}
-              className="pl-9 pr-16 bg-stone-50 border-stone-200 h-9 text-sm"
+              className="pl-9 pr-16 bg-stone-50 border-stone-200 h-10 md:h-9 text-sm"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
               {searchQuery ? (
@@ -647,10 +1053,10 @@ export default function POSClient({
                     setSearchQuery("")
                     searchInputRef.current?.focus()
                   }}
-                  className="text-stone-400 hover:text-stone-600"
+                  className="text-stone-400 hover:text-stone-600 p-1"
                   aria-label="Limpiar búsqueda"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               ) : (
                 <Kbd className="text-stone-400">/</Kbd>
@@ -682,8 +1088,8 @@ export default function POSClient({
         </header>
 
         {/* Product grid */}
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-6">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className={`p-4 space-y-6 ${isMobile ? "pb-24" : ""}`}>
             {products.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-stone-400">
                 <Coffee className="h-12 w-12 mb-3 opacity-40" />
@@ -702,7 +1108,7 @@ export default function POSClient({
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1">
                   {subcategory}
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {items.map((product) => (
                     <div key={product.id}>
                       <motion.button
@@ -746,7 +1152,7 @@ export default function POSClient({
                                   key={size.label}
                                   whileTap={{ scale: 0.92 }}
                                   onClick={() => chooseProduct(product, size)}
-                                  className="relative flex-1 py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
+                                  className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
                                 >
                                   {index < 9 && (
                                     <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
@@ -771,332 +1177,37 @@ export default function POSClient({
         </ScrollArea>
       </div>
 
-      {/* ───── RIGHT PANEL (Cart) ───── */}
-      <div className="w-2/5 flex flex-col h-full bg-white">
-        <header className="shrink-0 px-5 py-4 border-b border-stone-200 bg-amber-50/60">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5 text-amber-700" />
-              <h2 className="text-lg font-bold text-stone-800">Venta Actual</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              {lines.length > 0 && (
-                <>
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
-                    {cartItemCount(lines)} items
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-stone-400 hover:text-red-600 hover:bg-red-50 gap-1"
-                    onClick={() => setConfirmClear(true)}
-                    title="Vaciar carrito (Ctrl+⌫)"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Vaciar
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </header>
+      {/* ───── RIGHT PANEL (Cart) — escritorio ───── */}
+      {!isMobile && <div className="w-2/5 h-full">{cartPanel}</div>}
 
-        {/* Cart items */}
-        <ScrollArea className="flex-1">
-          <div className="p-4">
-            {lines.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-stone-300">
-                <ShoppingBag className="h-14 w-14 mb-3 opacity-40" />
-                <p className="text-base font-medium text-stone-400">No hay productos</p>
-                <p className="text-sm text-stone-300">Toca un producto para agregarlo</p>
-              </div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {lines.map((line) => (
-                  <motion.div
-                    key={line.lineId}
-                    layout
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{
-                      opacity: 1,
-                      x: 0,
-                      backgroundColor: line.isNew ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0)",
-                    }}
-                    exit={{ opacity: 0, x: -20, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="py-3 border-b border-stone-100 rounded-lg px-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-stone-800 text-sm truncate">{line.product.name}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs text-stone-400">{formatCurrency(getLinePrice(line))}</span>
-                          {line.size && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 h-4 border-stone-300 text-stone-500"
-                            >
-                              {line.size.label}
-                            </Badge>
-                          )}
-                        </div>
-                        {line.modifiers.length > 0 && (
-                          <p className="text-[11px] text-amber-700 mt-0.5 truncate">
-                            {line.modifiers.map((m) => `+ ${m.name}`).join(" · ")}
-                          </p>
-                        )}
-                        {line.notes && editingNoteFor !== line.lineId && (
-                          <button
-                            type="button"
-                            onClick={() => setEditingNoteFor(line.lineId)}
-                            className="text-[11px] text-stone-500 italic mt-0.5 truncate max-w-full text-left hover:text-amber-700"
-                            title="Editar nota"
-                          >
-                            📝 {line.notes}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Quantity controls */}
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-full border-stone-300 text-stone-500"
-                          onClick={() => updateQuantity(line.lineId, -1)}
-                          aria-label="Quitar uno"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-6 text-center text-sm font-bold text-stone-700">{line.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-full border-stone-300 text-stone-500"
-                          onClick={() => updateQuantity(line.lineId, 1)}
-                          aria-label="Agregar uno"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-
-                      <span className="font-bold text-sm text-stone-800 w-16 text-right">
-                        {formatCurrency(getLinePrice(line) * line.quantity)}
-                      </span>
-
-                      <div className="flex items-center shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={`h-8 w-8 ${
-                            line.notes ? "text-amber-600" : "text-stone-300"
-                          } hover:text-amber-700 hover:bg-amber-50`}
-                          onClick={() => setEditingNoteFor(editingNoteFor === line.lineId ? null : line.lineId)}
-                          title="Nota para este artículo"
-                          aria-label="Nota para este artículo"
-                        >
-                          <StickyNote className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-stone-300 hover:text-red-500 hover:bg-red-50"
-                          onClick={() => removeLine(line.lineId)}
-                          aria-label="Quitar línea"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Nota por artículo */}
-                    {editingNoteFor === line.lineId && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Input
-                          autoFocus
-                          placeholder="ej. sin azúcar, extra caliente…"
-                          defaultValue={line.notes}
-                          maxLength={200}
-                          className="h-8 text-sm bg-amber-50/50 border-amber-200"
-                          onBlur={(e) => {
-                            setLineNotes(line.lineId, e.target.value.trim())
-                            setEditingNoteFor(null)
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === "Escape") {
-                              e.preventDefault()
-                              ;(e.target as HTMLInputElement).blur()
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            )}
-          </div>
-        </ScrollArea>
-
-        {/* Checkout */}
-        <div className="shrink-0 p-4 border-t border-stone-200 bg-stone-50/80 space-y-3">
-          {/* Ticket notes */}
-          <Input
-            placeholder="Nota del ticket: mesa, nombre, para llevar..."
-            value={ticketNotes}
-            onChange={(e) => setTicketNotes(e.target.value)}
-            maxLength={500}
-            className="bg-white border-stone-200 h-8 text-sm"
-          />
-
-          {/* Payment method selector */}
-          <div className="flex gap-2">
-            {PAYMENT_METHOD_KEYS.map((key, index) => {
-              const info = PAYMENT_METHODS[key]
-              const Icon = info.icon
-              const active = paymentMethod === key
-              const activeClass =
-                key === "efectivo"
-                  ? "border-green-500 bg-green-50 text-green-700"
-                  : key === "transferencia"
-                  ? "border-violet-500 bg-violet-50 text-violet-700"
-                  : "border-blue-500 bg-blue-50 text-blue-700"
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setPaymentMethod(key)}
-                  className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
-                    active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {info.shortLabel}
-                  <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Efectivo recibido + cambio */}
-          {paymentMethod === "efectivo" && (
-            <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
-                  Recibido <Kbd>F4</Kbd>
-                </span>
-                <Input
-                  ref={cashInputRef}
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  placeholder="Opcional"
-                  value={cashReceivedInput}
-                  onChange={(e) => setCashReceivedInput(e.target.value)}
-                  className={`h-8 text-sm font-semibold bg-white ${
-                    cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
-                  }`}
-                />
-                <span
-                  className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
-                    cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
-                  }`}
-                >
-                  {cashInsufficient
-                    ? `Faltan ${formatCurrency(total - (cashReceived ?? 0))}`
-                    : changeDue !== null
-                    ? `Cambio ${formatCurrency(changeDue)}`
-                    : "Cambio —"}
-                </span>
-              </div>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCashReceivedInput(total > 0 ? String(total) : "")}
-                  className="flex-1 py-1 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
-                >
-                  Exacto
-                </button>
-                {CASH_QUICK_AMOUNTS.map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => setCashReceivedInput(String(amount))}
-                    className="flex-1 py-1 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
-                    disabled={amount < total}
-                  >
-                    ${amount}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Subtotal / descuento / total */}
-          <div className="space-y-1">
-            {(discount || subtotal > 0) && (
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-stone-500">Subtotal</span>
-                <span className="text-stone-600">{formatCurrency(subtotal)}</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center text-sm">
-              <button
-                type="button"
-                onClick={() => setShowDiscount(true)}
-                disabled={lines.length === 0}
-                className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 -ml-1.5 transition-colors disabled:opacity-40 ${
-                  discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
-                }`}
-              >
-                <Percent className="h-3.5 w-3.5" />
-                {discount
-                  ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
-                  : "Agregar descuento"}
-                <Kbd>D</Kbd>
-              </button>
-              {discount && (
-                <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
-                  {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
-                </span>
-              )}
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-base font-medium text-stone-500">Total</span>
-              <span className="text-2xl font-bold text-stone-800">{formatCurrency(total)}</span>
-            </div>
-          </div>
-
-          {/* Cobrar button / gate de caja */}
-          {openSession ? (
+      {/* ───── Barra inferior + hoja del carrito — móvil ───── */}
+      {isMobile && (
+        <>
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <Button
-              className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
-                paymentMethod === "efectivo"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : paymentMethod === "transferencia"
-                  ? "bg-violet-600 hover:bg-violet-700"
-                  : "bg-blue-600 hover:bg-blue-700"
+              className={`w-full h-12 rounded-xl text-base font-bold justify-between px-4 ${
+                lines.length > 0 ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-stone-100 text-stone-500 hover:bg-stone-200"
               }`}
-              size="lg"
-              disabled={!canCharge}
-              onClick={finalizeSale}
+              onClick={() => setCartOpen(true)}
             >
-              {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
-              <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
+              <span className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5" />
+                {lines.length === 0 ? "Carrito vacío" : `${itemCount} artículo${itemCount === 1 ? "" : "s"}`}
+              </span>
+              <span className="flex items-center gap-2">
+                {formatCurrency(total)}
+                <ChevronUp className="h-4 w-4 opacity-70" />
+              </span>
             </Button>
-          ) : (
-            <Button
-              className="w-full py-6 text-lg font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2"
-              size="lg"
-              onClick={() => setShowCashDialog(true)}
-            >
-              <Lock className="h-5 w-5" />
-              Caja cerrada · Abrir caja para cobrar
-            </Button>
-          )}
-        </div>
-      </div>
+          </div>
+          <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+            <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col rounded-t-2xl overflow-hidden">
+              <SheetTitle className="sr-only">Venta actual</SheetTitle>
+              <div className="flex-1 min-h-0">{cartPanel}</div>
+            </SheetContent>
+          </Sheet>
+        </>
+      )}
 
       {/* ── Dialogs ── */}
       <CashSessionDialog open={showCashDialog} onOpenChange={setShowCashDialog} session={openSession} />
@@ -1124,8 +1235,8 @@ export default function POSClient({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Vaciar el carrito?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se quitarán {cartItemCount(lines)} artículo{cartItemCount(lines) === 1 ? "" : "s"}, la nota y el
-              descuento de esta venta. No se registra nada.
+              Se quitarán {itemCount} artículo{itemCount === 1 ? "" : "s"}, la nota y el descuento de esta venta. No se
+              registra nada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

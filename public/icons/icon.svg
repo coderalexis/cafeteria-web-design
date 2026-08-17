@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112.64" fill="#b45309"/>
+  <g transform="translate(0 0) scale(5.12)">
+    <!-- vapor -->
+    <path d="M38 22c-4 4-4 8 0 12s4 8 0 12" fill="none" stroke="#fde68a" stroke-width="5" stroke-linecap="round"/>
+    <path d="M52 18c-4 4-4 8 0 12s4 8 0 12" fill="none" stroke="#fde68a" stroke-width="5" stroke-linecap="round"/>
+    <!-- taza -->
+    <path d="M22 50h48v14a20 20 0 0 1-20 20h-8a20 20 0 0 1-20-20z" fill="#fffbeb"/>
+    <path d="M70 54h6a9 9 0 0 1 0 18h-6" fill="none" stroke="#fffbeb" stroke-width="7" stroke-linecap="round"/>
+    <!-- plato -->
+    <rect x="16" y="86" width="60" height="6" rx="3" fill="#fde68a"/>
+  </g>
+</svg>

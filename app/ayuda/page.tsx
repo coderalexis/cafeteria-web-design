@@ -190,6 +190,21 @@ export default function AyudaPage() {
             </ol>
           </Section>
 
+          <Section id="movil" icon={Coffee} title="En tablet o celular">
+            <ul className="space-y-2 text-sm text-stone-600">
+              <li>
+                En pantallas chicas el carrito vive en la <strong>barra inferior</strong>: muestra artículos y total; tócala
+                para abrirlo, cobrar o editar. Las acciones (Tickets, Caja, Guía, Cerrar sesión) están en el menú{" "}
+                <strong>⋮</strong> arriba a la derecha.
+              </li>
+              <li>
+                <strong>Instalar como app</strong>: en Chrome/Android o Safari/iPad abre el sitio y elige{" "}
+                <em>Agregar a pantalla de inicio</em>. Se abre a pantalla completa con su propio ícono. Sigue necesitando
+                internet.
+              </li>
+            </ul>
+          </Section>
+
           <Section id="atajos" icon={Keyboard} title="Atajos de teclado (con teclado físico)">
             <p className="text-sm text-stone-600 mb-3">
               Los atajos con letras funcionan cuando no estás escribiendo en un campo. En el POS, el botón{" "}

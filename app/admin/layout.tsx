@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Coffee, Store, LogOut, BookOpen } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { AdminNav } from "./admin-nav"
+import { AdminMobileNav } from "./mobile-nav"
 
 export default async function AdminLayout({
   children,
@@ -26,9 +27,9 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-stone-100">
-      {/* ───── Sidebar ───── */}
-      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shrink-0">
+    <div className="flex h-[100dvh] bg-stone-100">
+      {/* ───── Sidebar (escritorio) ───── */}
+      <aside className="hidden lg:flex w-64 bg-white border-r border-stone-200 flex-col shrink-0">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-stone-200">
           <div className="flex items-center gap-2">
@@ -84,8 +85,11 @@ export default async function AdminLayout({
         </div>
       </aside>
 
-      {/* ───── Main content ───── */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      {/* ───── Main content (con barra superior en móvil) ───── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <AdminMobileNav userName={userName} logoutAction={logout} />
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
     </div>
   )
 }
