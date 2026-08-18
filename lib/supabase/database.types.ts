@@ -869,6 +869,7 @@ export type Database = {
         Returns: Json
       }
       platform_overview: { Args: never; Returns: Json }
+      sales_insights: { Args: { p_from: string; p_to: string }; Returns: Json }
       sales_report: {
         Args: {
           p_cashier?: string

@@ -294,6 +294,28 @@ export default function AyudaPage() {
             </ul>
           </Section>
 
+          <Section id="admin-analisis" icon={Receipt} title="Análisis (comparativos y patrones)">
+            <ul className="space-y-2 text-sm text-stone-600">
+              <li>
+                <strong>Comparativo</strong>: cada indicador del periodo elegido se compara con el periodo anterior de la
+                misma duración (p. ej. últimos 30 días vs. los 30 previos) y muestra el % de cambio.
+              </li>
+              <li>
+                <strong>Día de la semana</strong>: promedio de ingresos por cada día (¿los martes van flojos?), y{" "}
+                <strong>mapa de calor día × hora</strong> para saber cuándo poner más personal o lanzar una promoción en
+                horas muertas.
+              </li>
+              <li>
+                <strong>Por cajero</strong>: ventas, ticket promedio, artículos por ticket, descuentos y cancelaciones de cada
+                quien. <strong>Descuentos y cancelaciones</strong> por motivo y por quién los aplicó.
+              </li>
+              <li>
+                <strong>Productos sin movimiento</strong> (candidatos a retirar del menú), <strong>modificadores más pedidos</strong>{" "}
+                (para compras) y <strong>parejas que se compran juntas</strong> (ideas de combos).
+              </li>
+            </ul>
+          </Section>
+
           <Section id="admin-negocio" icon={Coffee} title="Datos del negocio">
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
