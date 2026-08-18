@@ -563,9 +563,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_platform_admin: boolean
-          role: Database["public"]["Enums"]["app_role"]
           updated_at: string
-          username: string | null
         }
         Insert: {
           active_business_id?: string | null
@@ -573,9 +571,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_platform_admin?: boolean
-          role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
-          username?: string | null
         }
         Update: {
           active_business_id?: string | null
@@ -583,9 +579,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_platform_admin?: boolean
-          role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
-          username?: string | null
         }
         Relationships: [
           {
@@ -886,7 +880,6 @@ export type Database = {
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "admin" | "cajero"
       business_role: "owner" | "admin" | "cajero"
       payment_method: "efectivo" | "transferencia" | "tarjeta_clip"
       ticket_status: "completado" | "cancelado"
@@ -1017,7 +1010,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "cajero"],
       business_role: ["owner", "admin", "cajero"],
       payment_method: ["efectivo", "transferencia", "tarjeta_clip"],
       ticket_status: ["completado", "cancelado"],
