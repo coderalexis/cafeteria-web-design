@@ -30,12 +30,12 @@ export async function login(formData: FormData): Promise<ActionResult> {
 
   let email: string
   let businessId: string | null = null
+  // Con correo, el café es opcional (solo sirve para dejarlo activo si es miembro);
+  // un valor raro guardado en el dispositivo no debe impedir entrar.
+  const wantedSlug = SLUG_PATTERN.test(businessSlug) ? businessSlug : ""
 
   if (identifier.includes("@")) {
     email = identifier.toLowerCase()
-    if (businessSlug && !SLUG_PATTERN.test(businessSlug)) {
-      return { error: LOGIN_ERROR }
-    }
   } else {
     const username = normalizeUsername(identifier)
     if (!businessSlug) {
@@ -82,9 +82,9 @@ export async function login(formData: FormData): Promise<ActionResult> {
 
   // Si entró por café, ese pasa a ser el negocio activo. Si entró por correo
   // e indicó un café al que pertenece, también.
-  if (!businessId && businessSlug) {
+  if (!businessId && wantedSlug) {
     const { data: ctx0 } = await supabase.rpc("my_context")
-    const membership = parseContext(ctx0)?.memberships.find((m) => m.slug === businessSlug)
+    const membership = parseContext(ctx0)?.memberships.find((m) => m.slug === wantedSlug)
     businessId = membership?.id ?? null
   }
   if (businessId) {
