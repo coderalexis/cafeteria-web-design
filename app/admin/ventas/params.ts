@@ -1,5 +1,5 @@
 import { PAYMENT_METHOD_KEYS, type PaymentMethodKey } from "@/lib/format"
-import { cdmxDateString, parseDateString, type DateString } from "@/lib/dates"
+import { parseDateString, type DateString } from "@/lib/dates"
 
 /* ------------------------------------------------------------------ */
 /*  Filtros del historial de ventas: viven en la URL para que la       */
@@ -26,9 +26,11 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
 }
 
-/** Normaliza searchParams; valores inválidos caen al default (hoy, sin filtros, página 1). */
-export function parseVentasFilters(raw: RawParams): VentasFilters {
-  const today = cdmxDateString()
+/**
+ * Normaliza searchParams; valores inválidos caen al default (hoy, sin filtros, página 1).
+ * `today` es el día de operación en la zona del negocio.
+ */
+export function parseVentasFilters(raw: RawParams, today: DateString): VentasFilters {
   let from = parseDateString(first(raw.from)) ?? today
   let to = parseDateString(first(raw.to)) ?? from
   if (to < from) [from, to] = [to, from]

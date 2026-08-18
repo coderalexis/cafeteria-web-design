@@ -109,7 +109,7 @@ export default async function POSPage() {
   })
 
   /* ── Today's sales (día de operación CDMX, solo completadas) + caja ── */
-  const { fromIso, toIso } = businessDayRange()
+  const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
 
   const [{ data: todayTickets }, { data: session }] = await Promise.all([
     supabase

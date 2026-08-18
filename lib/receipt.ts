@@ -1,4 +1,5 @@
 import { formatCurrency, formatDate, formatTime, paymentLabel } from "@/lib/format"
+import type { BusinessInfo } from "@/lib/context-shape"
 import type { TicketRecord } from "@/lib/tickets"
 import { ticketItemLabel } from "@/lib/tickets"
 
@@ -9,13 +10,69 @@ import { ticketItemLabel } from "@/lib/tickets"
 /* ------------------------------------------------------------------ */
 
 const WIDTH = 32
-const BUSINESS_NAME = "EL CAFECITO"
 const RULE = "=".repeat(WIDTH)
 const THIN = "-".repeat(WIDTH)
+const DEFAULT_FOOTER = "¡Gracias por tu compra!"
 
 function center(text: string): string {
   const pad = Math.max(0, Math.floor((WIDTH - text.length) / 2))
   return " ".repeat(pad) + text
+}
+
+/** Parte un texto en líneas de máximo WIDTH columnas (respeta saltos de línea). */
+function wrap(text: string, width: number = WIDTH): string[] {
+  const out: string[] = []
+  for (const paragraph of text.split(/\r?\n/)) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean)
+    let line = ""
+    for (const w of words) {
+      const candidate = line ? `${line} ${w}` : w
+      if (candidate.length <= width) {
+        line = candidate
+      } else {
+        if (line) out.push(line)
+        // palabra más larga que el ancho: se corta
+        line = w.length > width ? w.slice(0, width) : w
+      }
+    }
+    if (line || words.length === 0) out.push(line)
+  }
+  return out
+}
+
+/** Datos del negocio que van en el encabezado/pie del ticket. */
+export interface ReceiptBusiness {
+  name: string
+  timezone?: string
+  address?: string | null
+  phone?: string | null
+  receiptHeader?: string | null
+  receiptFooter?: string | null
+}
+
+export function receiptBusinessFrom(b: BusinessInfo): ReceiptBusiness {
+  return {
+    name: b.name,
+    timezone: b.timezone,
+    address: b.address,
+    phone: b.phone,
+    receiptHeader: b.receiptHeader,
+    receiptFooter: b.receiptFooter,
+  }
+}
+
+function headerLines(biz: ReceiptBusiness, subtitle?: string): string[] {
+  const lines: string[] = [RULE, ...wrap(biz.name.toUpperCase()).map(center)]
+  if (subtitle) lines.push(center(subtitle))
+  if (biz.receiptHeader) lines.push(...wrap(biz.receiptHeader).map(center))
+  if (biz.address) lines.push(...wrap(biz.address).map(center))
+  if (biz.phone) lines.push(center(`Tel. ${biz.phone}`))
+  lines.push(RULE)
+  return lines
+}
+
+function footerLines(biz: ReceiptBusiness): string[] {
+  return [RULE, ...wrap(biz.receiptFooter?.trim() || DEFAULT_FOOTER).map(center), RULE]
 }
 
 /** Alinea `label` a la izquierda y `value` a la derecha en una línea. */
@@ -77,15 +134,14 @@ export function receiptFromTicket(ticket: TicketRecord, reprint = false): Receip
   }
 }
 
-export function buildTicketLines(r: ReceiptData): string[] {
+export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[] {
+  const tz = biz.timezone
   const lines: string[] = [
-    RULE,
-    center(BUSINESS_NAME),
-    RULE,
+    ...headerLines(biz),
     "",
     `Folio: ${r.folio}`,
-    `Fecha: ${formatDate(r.date)}`,
-    `Hora: ${formatTime(r.date)}`,
+    `Fecha: ${formatDate(r.date, tz)}`,
+    `Hora: ${formatTime(r.date, tz)}`,
     `Pago: ${paymentLabel(r.paymentMethod)}`,
   ]
   if (r.notes) lines.push(`Nota: ${r.notes}`)
@@ -120,7 +176,7 @@ export function buildTicketLines(r: ReceiptData): string[] {
     if (r.cancelReason) lines.push(`Motivo: ${r.cancelReason}`)
     lines.push(RULE)
   } else {
-    lines.push(RULE, center("¡Gracias por tu compra!"), RULE)
+    lines.push(...footerLines(biz))
   }
   return lines
 }
@@ -129,12 +185,12 @@ export function buildTicketLines(r: ReceiptData): string[] {
 /*  Comanda para barra/cocina (sin precios: qué preparar y cómo)       */
 /* ------------------------------------------------------------------ */
 
-export function buildKitchenLines(r: ReceiptData): string[] {
+export function buildKitchenLines(r: ReceiptData, biz?: Pick<ReceiptBusiness, "timezone">): string[] {
   const lines: string[] = [
     RULE,
     center("COMANDA"),
     RULE,
-    row(`Folio: ${r.folio}`, formatTime(r.date)),
+    row(`Folio: ${r.folio}`, formatTime(r.date, biz?.timezone)),
   ]
   if (r.notes) lines.push(`Nota: ${r.notes}`)
   lines.push(THIN)
@@ -187,20 +243,18 @@ export interface CashSessionSummary {
   by_method: Array<{ method: string; tickets: number; revenue: number }>
 }
 
-export function buildCorteLines(s: CashSessionSummary): string[] {
+export function buildCorteLines(s: CashSessionSummary, biz: ReceiptBusiness): string[] {
+  const tz = biz.timezone
   const opened = new Date(s.opened_at)
   const closed = s.closed_at ? new Date(s.closed_at) : null
   const lines: string[] = [
-    RULE,
-    center(BUSINESS_NAME),
-    center("CORTE DE CAJA"),
-    RULE,
+    ...headerLines({ name: biz.name, timezone: tz }, "CORTE DE CAJA"),
     "",
-    `Apertura: ${formatDate(opened)} ${formatTime(opened)}`,
+    `Apertura: ${formatDate(opened, tz)} ${formatTime(opened, tz)}`,
     `Abrió: ${s.opened_by}`,
   ]
   if (closed) {
-    lines.push(`Cierre: ${formatDate(closed)} ${formatTime(closed)}`)
+    lines.push(`Cierre: ${formatDate(closed, tz)} ${formatTime(closed, tz)}`)
     if (s.closed_by) lines.push(`Cerró: ${s.closed_by}`)
   }
   lines.push("", THIN, "VENTAS POR MÉTODO")
@@ -221,7 +275,7 @@ export function buildCorteLines(s: CashSessionSummary): string[] {
     lines.push("", THIN, "MOVIMIENTOS DE EFECTIVO")
     for (const m of s.movements ?? []) {
       const sign = m.kind === "entrada" ? "+" : "-"
-      lines.push(row(`${formatTime(new Date(m.created_at))} ${m.reason}`.slice(0, 22), `${sign}${formatCurrency(m.amount)}`))
+      lines.push(row(`${formatTime(new Date(m.created_at), tz)} ${m.reason}`.slice(0, 22), `${sign}${formatCurrency(m.amount)}`))
     }
   }
   lines.push("", THIN, "EFECTIVO EN CAJA")

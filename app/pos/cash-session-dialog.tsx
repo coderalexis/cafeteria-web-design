@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { addCashMovement, closeCashSession, getCashSessionSummary, openCashSession } from "@/app/actions/cash"
 import { formatCurrency, formatTime, paymentLabel } from "@/lib/format"
-import { buildCorteLines, printLines, type CashSessionSummary } from "@/lib/receipt"
+import { buildCorteLines, printLines, receiptBusinessFrom, type CashSessionSummary } from "@/lib/receipt"
 import { useBusiness } from "@/components/business-provider"
 
 export interface OpenSession {
@@ -234,7 +234,7 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
         ? "Caja cerrada. El efectivo cuadró."
         : `Caja cerrada. Diferencia: ${diff > 0 ? "+" : ""}${formatCurrency(diff)}`,
     )
-    if (print && !printLines(buildCorteLines(result.summary), "Corte de caja")) {
+    if (print && !printLines(buildCorteLines(result.summary, receiptBusinessFrom(business)), "Corte de caja")) {
       toast.warning("El navegador bloqueó la ventana de impresión. Puedes reimprimir el corte desde Administrar → Cortes.")
     }
     onDone()

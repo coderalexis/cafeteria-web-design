@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { cancelTicket, getTodayTickets } from "@/app/actions/sales"
 import { formatCurrency, formatTime, PAYMENT_METHODS, type PaymentMethodKey } from "@/lib/format"
-import { buildKitchenLines, buildTicketLines, printLines, receiptFromTicket } from "@/lib/receipt"
+import { buildKitchenLines, buildTicketLines, printLines, receiptBusinessFrom, receiptFromTicket } from "@/lib/receipt"
+import { useBusiness } from "@/components/business-provider"
 import { ticketItemLabel, type TicketRecord } from "@/lib/tickets"
 
 interface Props {
@@ -38,6 +39,7 @@ interface Props {
 
 export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
   const router = useRouter()
+  const receiptBiz = receiptBusinessFrom(useBusiness())
   const [tickets, setTickets] = useState<TicketRecord[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [toCancel, setToCancel] = useState<TicketRecord | null>(null)
@@ -60,13 +62,13 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
   }, [open, load])
 
   const reprint = (ticket: TicketRecord) => {
-    if (!printLines(buildTicketLines(receiptFromTicket(ticket, true)), `Ticket ${ticket.folio}`)) {
+    if (!printLines(buildTicketLines(receiptFromTicket(ticket, true), receiptBiz), `Ticket ${ticket.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }
 
   const printKitchen = (ticket: TicketRecord) => {
-    if (!printLines(buildKitchenLines(receiptFromTicket(ticket)), `Comanda ${ticket.folio}`)) {
+    if (!printLines(buildKitchenLines(receiptFromTicket(ticket), receiptBiz), `Comanda ${ticket.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

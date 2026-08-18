@@ -18,7 +18,6 @@ import {
 import { PAYMENT_METHODS, PAYMENT_METHOD_KEYS, type PaymentMethodKey } from "@/lib/format"
 import {
   RANGE_PRESETS,
-  cdmxDateString,
   dateStringToLocalDate,
   formatDateString,
   localDateToDateString,
@@ -30,18 +29,19 @@ import { filtersToSearchParams, type VentasFilters } from "./params"
 interface Props {
   filters: VentasFilters
   cashiers: Array<{ id: string; name: string }>
+  /** Día de operación del negocio (en su zona horaria), calculado en el servidor. */
+  today: string
 }
 
 const ALL = "__all__"
 
-export function VentasFiltersBar({ filters, cashiers }: Props) {
+export function VentasFiltersBar({ filters, cashiers, today }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [draftRange, setDraftRange] = useState<DateRange | undefined>()
 
-  const today = cdmxDateString()
   const activePreset = matchPreset(filters.from, filters.to, today)
 
   const apply = (next: Partial<VentasFilters>) => {

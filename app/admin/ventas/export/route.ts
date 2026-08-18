@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
-import { cdmxDaysToUtcRange } from "@/lib/dates"
+import { dateStringInTz, daysToUtcRange } from "@/lib/dates"
 import { formatDate, formatTime, paymentLabel } from "@/lib/format"
 import { getMemberDirectory } from "@/lib/team"
 import { TICKET_SELECT, buildProfileNameMap, serializeTicket, ticketItemLabel, type TicketRow } from "@/lib/tickets"
@@ -21,14 +21,15 @@ function csvCell(value: string | number | null | undefined): string {
 }
 
 export async function GET(request: Request) {
-  const { error: authError } = await requireAdmin()
-  if (authError) {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) {
     return new Response("No autorizado", { status: 401 })
   }
 
+  const tz = ctx.business.timezone
   const url = new URL(request.url)
-  const filters = parseVentasFilters(Object.fromEntries(url.searchParams.entries()))
-  const { fromIso, toIso } = cdmxDaysToUtcRange(filters.from, filters.to)
+  const filters = parseVentasFilters(Object.fromEntries(url.searchParams.entries()), dateStringInTz(tz))
+  const { fromIso, toIso } = daysToUtcRange(tz, filters.from, filters.to)
 
   const supabase = await createClient()
 
@@ -76,8 +77,8 @@ export async function GET(request: Request) {
     lines.push(
       [
         t.folio,
-        formatDate(t.createdAt),
-        formatTime(t.createdAt),
+        formatDate(t.createdAt, tz),
+        formatTime(t.createdAt, tz),
         t.cashierName,
         paymentLabel(t.paymentMethod),
         t.status === "cancelado" ? "Cancelado" : "Completado",

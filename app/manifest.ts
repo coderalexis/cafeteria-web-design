@@ -7,9 +7,9 @@ import type { MetadataRoute } from "next"
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "El Cafecito POS",
-    short_name: "Cafecito",
-    description: "Punto de venta de El Cafecito",
+    name: "Cafecito POS",
+    short_name: "Cafecito POS",
+    description: "Punto de venta para cafeterías",
     lang: "es-MX",
     start_url: "/pos",
     scope: "/",

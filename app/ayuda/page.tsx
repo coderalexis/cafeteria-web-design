@@ -294,6 +294,17 @@ export default function AyudaPage() {
             </ul>
           </Section>
 
+          <Section id="admin-negocio" icon={Coffee} title="Datos del negocio">
+            <ul className="space-y-2 text-sm text-stone-600">
+              <li>
+                En <strong>Negocio</strong> defines el nombre, la <strong>zona horaria</strong> (marca el «día de operación» de
+                reportes y cortes: si tu cafetería está en Tijuana o Cancún, elígela), la dirección y el teléfono, y los
+                textos de <strong>encabezado y pie del ticket</strong>. Verás una vista previa del ticket al editar.
+              </li>
+              <li>El identificador corto de tu café (para el login de cajeros) se muestra ahí y no se puede cambiar.</li>
+            </ul>
+          </Section>
+
           <Section id="admin-equipo" icon={Users} title="Equipo y accesos">
             <ul className="space-y-2 text-sm text-stone-600">
               <li>

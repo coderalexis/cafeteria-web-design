@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getCashSessionSummary } from "@/app/actions/cash"
 import { formatCurrency, formatDate, formatTime } from "@/lib/format"
-import { buildCorteLines, printLines } from "@/lib/receipt"
+import { buildCorteLines, printLines, receiptBusinessFrom } from "@/lib/receipt"
+import { useBusiness } from "@/components/business-provider"
 
 export interface CashSessionRecord {
   id: string
@@ -48,6 +49,7 @@ function DifferenceBadge({ value }: { value: number | null }) {
 }
 
 export default function CortesClient({ sessions }: { sessions: CashSessionRecord[] }) {
+  const business = useBusiness()
   const [printingId, setPrintingId] = useState<string | null>(null)
 
   const openSession = sessions.find((s) => s.status === "abierta")
@@ -62,7 +64,7 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
       toast.error(result.error)
       return
     }
-    if (!printLines(buildCorteLines(result.summary), "Corte de caja")) {
+    if (!printLines(buildCorteLines(result.summary, receiptBusinessFrom(business)), "Corte de caja")) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

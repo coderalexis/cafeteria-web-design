@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS } from "@/lib/format"
-import { buildKitchenLines, buildTicketLines, printLines, type ReceiptData } from "@/lib/receipt"
+import { buildKitchenLines, buildTicketLines, printLines, receiptBusinessFrom, type ReceiptData } from "@/lib/receipt"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Trash2,
@@ -29,7 +29,7 @@ import {
   ChevronUp,
   UserCircle,
 } from "lucide-react"
-import { useAppContext } from "@/components/business-provider"
+import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -156,15 +156,17 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
 function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => void }) {
   const paymentInfo = PAYMENT_METHODS[sale.paymentMethod]
   const PaymentIcon = paymentInfo.icon
+  const business = useBusiness()
+  const receiptBiz = receiptBusinessFrom(business)
 
   const handlePrint = () => {
-    if (!printLines(buildTicketLines(saleToReceipt(sale)), `Ticket ${sale.folio}`)) {
+    if (!printLines(buildTicketLines(saleToReceipt(sale), receiptBiz), `Ticket ${sale.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión. Puedes reimprimir desde «Tickets».")
     }
   }
 
   const handleKitchen = () => {
-    if (!printLines(buildKitchenLines(saleToReceipt(sale)), `Comanda ${sale.folio}`)) {
+    if (!printLines(buildKitchenLines(saleToReceipt(sale), receiptBiz), `Comanda ${sale.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

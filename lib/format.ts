@@ -13,19 +13,24 @@ export function formatCurrency(amount: number): string {
   return currencyFormatter.format(amount)
 }
 
-export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("es-MX")
+/**
+ * Fecha/hora en es-MX. Con `timeZone` (IANA del negocio) el resultado no
+ * depende de la zona del navegador ni del servidor; sin él, usa la local.
+ */
+export function formatDate(date: Date | string, timeZone?: string): string {
+  return new Date(date).toLocaleDateString("es-MX", timeZone ? { timeZone } : undefined)
 }
 
-export function formatTime(date: Date | string): string {
+export function formatTime(date: Date | string, timeZone?: string): string {
   return new Date(date).toLocaleTimeString("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 
-export function formatDateTime(date: Date | string): string {
-  return `${formatDate(date)} ${formatTime(date)}`
+export function formatDateTime(date: Date | string, timeZone?: string): string {
+  return `${formatDate(date, timeZone)} ${formatTime(date, timeZone)}`
 }
 
 /* ------------------------------------------------------------------ */

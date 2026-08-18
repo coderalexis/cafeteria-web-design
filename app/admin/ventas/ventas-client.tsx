@@ -36,7 +36,8 @@ import {
 import { cancelTicket } from "@/app/actions/sales"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, type PaymentMethodKey } from "@/lib/format"
 import { formatDateString } from "@/lib/dates"
-import { buildTicketLines, printLines, receiptFromTicket } from "@/lib/receipt"
+import { buildTicketLines, printLines, receiptBusinessFrom, receiptFromTicket } from "@/lib/receipt"
+import { useBusiness } from "@/components/business-provider"
 import type { TicketRecord } from "@/lib/tickets"
 import { toast } from "sonner"
 import {
@@ -69,6 +70,10 @@ interface VentasClientProps {
   totalCount: number
   pageCount: number
   cashiers: Array<{ id: string; name: string }>
+  /** Día de operación del negocio (YYYY-MM-DD en su zona). */
+  today: string
+  /** Zona horaria IANA del negocio (fechas/horas de tickets). */
+  timezone: string
 }
 
 /* ────────────────────────────────────────────────────── Helpers */
@@ -91,16 +96,17 @@ function paymentColor(method: string): string {
   }
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string, timeZone: string): string {
   return new Date(dateStr).toLocaleDateString("es-MX", {
     weekday: "short",
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone,
   })
 }
 
-function formatDateTime(dateStr: string): string {
+function formatDateTime(dateStr: string, timeZone: string): string {
   return new Date(dateStr).toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
@@ -108,6 +114,7 @@ function formatDateTime(dateStr: string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   })
 }
 
@@ -121,8 +128,11 @@ export default function VentasClient({
   totalCount,
   pageCount,
   cashiers,
+  today,
+  timezone,
 }: VentasClientProps) {
   const router = useRouter()
+  const business = useBusiness()
   const pathname = usePathname()
   const [selectedTicket, setSelectedTicket] = useState<TicketRecord | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -162,7 +172,7 @@ export default function VentasClient({
 
   function handleReprint() {
     if (!selectedTicket) return
-    if (!printLines(buildTicketLines(receiptFromTicket(selectedTicket, true)), `Ticket ${selectedTicket.folio}`)) {
+    if (!printLines(buildTicketLines(receiptFromTicket(selectedTicket, true), receiptBusinessFrom(business)), `Ticket ${selectedTicket.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }
@@ -200,7 +210,7 @@ export default function VentasClient({
       </div>
 
       {/* Filters */}
-      <VentasFiltersBar filters={filters} cashiers={cashiers} />
+      <VentasFiltersBar filters={filters} cashiers={cashiers} today={today} />
 
       {reportError && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -463,10 +473,10 @@ export default function VentasClient({
                       <td className="px-4 py-3 text-stone-700">
                         <div className="flex items-center gap-1.5">
                           <Clock className="h-3.5 w-3.5 text-stone-400" />
-                          {formatTime(ticket.createdAt)}
+                          {formatTime(ticket.createdAt, timezone)}
                         </div>
                         <p className="text-xs text-stone-400 mt-0.5">
-                          {formatDate(ticket.createdAt)}
+                          {formatDate(ticket.createdAt, timezone)}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-stone-700">
@@ -533,7 +543,7 @@ export default function VentasClient({
                 <div className="space-y-1.5 mt-2">
                   <div className="flex items-center gap-2 text-sm text-stone-500">
                     <Calendar className="h-3.5 w-3.5" />
-                    {formatDateTime(selectedTicket.createdAt)}
+                    {formatDateTime(selectedTicket.createdAt, timezone)}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-stone-500">
                     <User className="h-3.5 w-3.5" />
@@ -548,7 +558,7 @@ export default function VentasClient({
                     {selectedTicket.cancelReason && <p>Motivo: {selectedTicket.cancelReason}</p>}
                     <p className="text-xs text-red-600/80">
                       {selectedTicket.cancelledByName ? `Por ${selectedTicket.cancelledByName}` : ""}
-                      {selectedTicket.cancelledAt ? ` · ${formatDateTime(selectedTicket.cancelledAt)}` : ""}
+                      {selectedTicket.cancelledAt ? ` · ${formatDateTime(selectedTicket.cancelledAt, timezone)}` : ""}
                     </p>
                   </div>
                 )}

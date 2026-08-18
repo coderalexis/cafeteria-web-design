@@ -8,9 +8,9 @@ import { Toaster } from "@/components/ui/sonner"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "El Cafecito - POS",
-  description: "Sistema de punto de venta para El Cafecito",
-  applicationName: "El Cafecito POS",
+  title: "Cafecito POS",
+  description: "Sistema de punto de venta para cafeterías",
+  applicationName: "Cafecito POS",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

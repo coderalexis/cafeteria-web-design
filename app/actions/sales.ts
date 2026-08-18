@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { checkExpectedBusiness } from "@/lib/context"
+import { checkExpectedBusiness, requireContext } from "@/lib/context"
 import { businessDayRange } from "@/lib/dates"
 import { getMemberDirectory } from "@/lib/team"
 import {
@@ -157,8 +157,12 @@ export async function cancelTicket(
 /* ------------------------------------------------------------------ */
 
 export async function getTodayTickets(): Promise<ActionResult<{ tickets: TicketRecord[] }>> {
+  const { ctx, error: ctxError } = await requireContext()
+  if (ctxError !== null) {
+    return { error: ctxError }
+  }
   const supabase = await createClient()
-  const { fromIso, toIso } = businessDayRange()
+  const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
 
   const { data: rows, error } = await supabase
     .from("tickets")

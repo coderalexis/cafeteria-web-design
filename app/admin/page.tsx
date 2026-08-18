@@ -1,5 +1,8 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { cdmxDateString } from "@/lib/dates"
+import { getContext } from "@/lib/context"
+import { homePathFor } from "@/lib/context-shape"
+import { dateStringInTz } from "@/lib/dates"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
 import type { SalesReport } from "@/app/admin/ventas/params"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,7 +25,10 @@ export default async function AdminDashboard() {
   const supabase = await createClient()
 
   /* ── Datos: conteos del menú + reporte de hoy (agregado en SQL) ─── */
-  const today = cdmxDateString()
+  const ctx = await getContext()
+  if (!ctx?.business) redirect(homePathFor(ctx))
+  const tz = ctx.business.timezone
+  const today = dateStringInTz(tz)
 
   const [
     { count: categoryCount },
@@ -288,7 +294,7 @@ export default async function AdminDashboard() {
                     </p>
                   </div>
                   <p className="text-xs text-stone-400">
-                    {formatTime(ticket.created_at)}
+                    {formatTime(ticket.created_at, tz)}
                   </p>
                 </div>
               ))}

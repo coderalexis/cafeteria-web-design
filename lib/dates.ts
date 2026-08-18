@@ -1,45 +1,144 @@
 /**
- * Día de operación de la cafetería en America/Mexico_City.
+ * Día de operación de cada cafetería en SU zona horaria (`businesses.timezone`).
  *
  * El servidor (Vercel) corre en UTC; sin esto, las ventas después de las
- * 18:00 hora local caerían en el "hoy" del día siguiente. CDMX no aplica
- * horario de verano desde 2022, así que el offset -06:00 es fijo.
+ * 18:00 hora local caerían en el "hoy" del día siguiente. México tiene
+ * varias zonas (Centro, Pacífico, Noroeste con horario de verano…), así que
+ * todo se calcula con Intl a partir de un nombre IANA, sin offsets fijos.
+ * Sin dependencias de servidor: se usa en server components, actions y cliente.
  */
-const CDMX_UTC_OFFSET_HOURS = 6
-const CDMX_OFFSET_SUFFIX = "-06:00"
+
+export const DEFAULT_TIMEZONE = "America/Mexico_City"
 const DAY_MS = 24 * 3_600_000
 
-/** Fecha en formato YYYY-MM-DD (día calendario CDMX). */
+/** Fecha en formato YYYY-MM-DD (día calendario en la zona del negocio). */
 export type DateString = string
 
 export const DATE_STRING_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 export interface DayRange {
-  /** Inicio del día de operación (00:00 CDMX) en ISO UTC, inclusivo. */
+  /** Inicio del día de operación (00:00 local) en ISO UTC, inclusivo. */
   fromIso: string
   /** Inicio del día siguiente en ISO UTC, exclusivo. */
   toIso: string
 }
 
-/** Rango UTC [from, to) del día de operación CDMX que contiene `reference`. */
-export function businessDayRange(reference: Date = new Date()): DayRange {
-  const cdmx = new Date(reference.getTime() - CDMX_UTC_OFFSET_HOURS * 3_600_000)
-  const from = Date.UTC(
-    cdmx.getUTCFullYear(),
-    cdmx.getUTCMonth(),
-    cdmx.getUTCDate(),
-    CDMX_UTC_OFFSET_HOURS,
-  )
-  return {
-    fromIso: new Date(from).toISOString(),
-    toIso: new Date(from + DAY_MS).toISOString(),
+/* ------------------------------------------------------------------ */
+/*  Zonas horarias                                                     */
+/* ------------------------------------------------------------------ */
+
+/** Zonas de México (etiqueta para la UI). Cualquier IANA válida se acepta igualmente. */
+export const MEXICO_TIMEZONES: { value: string; label: string }[] = [
+  { value: "America/Mexico_City", label: "Centro — Ciudad de México, Guadalajara, Puebla, León (UTC−6)" },
+  { value: "America/Monterrey", label: "Centro — Monterrey (UTC−6)" },
+  { value: "America/Merida", label: "Centro — Mérida, Campeche (UTC−6)" },
+  { value: "America/Bahia_Banderas", label: "Centro — Bahía de Banderas (UTC−6)" },
+  { value: "America/Cancun", label: "Sureste — Cancún, Quintana Roo (UTC−5)" },
+  { value: "America/Chihuahua", label: "Centro — Chihuahua (UTC−6)" },
+  { value: "America/Ojinaga", label: "Frontera — Ojinaga (con horario de verano)" },
+  { value: "America/Ciudad_Juarez", label: "Frontera — Ciudad Juárez (con horario de verano)" },
+  { value: "America/Matamoros", label: "Frontera — Matamoros, Reynosa, Nuevo Laredo (con horario de verano)" },
+  { value: "America/Mazatlan", label: "Pacífico — Mazatlán, La Paz, Culiacán (UTC−7)" },
+  { value: "America/Hermosillo", label: "Pacífico — Hermosillo, Sonora (UTC−7)" },
+  { value: "America/Tijuana", label: "Noroeste — Tijuana, Mexicali, Ensenada (con horario de verano)" },
+]
+
+const formatterCache = new Map<string, Intl.DateTimeFormat>()
+
+function partsFormatter(tz: string): Intl.DateTimeFormat {
+  let f = formatterCache.get(tz)
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+    formatterCache.set(tz, f)
+  }
+  return f
+}
+
+/** ¿Es un nombre de zona IANA que el runtime reconoce? */
+export function isValidTimeZone(tz: string): boolean {
+  if (!tz || tz.length > 64) return false
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz })
+    return true
+  } catch {
+    return false
   }
 }
 
-/** Día de operación CDMX (YYYY-MM-DD) que contiene `reference`. */
-export function cdmxDateString(reference: Date = new Date()): DateString {
-  return new Date(reference.getTime() - CDMX_UTC_OFFSET_HOURS * 3_600_000).toISOString().slice(0, 10)
+interface ZonedParts {
+  y: number
+  m: number
+  d: number
+  hh: number
+  mm: number
+  ss: number
 }
+
+/** Componentes de fecha/hora "de reloj de pared" de un instante en `tz`. */
+function zonedParts(instant: Date, tz: string): ZonedParts {
+  const parts = partsFormatter(tz).formatToParts(instant)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0")
+  // hourCycle h23 puede devolver "24" en algunos motores para medianoche
+  const hh = get("hour") % 24
+  return { y: get("year"), m: get("month"), d: get("day"), hh, mm: get("minute"), ss: get("second") }
+}
+
+/** Offset (ms) de `tz` respecto a UTC en ese instante: local = utc + offset. */
+function tzOffsetMs(instant: Date, tz: string): number {
+  const p = zonedParts(instant, tz)
+  const asUtc = Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm, p.ss)
+  return asUtc - Math.floor(instant.getTime() / 1000) * 1000
+}
+
+/** Día calendario (YYYY-MM-DD) en `tz` que contiene `reference`. */
+export function dateStringInTz(tz: string, reference: Date = new Date()): DateString {
+  const p = zonedParts(reference, tz)
+  return `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`
+}
+
+/**
+ * Instante UTC de la medianoche local de `date` en `tz`. Correcto también en
+ * los cambios de horario de verano (se recalcula el offset en el resultado).
+ */
+export function zonedMidnightUtc(tz: string, date: DateString): Date {
+  const [y, m, d] = date.split("-").map(Number)
+  const guess = Date.UTC(y, m - 1, d, 0, 0, 0)
+  const off1 = tzOffsetMs(new Date(guess), tz)
+  let result = guess - off1
+  const off2 = tzOffsetMs(new Date(result), tz)
+  if (off2 !== off1) result = guess - off2
+  return new Date(result)
+}
+
+/**
+ * Límites UTC [from 00:00 local, (to + 1 día) 00:00 local) para consultar
+ * tickets por `created_at` en un rango de días de operación inclusivo.
+ */
+export function daysToUtcRange(tz: string, from: DateString, to: DateString): DayRange {
+  return {
+    fromIso: zonedMidnightUtc(tz, from).toISOString(),
+    toIso: zonedMidnightUtc(tz, addDays(to, 1)).toISOString(),
+  }
+}
+
+/** Rango UTC [from, to) del día de operación en `tz` que contiene `reference`. */
+export function businessDayRange(tz: string, reference: Date = new Date()): DayRange {
+  const today = dateStringInTz(tz, reference)
+  return daysToUtcRange(tz, today, today)
+}
+
+/* ------------------------------------------------------------------ */
+/*  Aritmética de YYYY-MM-DD (independiente de zona)                   */
+/* ------------------------------------------------------------------ */
 
 /** Suma `days` (puede ser negativo) a una fecha YYYY-MM-DD. */
 export function addDays(date: DateString, days: number): DateString {
@@ -60,15 +159,9 @@ export function parseDateString(value: string | undefined | null): DateString | 
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value ? null : value
 }
 
-/**
- * Límites UTC [from 00:00 CDMX, (to + 1 día) 00:00 CDMX) para consultar
- * tickets por `created_at` en un rango de días de operación inclusivo.
- */
-export function cdmxDaysToUtcRange(from: DateString, to: DateString): DayRange {
-  return {
-    fromIso: new Date(`${from}T00:00:00${CDMX_OFFSET_SUFFIX}`).toISOString(),
-    toIso: new Date(`${addDays(to, 1)}T00:00:00${CDMX_OFFSET_SUFFIX}`).toISOString(),
-  }
+/** Días entre dos fechas YYYY-MM-DD (b - a). */
+export function daysBetween(a: DateString, b: DateString): number {
+  return Math.round((new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / DAY_MS)
 }
 
 /** Convierte YYYY-MM-DD a Date local (mediodía, para evitar saltos de zona en calendarios). */
@@ -99,7 +192,8 @@ export const RANGE_PRESETS: { key: RangePreset; label: string }[] = [
   { key: "mes", label: "Este mes" },
 ]
 
-export function presetRange(preset: RangePreset, today: DateString = cdmxDateString()): { from: DateString; to: DateString } {
+/** Rango del preset relativo a `today` (el día de operación del negocio). */
+export function presetRange(preset: RangePreset, today: DateString): { from: DateString; to: DateString } {
   switch (preset) {
     case "hoy":
       return { from: today, to: today }
@@ -117,7 +211,7 @@ export function presetRange(preset: RangePreset, today: DateString = cdmxDateStr
 }
 
 /** Devuelve el preset que coincide exactamente con el rango, si hay. */
-export function matchPreset(from: DateString, to: DateString, today: DateString = cdmxDateString()): RangePreset | null {
+export function matchPreset(from: DateString, to: DateString, today: DateString): RangePreset | null {
   for (const { key } of RANGE_PRESETS) {
     const r = presetRange(key, today)
     if (r.from === from && r.to === to) return key

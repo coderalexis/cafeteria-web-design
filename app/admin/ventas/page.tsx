@@ -1,5 +1,8 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { cdmxDaysToUtcRange } from "@/lib/dates"
+import { getContext } from "@/lib/context"
+import { homePathFor } from "@/lib/context-shape"
+import { dateStringInTz, daysToUtcRange } from "@/lib/dates"
 import { getMemberDirectory, memberLabel } from "@/lib/team"
 import { TICKET_SELECT, buildProfileNameMap, serializeTicket, type TicketRow } from "@/lib/tickets"
 import { PAGE_SIZE, parseVentasFilters, type SalesReport } from "./params"
@@ -10,8 +13,12 @@ export default async function VentasPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const filters = parseVentasFilters(await searchParams)
-  const { fromIso, toIso } = cdmxDaysToUtcRange(filters.from, filters.to)
+  const ctx = await getContext()
+  if (!ctx?.business) redirect(homePathFor(ctx))
+  const tz = ctx.business.timezone
+  const today = dateStringInTz(tz)
+  const filters = parseVentasFilters(await searchParams, today)
+  const { fromIso, toIso } = daysToUtcRange(tz, filters.from, filters.to)
   const offset = (filters.page - 1) * PAGE_SIZE
 
   // Cliente de sesión: el RLS ya da acceso total al admin, sin service-role.
@@ -54,6 +61,8 @@ export default async function VentasPage({
       totalCount={totalCount}
       pageCount={pageCount}
       cashiers={cashiers}
+      today={today}
+      timezone={tz}
     />
   )
 }
