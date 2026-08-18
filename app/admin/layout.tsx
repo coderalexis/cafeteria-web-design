@@ -1,7 +1,7 @@
 import type React from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Coffee, Store, LogOut, BookOpen, UserCircle } from "lucide-react"
+import { Coffee, Store, LogOut, BookOpen, UserCircle, ShieldCheck } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager, ROLE_LABELS } from "@/lib/context-shape"
@@ -80,6 +80,15 @@ export default async function AdminLayout({
               <UserCircle className="h-4 w-4" />
               Mi cuenta
             </Link>
+            {ctx.isPlatformAdmin && (
+              <Link
+                href="/super"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100 transition-colors"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Panel del operador
+              </Link>
+            )}
             <form action={logout}>
               <button
                 type="submit"
@@ -108,6 +117,7 @@ export default async function AdminLayout({
             isTemplate={isTemplate}
             memberships={ctx.memberships}
             activeBusinessId={business.id}
+            isPlatformAdmin={ctx.isPlatformAdmin}
             logoutAction={logout}
           />
           <main className="flex-1 overflow-auto">{children}</main>

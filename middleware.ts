@@ -25,7 +25,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // Un solo round trip: negocio activo, rol y flags del usuario.
-  const { data } = await supabase.rpc("my_context")
+  const { data, error } = await supabase.rpc("my_context")
+  if (error) {
+    // Fallo transitorio de la BD: no decidir redirecciones a ciegas; los
+    // layouts de servidor vuelven a resolver el contexto y actúan.
+    return response
+  }
   const ctx = parseContext(data)
 
   if (path.startsWith("/super")) {

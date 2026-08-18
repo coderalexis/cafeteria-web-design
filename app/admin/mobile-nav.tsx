@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Coffee, Menu, Store, BookOpen, LogOut, UserCircle } from "lucide-react"
+import { Coffee, Menu, Store, BookOpen, LogOut, UserCircle, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { BusinessSwitcher } from "@/components/business-switcher"
@@ -31,6 +31,7 @@ export function AdminMobileNav({
   isTemplate,
   memberships,
   activeBusinessId,
+  isPlatformAdmin,
   logoutAction,
 }: {
   userName: string
@@ -39,6 +40,7 @@ export function AdminMobileNav({
   isTemplate: boolean
   memberships: Membership[]
   activeBusinessId: string
+  isPlatformAdmin: boolean
   logoutAction: () => Promise<void>
 }) {
   const [open, setOpen] = useState(false)
@@ -102,6 +104,16 @@ export function AdminMobileNav({
               <UserCircle className="h-4 w-4" />
               Mi cuenta
             </Link>
+            {isPlatformAdmin && (
+              <Link
+                href="/super"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100"
+                onClick={() => setOpen(false)}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Panel del operador
+              </Link>
+            )}
             <form action={logoutAction}>
               <button
                 type="submit"

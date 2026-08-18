@@ -43,6 +43,7 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 8. `08_fase4b.sql` — `cash_movements` (entradas/salidas de efectivo del turno), RPC `add_cash_movement`; el corte los considera
 9. `09_multitenant.sql` — multi-cafetería (M0): `businesses`, `business_members`, `business_counters`; `business_id` en las 11 tablas; funciones `member_ctx()`, `current_business_id()`, `current_member_role()` (sustituye a `current_role()`), `my_context()`, `set_active_business()`, `clone_menu()`, `derive_uuid()`, `find_user_id_by_email()`, `business_day(ts, tz)`; RLS y los 7 RPC filtran por negocio; folio por negocio (`business_counters`) y una caja abierta por negocio; backfill de "El Cafecito" (`el-cafecito`) y de la plantilla clonable `plantilla-cafeteria`. Compatible con el código de la app hasta la Fase 4c.
 10. `10_multitenant_cleanup.sql` — (M1) elimina `profiles.role`/`profiles.username` y el tipo `app_role`. **Aplicar solo después de desplegar el código de M1.**
+11. `11_platform.sql` — (M3) RPC `platform_overview()` (resumen de negocios para `/super`; solo `service_role`).
 
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 
@@ -60,7 +61,8 @@ Prueba de aislamiento entre negocios (impersonación con `set_config('request.jw
 
 - Clientes Supabase tipados: `lib/supabase/server.ts`, `client.ts`, `admin.ts` (service role, solo servidor); tipos en `lib/supabase/database.types.ts` (regenerar tras cada migración).
 - Contexto de sesión: `lib/context.ts` (`getContext` = usuario + `my_context()` cacheado por request; `requireContext`/`requireRole`/`requireSuperAdmin`/`checkExpectedBusiness`), forma compartida en `lib/context-shape.ts`, provider cliente `components/business-provider.tsx` (`useBusiness`/`useAppContext`) y `components/business-switcher.tsx`.
-- Server actions: `app/actions/auth.ts` (login por correo o usuario+café, logout, cambiar mi contraseña), `business.ts` (cambiar negocio activo), `team.ts` (equipo), `menu.ts`, `modifiers.ts`, `sales.ts`, `cash.ts`.
+- Server actions: `app/actions/auth.ts` (login por correo o usuario+café, logout, cambiar mi contraseña), `business.ts` (cambiar negocio activo, ajustes del negocio), `team.ts` (equipo), `super.ts` (panel del operador: crear cafetería + dueño, suspender/reactivar, clonar plantilla, entrar como dueño; todo con `requireSuperAdmin()` + service role), `menu.ts`, `modifiers.ts`, `sales.ts`, `cash.ts`.
+- Panel del operador `/super` (`profiles.is_platform_admin`): lista de cafeterías con miembros/ventas 30 días (`platform_overview()`), alta de cafetería (slug = identificador para el login de cajeros, zona horaria, copia del menú de la plantilla `is_template`) con dueño por correo (cuenta existente o nueva con contraseña temporal mostrada una vez).
 - POS: `app/pos/page.tsx` + `pos-client.tsx` (+ `cash-session-dialog`, `ticket-history-dialog`, `modifier-sheet`, `discount-dialog`).
 - Admin: `app/admin/*` (dashboard, categorías, productos, modificadores, ventas con reportes/CSV, cortes, equipo, negocio). Cuenta: `/cuenta`; selector `/seleccionar-negocio`; `/suspendido`.
 - Zona horaria por negocio (`businesses.timezone`): `lib/dates.ts` calcula el día de operación con Intl (`dateStringInTz`, `daysToUtcRange`, `businessDayRange`), sin offsets fijos; `formatDate/Time` aceptan la zona; los recibos (`lib/receipt.ts`) llevan nombre, encabezado, dirección, teléfono y pie del negocio (`/admin/negocio` los edita con el cliente de sesión: RLS + grant por columna).

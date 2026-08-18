@@ -868,6 +868,7 @@ export type Database = {
         Args: { p_notes?: string; p_opening_float: number }
         Returns: Json
       }
+      platform_overview: { Args: never; Returns: Json }
       sales_report: {
         Args: {
           p_cashier?: string
