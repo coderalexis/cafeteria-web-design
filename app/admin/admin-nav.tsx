@@ -12,7 +12,7 @@ const navItems = [
   { href: "/admin/modificadores", label: "Modificadores", icon: SlidersHorizontal },
   { href: "/admin/ventas", label: "Ventas", icon: Receipt },
   { href: "/admin/cortes", label: "Cortes de caja", icon: Wallet },
-  { href: "/admin/cajeros", label: "Cajeros", icon: Users },
+  { href: "/admin/equipo", label: "Equipo", icon: Users },
 ]
 
 export function AdminNav() {

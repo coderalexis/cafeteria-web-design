@@ -27,7 +27,10 @@ import {
   LogOut,
   BookOpen,
   ChevronUp,
+  UserCircle,
 } from "lucide-react"
+import { useAppContext } from "@/components/business-provider"
+import { BusinessSwitcher } from "@/components/business-switcher"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/kbd"
@@ -110,6 +113,7 @@ interface POSClientProps {
   categories: Category[]
   products: Product[]
   isAdmin: boolean
+  businessId: string
   cashierId: string
   initialTotalSales: number
   openSession: OpenSession | null
@@ -276,11 +280,15 @@ export default function POSClient({
   categories,
   products,
   isAdmin,
+  businessId,
   cashierId,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
-  const cart = usePosCart(`pos-cart:${cashierId}`, products)
+  const appCtx = useAppContext()
+  const businessName = appCtx.business?.name ?? "Cafecito POS"
+  // Carrito por negocio y cajero: cambiar de cafetería no mezcla carritos.
+  const cart = usePosCart(`pos-cart:${businessId}:${cashierId}`, products)
   const {
     lines,
     paymentMethod,
@@ -373,6 +381,7 @@ export default function POSClient({
       // (variante + modificadores) y valida el descuento.
       const result = await createTicket({
         clientRef: saleRef,
+        expectedBusinessId: businessId,
         paymentMethod,
         notes: ticketNotes.trim() || undefined,
         cashReceived: cashReceived ?? undefined,
@@ -411,7 +420,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, paymentMethod, ticketNotes, cashReceived, discount, lines, resetAfterSale])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, discount, lines, resetAfterSale])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -967,6 +976,11 @@ export default function POSClient({
           >
             <Keyboard className="h-4 w-4" />
           </Button>
+          <Link href="/cuenta" title="Mi cuenta" aria-label="Mi cuenta">
+            <Button variant="outline" size="icon" className="bg-white/80 backdrop-blur">
+              <UserCircle className="h-4 w-4" />
+            </Button>
+          </Link>
           <form action={logout}>
             <Button type="submit" variant="outline" className="bg-white/80 backdrop-blur">
               Cerrar sesión
@@ -982,11 +996,24 @@ export default function POSClient({
           <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
-              <h1 className="text-xl md:text-2xl font-bold text-stone-800 tracking-tight truncate">El Cafecito</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-stone-800 tracking-tight truncate">{businessName}</h1>
+              {!isMobile && (
+                <BusinessSwitcher
+                  memberships={appCtx.memberships}
+                  activeId={appCtx.business?.id ?? null}
+                  variant="compact"
+                  className="ml-1"
+                />
+              )}
             </div>
             {isMobile ? (
               <div className="flex items-center gap-1.5 shrink-0">
                 {cashChip(true)}
+                <BusinessSwitcher
+                  memberships={appCtx.memberships}
+                  activeId={appCtx.business?.id ?? null}
+                  variant="compact"
+                />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Menú">
@@ -1011,6 +1038,11 @@ export default function POSClient({
                     <DropdownMenuItem asChild>
                       <Link href="/ayuda" target="_blank">
                         <BookOpen className="h-4 w-4 mr-2" /> Guía de uso
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/cuenta">
+                        <UserCircle className="h-4 w-4 mr-2" /> Mi cuenta
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

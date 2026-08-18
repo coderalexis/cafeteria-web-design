@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
 import { cdmxDaysToUtcRange } from "@/lib/dates"
 import { formatDate, formatTime, paymentLabel } from "@/lib/format"
+import { getMemberDirectory } from "@/lib/team"
 import { TICKET_SELECT, buildProfileNameMap, serializeTicket, ticketItemLabel, type TicketRow } from "@/lib/tickets"
 import { parseVentasFilters } from "../params"
 
@@ -39,16 +40,16 @@ export async function GET(request: Request) {
   if (filters.cajero) query = query.eq("cashier_id", filters.cajero)
   if (filters.pago) query = query.eq("payment_method", filters.pago)
 
-  const [{ data: rows, error }, { data: profiles }] = await Promise.all([
+  const [{ data: rows, error }, members] = await Promise.all([
     query.order("created_at", { ascending: true }).limit(MAX_ROWS),
-    supabase.from("profiles").select("id, full_name, username"),
+    getMemberDirectory(supabase),
   ])
 
   if (error) {
     return new Response(`Error al consultar ventas: ${error.message}`, { status: 500 })
   }
 
-  const names = buildProfileNameMap(profiles)
+  const names = buildProfileNameMap(members)
   const tickets = (rows ?? []).map((r) => serializeTicket(r as TicketRow, names))
 
   const header = [

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { requireAdmin } from "@/lib/auth"
 
 function revalidateAll() {
   revalidatePath("/admin", "layout")
@@ -13,6 +14,9 @@ function revalidateAll() {
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export async function createCategory(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const name = String(formData.get("name") ?? "")
   const slug = String(formData.get("slug") ?? "")
 
@@ -34,6 +38,9 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function updateCategory(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
   const name = String(formData.get("name") ?? "")
   const slug = String(formData.get("slug") ?? "")
@@ -56,6 +63,9 @@ export async function updateCategory(formData: FormData) {
 }
 
 export async function createProduct(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const name = String(formData.get("name") ?? "")
   const categoryId = String(formData.get("category_id") ?? "")
   const description = String(formData.get("description") ?? "")
@@ -78,6 +88,9 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
   const name = String(formData.get("name") ?? "")
   const categoryId = String(formData.get("category_id") ?? "")
@@ -100,6 +113,9 @@ export async function updateProduct(formData: FormData) {
 }
 
 export async function createVariant(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const productId = String(formData.get("product_id") ?? "")
   const name = String(formData.get("name") ?? "")
   const price = Number(formData.get("price") ?? 0)
@@ -124,6 +140,9 @@ export async function createVariant(formData: FormData) {
 }
 
 export async function updateVariant(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
   const name = String(formData.get("name") ?? "")
   const price = Number(formData.get("price") ?? 0)
@@ -146,6 +165,9 @@ export async function updateVariant(formData: FormData) {
 }
 
 export async function deleteVariant(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
 
   if (!id) {
@@ -176,6 +198,9 @@ export async function deleteVariant(formData: FormData) {
 }
 
 export async function toggleVariantActive(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
   const isActive = formData.get("is_active") === "true"
 
@@ -196,6 +221,9 @@ export async function toggleVariantActive(formData: FormData) {
 }
 
 export async function toggleProductActive(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
   const isActive = formData.get("is_active") === "true"
 
@@ -216,6 +244,9 @@ export async function toggleProductActive(formData: FormData) {
 }
 
 export async function deleteProduct(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
 
   if (!id) {
@@ -247,6 +278,9 @@ export async function deleteProduct(formData: FormData) {
 }
 
 export async function deleteCategory(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
   const id = String(formData.get("id") ?? "")
 
   if (!id) {

@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { checkExpectedBusiness } from "@/lib/context"
 import { businessDayRange } from "@/lib/dates"
+import { getMemberDirectory } from "@/lib/team"
 import {
   TICKET_SELECT,
   buildProfileNameMap,
@@ -34,6 +36,8 @@ export type TicketDiscountInput = z.infer<typeof discountSchema>
 
 const createTicketSchema = z.object({
   clientRef: z.string().uuid(),
+  /** Negocio con el que la UI cree estar operando (guardia multi-pestaña). */
+  expectedBusinessId: z.string().uuid().optional(),
   paymentMethod: z.enum(["efectivo", "transferencia", "tarjeta_clip"]),
   notes: z.string().trim().max(500).optional(),
   cashReceived: z.number().finite().nonnegative().max(9_999_999).optional(),
@@ -71,7 +75,12 @@ export async function createTicket(
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, paymentMethod, notes, items, cashReceived, discount } = parsed.data
+  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, discount } = parsed.data
+
+  const businessError = await checkExpectedBusiness(expectedBusinessId)
+  if (businessError) {
+    return { error: businessError }
+  }
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("create_ticket", {
@@ -163,17 +172,8 @@ export async function getTodayTickets(): Promise<ActionResult<{ tickets: TicketR
     return { error: error.message }
   }
 
-  const ids = new Set<string>()
-  for (const r of rows ?? []) {
-    ids.add(r.cashier_id)
-    if (r.cancelled_by) ids.add(r.cancelled_by)
-  }
-
-  const { data: profiles } = ids.size
-    ? await supabase.from("profiles").select("id, full_name, username").in("id", [...ids])
-    : { data: [] }
-
-  const names = buildProfileNameMap(profiles)
+  // Nombres de quien vendió/canceló: directorio del negocio activo
+  const names = buildProfileNameMap(await getMemberDirectory(supabase))
   const tickets = (rows ?? []).map((r) => serializeTicket(r as TicketRow, names))
 
   return { success: true, tickets }

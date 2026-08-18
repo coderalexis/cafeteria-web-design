@@ -1,15 +1,8 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { getContext } from "@/lib/context"
+import { homePathFor } from "@/lib/context-shape"
 
 export default async function HomePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  redirect("/pos")
+  const ctx = await getContext()
+  redirect(homePathFor(ctx))
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { checkExpectedBusiness } from "@/lib/context"
 import type { CashSessionSummary } from "@/lib/receipt"
 import type { ActionResult } from "./types"
 
@@ -18,8 +19,14 @@ function revalidateCash() {
 
 const moneySchema = z.number().finite().nonnegative().max(9_999_999)
 const notesSchema = z.string().trim().max(300).optional()
+/** Negocio con el que la UI cree estar operando (guardia multi-pestaña). */
+const expectedBusinessSchema = z.string().uuid().optional()
 
-const openSchema = z.object({ openingFloat: moneySchema, notes: notesSchema })
+const openSchema = z.object({
+  openingFloat: moneySchema,
+  notes: notesSchema,
+  expectedBusinessId: expectedBusinessSchema,
+})
 
 export async function openCashSession(
   input: z.infer<typeof openSchema>,
@@ -27,6 +34,11 @@ export async function openCashSession(
   const parsed = openSchema.safeParse(input)
   if (!parsed.success) {
     return { error: "Fondo inicial inválido." }
+  }
+
+  const businessError = await checkExpectedBusiness(parsed.data.expectedBusinessId)
+  if (businessError) {
+    return { error: businessError }
   }
 
   const supabase = await createClient()
@@ -49,7 +61,11 @@ export async function openCashSession(
   }
 }
 
-const closeSchema = z.object({ countedCash: moneySchema, notes: notesSchema })
+const closeSchema = z.object({
+  countedCash: moneySchema,
+  notes: notesSchema,
+  expectedBusinessId: expectedBusinessSchema,
+})
 
 export async function closeCashSession(
   input: z.infer<typeof closeSchema>,
@@ -57,6 +73,11 @@ export async function closeCashSession(
   const parsed = closeSchema.safeParse(input)
   if (!parsed.success) {
     return { error: "Efectivo contado inválido." }
+  }
+
+  const businessError = await checkExpectedBusiness(parsed.data.expectedBusinessId)
+  if (businessError) {
+    return { error: businessError }
   }
 
   const supabase = await createClient()
@@ -77,6 +98,7 @@ const movementSchema = z.object({
   kind: z.enum(["entrada", "salida"]),
   amount: z.number().finite().positive().max(9_999_999),
   reason: z.string().trim().min(2, "Indica el motivo del movimiento.").max(200),
+  expectedBusinessId: expectedBusinessSchema,
 })
 
 export type CashMovementInput = z.infer<typeof movementSchema>
@@ -88,6 +110,11 @@ export async function addCashMovement(
   const parsed = movementSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
+  }
+
+  const businessError = await checkExpectedBusiness(parsed.data.expectedBusinessId)
+  if (businessError) {
+    return { error: businessError }
   }
 
   const supabase = await createClient()

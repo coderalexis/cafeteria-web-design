@@ -1,35 +1,24 @@
-import { createClient } from "@/lib/supabase/server"
-import type { User } from "@supabase/supabase-js"
+import { requireRole, type ActiveContext } from "@/lib/context"
 
 type RequireAdminResult =
-  | { user: User; error: null }
-  | { user: null; error: string }
+  | { ctx: ActiveContext; error: null }
+  | { ctx: null; error: string }
 
 /**
- * Verifica dentro de la server action que quien llama sea admin.
- * El middleware solo protege navegaciones de página; las actions
- * deben re-autorizar por su cuenta.
+ * Verifica dentro de la server action que quien llama sea owner o admin del
+ * negocio activo. El middleware solo protege navegaciones de página; las
+ * actions deben re-autorizar por su cuenta (además del RLS).
  */
 export async function requireAdmin(): Promise<RequireAdminResult> {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { user: null, error: "Sesión inválida." }
+  const result = await requireRole(["owner", "admin"])
+  if (result.error) {
+    const error =
+      result.error === "No tienes permiso para realizar esta acción."
+        ? "Solo un administrador puede realizar esta acción."
+        : result.error
+    return { ctx: null, error }
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  if (profile?.role !== "admin") {
-    return { user: null, error: "Solo un administrador puede realizar esta acción." }
-  }
-
-  return { user, error: null }
+  return result
 }
+
+export { requireSuperAdmin, requireContext, requireRole } from "@/lib/context"

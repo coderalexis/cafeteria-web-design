@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { cdmxDaysToUtcRange } from "@/lib/dates"
+import { getMemberDirectory, memberLabel } from "@/lib/team"
 import { TICKET_SELECT, buildProfileNameMap, serializeTicket, type TicketRow } from "@/lib/tickets"
 import { PAGE_SIZE, parseVentasFilters, type SalesReport } from "./params"
 import VentasClient from "./ventas-client"
@@ -24,7 +25,7 @@ export default async function VentasPage({
   if (filters.cajero) ticketsQuery = ticketsQuery.eq("cashier_id", filters.cajero)
   if (filters.pago) ticketsQuery = ticketsQuery.eq("payment_method", filters.pago)
 
-  const [reportResult, ticketsResult, profilesResult] = await Promise.all([
+  const [reportResult, ticketsResult, members] = await Promise.all([
     supabase.rpc("sales_report", {
       p_from: filters.from,
       p_to: filters.to,
@@ -32,15 +33,17 @@ export default async function VentasPage({
       p_method: filters.pago ?? undefined,
     }),
     ticketsQuery.order("created_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1),
-    supabase.from("profiles").select("id, full_name, username").order("full_name"),
+    getMemberDirectory(supabase),
   ])
 
-  const names = buildProfileNameMap(profilesResult.data)
+  const names = buildProfileNameMap(members)
   const tickets = (ticketsResult.data ?? []).map((t) => serializeTicket(t as TicketRow, names))
   const totalCount = ticketsResult.count ?? 0
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  const cashiers = (profilesResult.data ?? []).map((p) => ({ id: p.id, name: names[p.id] }))
+  const cashiers = [...members]
+    .sort((a, b) => memberLabel(a).localeCompare(memberLabel(b), "es"))
+    .map((m) => ({ id: m.id, name: memberLabel(m) }))
 
   return (
     <VentasClient

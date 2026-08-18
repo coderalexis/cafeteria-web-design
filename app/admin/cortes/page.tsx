@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
+import { getMemberDirectory } from "@/lib/team"
 import { buildProfileNameMap } from "@/lib/tickets"
 import CortesClient, { type CashSessionRecord } from "./cortes-client"
 
 export default async function CortesPage() {
   const supabase = await createClient()
 
-  const [{ data: sessions }, { data: profiles }] = await Promise.all([
+  const [{ data: sessions }, members] = await Promise.all([
     supabase
       .from("cash_sessions")
       .select(
@@ -13,10 +14,10 @@ export default async function CortesPage() {
       )
       .order("opened_at", { ascending: false })
       .limit(200),
-    supabase.from("profiles").select("id, full_name, username"),
+    getMemberDirectory(supabase),
   ])
 
-  const names = buildProfileNameMap(profiles)
+  const names = buildProfileNameMap(members)
 
   // Entradas/salidas de efectivo por sesión (solo las sesiones listadas)
   const sessionIds = (sessions ?? []).map((s) => s.id)

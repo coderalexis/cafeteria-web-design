@@ -20,7 +20,7 @@ import {
 import { POS_SHORTCUTS } from "@/app/pos/shortcuts"
 
 export const metadata: Metadata = {
-  title: "Guía de uso — El Cafecito POS",
+  title: "Guía de uso — Cafecito POS",
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,7 +83,7 @@ export default function AyudaPage() {
           </div>
           <h1 className="text-3xl font-bold text-stone-800 flex items-center gap-2">
             <BookOpen className="h-7 w-7 text-amber-700" />
-            Guía de uso — El Cafecito
+            Guía de uso — Cafecito POS
           </h1>
           <p className="text-stone-500">
             Cómo se opera la caja día a día y cómo se administra el menú. Imprime esta página (Ctrl+P) si la quieres junto
@@ -91,6 +91,7 @@ export default function AyudaPage() {
           </p>
           <nav className="flex flex-wrap gap-2 text-sm print:hidden">
             {[
+              ["#entrar", "Entrar"],
               ["#cajero", "Cajero"],
               ["#efectivo", "Efectivo y cambio"],
               ["#cancelar", "Cancelar / reimprimir"],
@@ -108,6 +109,23 @@ export default function AyudaPage() {
         {/* ── CAJERO ─────────────────────────────────────────────── */}
         <div className="space-y-8">
           <h2 className="text-xl font-bold text-stone-900 border-b border-stone-200 pb-2">Para el cajero</h2>
+
+          <Section id="entrar" icon={Users} title="Entrar al sistema">
+            <ul className="space-y-2 text-sm text-stone-600">
+              <li>
+                <strong>Cajeros</strong>: escribe tu <strong>usuario</strong>, el <strong>café</strong> (el identificador corto de tu
+                cafetería, p. ej. <em>el-cafecito</em>) y tu contraseña. El café se recuerda en ese dispositivo.
+              </li>
+              <li>
+                <strong>Dueños y administradores</strong> pueden entrar con su <strong>correo</strong> y contraseña; el campo Café
+                se oculta solo.
+              </li>
+              <li>
+                Si perteneces a varias cafeterías, arriba verás un <strong>selector</strong> para cambiar de una a otra. Tu
+                contraseña se cambia en <strong>Mi cuenta</strong>.
+              </li>
+            </ul>
+          </Section>
 
           <Section id="cajero" icon={Coffee} title="Abrir el turno y vender">
             <ol className="space-y-3">
@@ -276,13 +294,26 @@ export default function AyudaPage() {
             </ul>
           </Section>
 
-          <Section id="admin-cajeros" icon={Users} title="Cajeros y accesos">
+          <Section id="admin-equipo" icon={Users} title="Equipo y accesos">
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
-                En <strong>Cajeros</strong> creas usuarios con rol <em>cajero</em> (solo POS) o <em>admin</em> (POS + panel).
-                Contraseñas: mínimo 8 caracteres con letras y números. Ahí mismo puedes cambiar la contraseña de alguien.
+                En <strong>Equipo</strong> das acceso a tu cafetería. <strong>Usuario de café</strong>: creas una cuenta con
+                usuario y contraseña (entra con usuario + café), ideal para cajeros. <strong>Por correo</strong>: das acceso a
+                alguien con su correo; si no tiene cuenta, se crea con una contraseña temporal que verás una sola vez.
               </li>
-              <li>Un cajero solo ve sus propias ventas; el admin ve todo.</li>
+              <li>
+                Roles: <em>Cajero</em> (solo POS), <em>Administrador</em> (POS + panel) y <em>Dueño</em> (todo; solo un dueño
+                puede nombrar o quitar dueños; siempre debe quedar al menos uno).
+              </li>
+              <li>
+                Contraseñas: mínimo 8 caracteres con letras y números. La de una cuenta de café la restableces desde Equipo;
+                quien entra con correo la cambia en Mi cuenta.
+              </li>
+              <li>
+                Si alguien deja de trabajar contigo, <strong>desactívalo</strong> (conserva su historial de ventas); quitarlo
+                del equipo solo se permite si no tiene ventas.
+              </li>
+              <li>Un cajero solo ve sus propias ventas; dueños y administradores ven todo el negocio.</li>
             </ul>
           </Section>
 

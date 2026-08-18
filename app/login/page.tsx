@@ -1,20 +1,46 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { login } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Coffee, AlertCircle, Loader2 } from "lucide-react"
 
+const BUSINESS_STORAGE_KEY = "pos-business-slug"
+
+function normalizeSlugInput(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+}
+
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
+  const [identifier, setIdentifier] = useState("")
+  const [business, setBusiness] = useState("")
   const [isPending, startTransition] = useTransition()
+
+  // Recuerda el café en este dispositivo; `?c=slug` (p. ej. desde un acceso
+  // directo en la tablet) tiene prioridad.
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("c")
+    const stored = window.localStorage.getItem(BUSINESS_STORAGE_KEY)
+    const initial = normalizeSlugInput(fromUrl ?? stored ?? "")
+    if (initial) setBusiness(initial)
+  }, [])
+
+  const usesEmail = identifier.includes("@")
 
   function handleSubmit(formData: FormData) {
     setError(null)
+    const slug = normalizeSlugInput(String(formData.get("business") ?? ""))
+    formData.set("business", slug)
+    if (slug) window.localStorage.setItem(BUSINESS_STORAGE_KEY, slug)
     startTransition(async () => {
       const result = await login(formData)
-      // If we get here, login failed (success redirects)
+      // Si llegamos aquí, el login falló (el éxito redirige)
       if (result?.error) {
         setError(result.error)
       }
@@ -29,7 +55,7 @@ export default function LoginPage() {
           <div className="h-14 w-14 rounded-2xl bg-amber-700 flex items-center justify-center">
             <Coffee className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-stone-800">El Cafecito</h1>
+          <h1 className="text-2xl font-bold text-stone-800">Cafecito POS</h1>
           <p className="text-sm text-stone-500">Ingresa para continuar</p>
         </div>
 
@@ -47,30 +73,51 @@ export default function LoginPage() {
           )}
 
           <div className="space-y-2">
-            <label
-              htmlFor="username"
-              className="text-sm font-medium text-stone-700"
-            >
-              Usuario
+            <label htmlFor="identifier" className="text-sm font-medium text-stone-700">
+              Usuario o correo
             </label>
             <Input
-              id="username"
-              name="username"
+              id="identifier"
+              name="identifier"
               type="text"
-              placeholder="Tu nombre de usuario"
+              placeholder="Tu usuario o tu correo"
               required
               autoComplete="username"
               autoFocus
+              autoCapitalize="none"
+              spellCheck={false}
               className="bg-stone-50"
               disabled={isPending}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
             />
           </div>
 
+          <div className={usesEmail ? "hidden" : "space-y-2"} aria-hidden={usesEmail}>
+            <label htmlFor="business" className="text-sm font-medium text-stone-700">
+              Café
+            </label>
+            <Input
+              id="business"
+              name="business"
+              type="text"
+              placeholder="nombre-corto-del-cafe"
+              required={!usesEmail}
+              autoComplete="organization"
+              autoCapitalize="none"
+              spellCheck={false}
+              className="bg-stone-50"
+              disabled={isPending}
+              value={business}
+              onChange={(e) => setBusiness(normalizeSlugInput(e.target.value))}
+            />
+            <p className="text-xs text-stone-400">
+              El identificador de tu cafetería (te lo da el administrador). Se recuerda en este dispositivo.
+            </p>
+          </div>
+
           <div className="space-y-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-stone-700"
-            >
+            <label htmlFor="password" className="text-sm font-medium text-stone-700">
               Contraseña
             </label>
             <Input
@@ -102,7 +149,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-xs text-stone-400">
-          Sistema de punto de venta
+          Sistema de punto de venta para cafeterías
         </p>
       </div>
     </main>

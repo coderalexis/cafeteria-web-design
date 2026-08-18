@@ -18,6 +18,7 @@ import {
 import { addCashMovement, closeCashSession, getCashSessionSummary, openCashSession } from "@/app/actions/cash"
 import { formatCurrency, formatTime, paymentLabel } from "@/lib/format"
 import { buildCorteLines, printLines, type CashSessionSummary } from "@/lib/receipt"
+import { useBusiness } from "@/components/business-provider"
 
 export interface OpenSession {
   id: string
@@ -57,6 +58,7 @@ export function CashSessionDialog({ open, onOpenChange, session }: Props) {
 /* ------------------------------------------------------------------ */
 function OpenSessionForm({ onDone }: { onDone: () => void }) {
   const router = useRouter()
+  const business = useBusiness()
   const [floatValue, setFloatValue] = useState("")
   const [notes, setNotes] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -66,7 +68,11 @@ function OpenSessionForm({ onDone }: { onDone: () => void }) {
   const submit = async () => {
     if (amount === null || isSubmitting) return
     setIsSubmitting(true)
-    const result = await openCashSession({ openingFloat: amount, notes: notes.trim() || undefined })
+    const result = await openCashSession({
+      openingFloat: amount,
+      notes: notes.trim() || undefined,
+      expectedBusinessId: business.id,
+    })
     setIsSubmitting(false)
     if (!result.success) {
       toast.error(result.error)
@@ -148,6 +154,7 @@ function OpenSessionForm({ onDone }: { onDone: () => void }) {
 /* ------------------------------------------------------------------ */
 function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: () => void }) {
   const router = useRouter()
+  const business = useBusiness()
   const [summary, setSummary] = useState<CashSessionSummary | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [countedValue, setCountedValue] = useState("")
@@ -190,7 +197,12 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
   const saveMovement = async () => {
     if (!canSaveMovement || movementKind === null || movementAmountNum === null || isSavingMovement) return
     setIsSavingMovement(true)
-    const result = await addCashMovement({ kind: movementKind, amount: movementAmountNum, reason: movementReason.trim() })
+    const result = await addCashMovement({
+      kind: movementKind,
+      amount: movementAmountNum,
+      reason: movementReason.trim(),
+      expectedBusinessId: business.id,
+    })
     setIsSavingMovement(false)
     if (!result.success) {
       toast.error(result.error)
@@ -206,7 +218,11 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
   const submit = async (print: boolean) => {
     if (counted === null || isSubmitting) return
     setIsSubmitting(true)
-    const result = await closeCashSession({ countedCash: counted, notes: notes.trim() || undefined })
+    const result = await closeCashSession({
+      countedCash: counted,
+      notes: notes.trim() || undefined,
+      expectedBusinessId: business.id,
+    })
     setIsSubmitting(false)
     if (!result.success) {
       toast.error(result.error)

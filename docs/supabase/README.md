@@ -42,6 +42,7 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 7. `07_fase3.sql` — modificadores en la venta y descuento por ticket (`create_ticket` v3), `discount_reason`
 8. `08_fase4b.sql` — `cash_movements` (entradas/salidas de efectivo del turno), RPC `add_cash_movement`; el corte los considera
 9. `09_multitenant.sql` — multi-cafetería (M0): `businesses`, `business_members`, `business_counters`; `business_id` en las 11 tablas; funciones `member_ctx()`, `current_business_id()`, `current_member_role()` (sustituye a `current_role()`), `my_context()`, `set_active_business()`, `clone_menu()`, `derive_uuid()`, `find_user_id_by_email()`, `business_day(ts, tz)`; RLS y los 7 RPC filtran por negocio; folio por negocio (`business_counters`) y una caja abierta por negocio; backfill de "El Cafecito" (`el-cafecito`) y de la plantilla clonable `plantilla-cafeteria`. Compatible con el código de la app hasta la Fase 4c.
+10. `10_multitenant_cleanup.sql` — (M1) elimina `profiles.role`/`profiles.username` y el tipo `app_role`. **Aplicar solo después de desplegar el código de M1.**
 
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 
@@ -53,16 +54,17 @@ Prueba de aislamiento entre negocios (impersonación con `set_config('request.jw
 - No hay políticas de INSERT/UPDATE/DELETE directas sobre `tickets`; cancelar es la única "baja" (`cancel_ticket`).
 - Lectura vía RLS, siempre dentro del negocio activo: cajero ve sus tickets; owner/admin ven todo el negocio. `businesses` solo permite a owner/admin actualizar `name, timezone, address, phone, receipt_header, receipt_footer` (grant por columna). `business_members` y `business_counters` no aceptan escrituras de clientes.
 - Con `service_role` (sin sesión) el default de `business_id` es null: las actions que usen el cliente admin deben pasar `business_id` explícito.
-- Los mutaciones de menú/modificadores/cajeros van por server actions que verifican rol (`requireAdmin`) además del RLS.
+- Las mutaciones de menú/modificadores van por server actions que verifican rol (`requireAdmin` = owner|admin del negocio activo) además del RLS. El equipo (`app/actions/team.ts`) escribe `business_members`/perfiles con service role, filtrando SIEMPRE por el negocio activo del que llama.
 
 ## D) Integración en Next.js
 
 - Clientes Supabase tipados: `lib/supabase/server.ts`, `client.ts`, `admin.ts` (service role, solo servidor); tipos en `lib/supabase/database.types.ts` (regenerar tras cada migración).
-- Server actions: `app/actions/auth.ts`, `menu.ts`, `modifiers.ts`, `sales.ts`, `cash.ts`.
+- Contexto de sesión: `lib/context.ts` (`getContext` = usuario + `my_context()` cacheado por request; `requireContext`/`requireRole`/`requireSuperAdmin`/`checkExpectedBusiness`), forma compartida en `lib/context-shape.ts`, provider cliente `components/business-provider.tsx` (`useBusiness`/`useAppContext`) y `components/business-switcher.tsx`.
+- Server actions: `app/actions/auth.ts` (login por correo o usuario+café, logout, cambiar mi contraseña), `business.ts` (cambiar negocio activo), `team.ts` (equipo), `menu.ts`, `modifiers.ts`, `sales.ts`, `cash.ts`.
 - POS: `app/pos/page.tsx` + `pos-client.tsx` (+ `cash-session-dialog`, `ticket-history-dialog`, `modifier-sheet`, `discount-dialog`).
-- Admin: `app/admin/*` (dashboard, categorías, productos, modificadores, ventas con reportes/CSV, cortes, cajeros).
-- Middleware `middleware.ts` protege `/admin` y `/pos`.
-- Variables de entorno: copiar `env.example.txt` a `.env.local`.
+- Admin: `app/admin/*` (dashboard, categorías, productos, modificadores, ventas con reportes/CSV, cortes, equipo). Cuenta: `/cuenta`; selector `/seleccionar-negocio`; `/suspendido`.
+- Middleware `middleware.ts`: sin sesión → `/login`; con sesión resuelve `my_context()` una vez: `/super` solo platform admin; `/admin` y `/pos` exigen negocio activo vigente (si no → `/seleccionar-negocio`, suspendido → `/suspendido`); `/admin` exige owner|admin; `/pos` no aplica a plantillas.
+- Variables de entorno: copiar `env.example.txt` a `.env.local` (`SYNTHETIC_EMAIL_DOMAIN` para los correos sintéticos `usuario@slug.<dominio>` de las cuentas de café).
 
 ## Notas de error handling
 

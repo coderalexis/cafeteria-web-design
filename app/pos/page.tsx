@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getContext } from "@/lib/context"
+import { homePathFor, isManager } from "@/lib/context-shape"
 import { businessDayRange } from "@/lib/dates"
 import POSClient from "./pos-client"
 
@@ -8,20 +11,13 @@ import POSClient from "./pos-client"
 export default async function POSPage() {
   const supabase = await createClient()
 
-  /* ── Auth & role ────────────────────────────────────────────────── */
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  let isAdmin = false
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle()
-    isAdmin = profile?.role === "admin"
+  /* ── Contexto (negocio activo + rol) ────────────────────────────── */
+  const ctx = await getContext()
+  if (!ctx?.business) {
+    redirect(homePathFor(ctx))
   }
+  const isAdmin = isManager(ctx.role)
+  const businessId = ctx.business.id
 
   /* ── Fetch menu data ────────────────────────────────────────────── */
   const [{ data: dbCategories }, { data: dbProducts }] = await Promise.all([
@@ -136,7 +132,8 @@ export default async function POSPage() {
       categories={categories}
       products={products}
       isAdmin={isAdmin}
-      cashierId={user?.id ?? "anon"}
+      businessId={businessId}
+      cashierId={ctx.userId}
       initialTotalSales={dbTotalSales}
       openSession={
         session
