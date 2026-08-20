@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
+import Link from "next/link"
 import { login } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -146,6 +147,15 @@ export default function LoginPage() {
               "Iniciar sesión"
             )}
           </Button>
+
+          <p className="text-center">
+            <Link
+              href="/olvide-contrasena"
+              className="text-xs text-stone-400 hover:text-stone-600 hover:underline underline-offset-2"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
         </form>
 
         <p className="text-center text-xs text-stone-400">

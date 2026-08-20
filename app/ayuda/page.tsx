@@ -124,6 +124,11 @@ export default function AyudaPage() {
                 Si perteneces a varias cafeterías, arriba verás un <strong>selector</strong> para cambiar de una a otra. Tu
                 contraseña se cambia en <strong>Mi cuenta</strong>.
               </li>
+              <li>
+                ¿Se te olvidó la contraseña? Si entras con correo, usa <strong>«¿Olvidaste tu contraseña?»</strong> en el
+                login y te llega un enlace. Si eres cajero (usuario + café), pídele a tu administrador que la restablezca
+                desde <strong>Equipo</strong>.
+              </li>
             </ul>
           </Section>
 

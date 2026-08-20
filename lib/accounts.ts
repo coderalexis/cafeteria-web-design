@@ -57,10 +57,10 @@ export function syntheticEmail(username: string, businessSlug: string): string {
 export function isSyntheticEmail(email: string | null | undefined): boolean {
   if (!email) return false
   const domain = email.toLowerCase().split("@")[1] ?? ""
-  return (
-    LEGACY_SYNTHETIC_DOMAINS.includes(domain) ||
-    domain === SYNTHETIC_EMAIL_DOMAIN ||
-    domain.endsWith(`.${SYNTHETIC_EMAIL_DOMAIN}`)
+  // El dominio vigente y los legados cuentan igual, con o sin subdominio de café:
+  // cambiar SYNTHETIC_EMAIL_DOMAIN no debe "desconocer" cuentas ya creadas.
+  return [SYNTHETIC_EMAIL_DOMAIN, ...LEGACY_SYNTHETIC_DOMAINS].some(
+    (d) => domain === d || domain.endsWith(`.${d}`),
   )
 }
 

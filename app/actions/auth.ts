@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { homePathFor, parseContext } from "@/lib/context-shape"
-import { normalizeSlug, normalizeUsername, SLUG_PATTERN, USERNAME_PATTERN, validatePassword } from "@/lib/accounts"
+import { isSyntheticEmail, normalizeSlug, normalizeUsername, SLUG_PATTERN, USERNAME_PATTERN, validatePassword } from "@/lib/accounts"
 import type { ActionResult } from "./types"
 
 // Mensaje único para usuario inexistente, café incorrecto y contraseña
@@ -154,5 +154,64 @@ export async function changeOwnPassword(formData: FormData): Promise<ActionResul
     return { error: "No se pudo cambiar la contraseña. Intenta de nuevo." }
   }
 
+  return { success: true }
+}
+
+/* ── ¿Olvidaste tu contraseña? (solo cuentas con correo real) ─────── */
+export async function requestPasswordReset(formData: FormData): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Escribe un correo válido." }
+  }
+  if (isSyntheticEmail(email)) {
+    return {
+      error:
+        "Las cuentas de café (usuario + café) no usan correo. Pide a tu administrador que restablezca tu contraseña desde Equipo.",
+    }
+  }
+
+  const supabase = await createClient()
+  // Supabase no revela si el correo existe (solo envía cuando sí); nosotros tampoco.
+  const { error } = await supabase.auth.resetPasswordForEmail(email)
+  if (error) {
+    if (/rate|seconds|frequen/i.test(error.message)) {
+      return { error: "Ya se envió un correo hace poco. Espera unos minutos e intenta de nuevo." }
+    }
+    return { error: "No se pudo enviar el correo. Intenta de nuevo más tarde." }
+  }
+  return { success: true }
+}
+
+/* ── Nueva contraseña desde el enlace de recuperación ─────────────── */
+export async function completePasswordReset(formData: FormData): Promise<ActionResult> {
+  const next = String(formData.get("new_password") ?? "")
+  const confirm = String(formData.get("confirm_password") ?? "")
+
+  if (!next || !confirm) {
+    return { error: "Completa ambos campos." }
+  }
+  if (next !== confirm) {
+    return { error: "La confirmación no coincide con la nueva contraseña." }
+  }
+  const passwordError = validatePassword(next)
+  if (passwordError) {
+    return { error: passwordError }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "El enlace caducó. Solicita uno nuevo desde «¿Olvidaste tu contraseña?»." }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: next })
+  if (error) {
+    if (/different from the old/i.test(error.message)) {
+      return { error: "La nueva contraseña debe ser distinta a la anterior." }
+    }
+    return { error: "No se pudo guardar la contraseña. Intenta de nuevo." }
+  }
   return { success: true }
 }
