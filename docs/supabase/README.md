@@ -79,3 +79,9 @@ Prueba de aislamiento entre negocios (impersonación con `set_config('request.jw
 - Server actions validan con zod y devuelven `{ error }` o `{ success: true, ... }` (`ActionResult`).
 - Los RPC lanzan excepciones con mensajes en español que la UI muestra tal cual.
 - Formularios crudos usan `components/action-form.tsx` para mostrar los errores con toast.
+
+## E) Correo y respaldos (operación)
+
+- Dominio: `cafecitopos.com` (Cloudflare). Resend verificado (DKIM/SPF) y conectado como SMTP de Supabase Auth (remitente `no-reply@cafecitopos.com`).
+- Plantilla de "Reset Password": `docs/supabase/email-templates/reset-password.html` (pegar en Supabase → Authentication → Emails; el enlace usa `{{ .SiteURL }}/restablecer/confirmar?token_hash={{ .TokenHash }}&type=recovery`).
+- Respaldos: workflow `backup.yml` (03:00 CDMX aprox.) → `pg_dump` cifrado, artefacto 30 días. Secrets del repo: `SUPABASE_DB_URL` (cadena "Session pooler" con contraseña) y `BACKUP_PASSPHRASE`. Restaurar: `openssl enc -d -aes-256-cbc -pbkdf2 -in db.dump.enc -out db.dump` y `pg_restore --clean --if-exists -d <url destino> db.dump`.
