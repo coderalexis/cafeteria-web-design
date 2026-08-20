@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
+import { OfflineBanner, PosLockScreen, POS_LOCK_EVENT } from "./lock-screen"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/kbd"
@@ -115,6 +116,10 @@ interface POSClientProps {
   isAdmin: boolean
   businessId: string
   cashierId: string
+  /** Minutos de inactividad para bloquear el POS (0 = desactivado). */
+  lockMinutes: number
+  /** ¿El usuario ya tiene PIN de caja en este negocio? */
+  hasPin: boolean
   initialTotalSales: number
   openSession: OpenSession | null
 }
@@ -284,6 +289,8 @@ export default function POSClient({
   isAdmin,
   businessId,
   cashierId,
+  lockMinutes,
+  hasPin,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
@@ -418,7 +425,12 @@ export default function POSClient({
         toast.error(result.error || "Error al registrar la venta")
       }
     } catch {
-      toast.error("Error de conexión al registrar la venta. Intenta de nuevo.")
+      const offline = typeof navigator !== "undefined" && !navigator.onLine
+      toast.error(
+        offline
+          ? "Sin conexión. El pedido queda guardado aquí; vuelve a pulsar Cobrar cuando regrese el internet."
+          : "Error de conexión al registrar la venta. Intenta de nuevo.",
+      )
     } finally {
       setIsProcessing(false)
     }
@@ -947,6 +959,13 @@ export default function POSClient({
 
   return (
     <div className="relative flex h-[100dvh] bg-stone-50 overflow-hidden">
+      <OfflineBanner />
+      <PosLockScreen
+        lockMinutes={lockMinutes}
+        initialHasPin={hasPin}
+        businessName={businessName}
+        userName={appCtx.fullName || "quien está en caja"}
+      />
       {/* ── Top-right actions (escritorio) ── */}
       {!isMobile && (
         <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
@@ -978,6 +997,18 @@ export default function POSClient({
           >
             <Keyboard className="h-4 w-4" />
           </Button>
+          {lockMinutes > 0 && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => window.dispatchEvent(new Event(POS_LOCK_EVENT))}
+              className="bg-white/80 backdrop-blur"
+              title="Bloquear pantalla"
+              aria-label="Bloquear pantalla"
+            >
+              <Lock className="h-4 w-4" />
+            </Button>
+          )}
           <Link href="/cuenta" title="Mi cuenta" aria-label="Mi cuenta">
             <Button variant="outline" size="icon" className="bg-white/80 backdrop-blur">
               <UserCircle className="h-4 w-4" />
@@ -1047,6 +1078,11 @@ export default function POSClient({
                         <UserCircle className="h-4 w-4 mr-2" /> Mi cuenta
                       </Link>
                     </DropdownMenuItem>
+                    {lockMinutes > 0 && (
+                      <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event(POS_LOCK_EVENT))}>
+                        <Lock className="h-4 w-4 mr-2" /> Bloquear pantalla
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => logout()} className="text-red-600 focus:text-red-700">
                       <LogOut className="h-4 w-4 mr-2" /> Cerrar sesión

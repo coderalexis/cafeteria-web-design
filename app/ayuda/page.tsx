@@ -352,6 +352,15 @@ export default function AyudaPage() {
                 del equipo solo se permite si no tiene ventas.
               </li>
               <li>Un cajero solo ve sus propias ventas; dueños y administradores ven todo el negocio.</li>
+              <li>
+                <strong>PIN de caja</strong>: si el negocio activa el bloqueo por inactividad (en Negocio → Seguridad de
+                caja), el POS se bloquea solo y se desbloquea con el PIN de quien está en caja. Cada quien crea su PIN en
+                Mi cuenta (o al desbloquear la primera vez); un administrador puede asignarlo o quitarlo desde Equipo.
+              </li>
+              <li>
+                En <strong>Actividad</strong> queda el registro de quién cambió qué (precios, productos, equipo, ajustes) y
+                cuándo.
+              </li>
             </ul>
           </Section>
 

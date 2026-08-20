@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string
+          business_id: string
+          created_at: string
+          details: Json | null
+          entity: string | null
+          id: number
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name?: string
+          business_id: string
+          created_at?: string
+          details?: Json | null
+          entity?: string | null
+          id?: never
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string
+          business_id?: string
+          created_at?: string
+          details?: Json | null
+          entity?: string | null
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_pins: {
+        Row: {
+          business_id: string
+          pin_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_id: string
+          pin_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string
+          pin_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_pins_business_id_user_id_fkey"
+            columns: ["business_id", "user_id"]
+            isOneToOne: true
+            referencedRelation: "business_members"
+            referencedColumns: ["business_id", "user_id"]
+          },
+        ]
+      }
       business_counters: {
         Row: {
           business_id: string
@@ -93,6 +170,7 @@ export type Database = {
           plan: string
           receipt_footer: string | null
           receipt_header: string | null
+          settings: Json
           slug: string
           status: string
           timezone: string
@@ -111,6 +189,7 @@ export type Database = {
           plan?: string
           receipt_footer?: string | null
           receipt_header?: string | null
+          settings?: Json
           slug: string
           status?: string
           timezone?: string
@@ -129,6 +208,7 @@ export type Database = {
           plan?: string
           receipt_footer?: string | null
           receipt_header?: string | null
+          settings?: Json
           slug?: string
           status?: string
           timezone?: string
@@ -851,8 +931,16 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["business_role"]
       }
+      admin_set_member_pin: {
+        Args: { p_pin?: string; p_user_id: string }
+        Returns: undefined
+      }
       derive_uuid: { Args: { p_key: string; p_ns: string }; Returns: string }
       find_user_id_by_email: { Args: { p_email: string }; Returns: string }
+      log_audit: {
+        Args: { p_action: string; p_details?: Json; p_entity?: string }
+        Returns: undefined
+      }
       member_ctx: {
         Args: never
         Returns: {
@@ -864,6 +952,9 @@ export type Database = {
         }[]
       }
       my_context: { Args: never; Returns: Json }
+      my_pin_set: { Args: never; Returns: boolean }
+      set_my_pin: { Args: { p_pin: string }; Returns: undefined }
+      verify_my_pin: { Args: { p_pin: string }; Returns: boolean }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }
         Returns: Json

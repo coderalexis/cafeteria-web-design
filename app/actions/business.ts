@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
+import { logAudit } from "@/lib/audit"
 import { homePathFor, parseContext } from "@/lib/context-shape"
 import { isValidTimeZone } from "@/lib/dates"
+import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, serializeBusinessSettings } from "@/lib/settings"
 import type { ActionResult } from "./types"
 
 /**
@@ -52,6 +54,10 @@ const settingsSchema = z.object({
   phone: optionalText(40),
   receiptHeader: optionalText(200),
   receiptFooter: optionalText(200),
+  lockMinutes: z
+    .number()
+    .int()
+    .refine((n) => (LOCK_MINUTES_OPTIONS as readonly number[]).includes(n), "Valor de bloqueo inválido."),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -65,11 +71,19 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     phone: formData.get("phone") ?? "",
     receiptHeader: formData.get("receipt_header") ?? "",
     receiptFooter: formData.get("receipt_footer") ?? "",
+    lockMinutes: Number(formData.get("lock_minutes") ?? 0),
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
   }
   const v = parsed.data
+
+  // Merge sobre el JSON existente: claves futuras de settings no se pierden.
+  const currentSettings =
+    ctx.business.settings && typeof ctx.business.settings === "object"
+      ? (ctx.business.settings as Record<string, unknown>)
+      : {}
+  const nextSettings = { ...currentSettings, ...serializeBusinessSettings({ lockMinutes: v.lockMinutes }) }
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -81,6 +95,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       phone: v.phone,
       receipt_header: v.receiptHeader,
       receipt_footer: v.receiptFooter,
+      settings: nextSettings as never,
     })
     .eq("id", ctx.business.id)
     .select("id")
@@ -90,6 +105,19 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   }
   if (!data || data.length === 0) {
     return { error: "No tienes permiso para editar este negocio." }
+  }
+
+  const before = ctx.business
+  const cambios: string[] = []
+  if (before.name !== v.name) cambios.push("nombre")
+  if (before.timezone !== v.timezone) cambios.push("zona horaria")
+  if ((before.address ?? null) !== v.address) cambios.push("dirección")
+  if ((before.phone ?? null) !== v.phone) cambios.push("teléfono")
+  if ((before.receiptHeader ?? null) !== v.receiptHeader) cambios.push("encabezado del ticket")
+  if ((before.receiptFooter ?? null) !== v.receiptFooter) cambios.push("pie del ticket")
+  if (parseBusinessSettings(before.settings).lockMinutes !== v.lockMinutes) cambios.push("bloqueo por inactividad")
+  if (cambios.length > 0) {
+    await logAudit("negocio.ajustes", v.name, { cambios })
   }
 
   revalidatePath("/", "layout")

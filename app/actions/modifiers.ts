@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
+import { logAudit } from "@/lib/audit"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -53,6 +54,7 @@ export async function createModifierGroup(formData: FormData): Promise<ActionRes
   })
   if (error) return { error: error.message }
 
+  await logAudit("grupo.creado", g.name)
   revalidateAll()
   return { success: true }
 }
@@ -83,6 +85,7 @@ export async function updateModifierGroup(formData: FormData): Promise<ActionRes
     .eq("id", id)
   if (error) return { error: error.message }
 
+  await logAudit("grupo.editado", g.name)
   revalidateAll()
   return { success: true }
 }
@@ -99,6 +102,8 @@ export async function toggleModifierGroupActive(formData: FormData): Promise<Act
   const { error } = await supabase.from("modifier_groups").update({ is_active: isActive }).eq("id", id)
   if (error) return { error: error.message }
 
+  const { data: g } = await supabase.from("modifier_groups").select("name").eq("id", id).maybeSingle()
+  await logAudit("grupo.editado", g?.name ?? id, { activo: isActive })
   revalidateAll()
   return { success: true }
 }
@@ -126,9 +131,12 @@ export async function deleteModifierGroup(formData: FormData): Promise<ActionRes
     }
   }
 
+  const { data: before } = await supabase.from("modifier_groups").select("name").eq("id", id).maybeSingle()
+
   const { error } = await supabase.from("modifier_groups").delete().eq("id", id)
   if (error) return { error: error.message }
 
+  await logAudit("grupo.eliminado", before?.name ?? id)
   revalidateAll()
   return { success: true }
 }
@@ -165,6 +173,8 @@ export async function createModifier(formData: FormData): Promise<ActionResult> 
   })
   if (error) return { error: error.message }
 
+  const { data: g } = await supabase.from("modifier_groups").select("name").eq("id", groupId).maybeSingle()
+  await logAudit("modificador.creado", `${g?.name ?? "?"}: ${parsed.data.name}`, { precio_extra: parsed.data.priceDelta })
   revalidateAll()
   return { success: true }
 }
@@ -186,6 +196,7 @@ export async function updateModifier(formData: FormData): Promise<ActionResult> 
     .eq("id", id)
   if (error) return { error: error.message }
 
+  await logAudit("modificador.editado", parsed.data.name, { precio_extra: parsed.data.priceDelta })
   revalidateAll()
   return { success: true }
 }
@@ -202,6 +213,8 @@ export async function toggleModifierActive(formData: FormData): Promise<ActionRe
   const { error } = await supabase.from("modifiers").update({ is_active: isActive }).eq("id", id)
   if (error) return { error: error.message }
 
+  const { data: m } = await supabase.from("modifiers").select("name").eq("id", id).maybeSingle()
+  await logAudit("modificador.editado", m?.name ?? id, { activo: isActive })
   revalidateAll()
   return { success: true }
 }
@@ -222,9 +235,12 @@ export async function deleteModifier(formData: FormData): Promise<ActionResult> 
     return { error: `Esta opción se usó en ${count} venta(s). Desactívala en lugar de eliminarla.` }
   }
 
+  const { data: before } = await supabase.from("modifiers").select("name").eq("id", id).maybeSingle()
+
   const { error } = await supabase.from("modifiers").delete().eq("id", id)
   if (error) return { error: error.message }
 
+  await logAudit("modificador.eliminado", before?.name ?? id)
   revalidateAll()
   return { success: true }
 }
@@ -274,6 +290,14 @@ export async function setProductModifierGroups(
     if (error) return { error: error.message }
   }
 
+  if (toAdd.length > 0 || toRemove.length > 0) {
+    const { data: p } = await supabase.from("menu_products").select("name").eq("id", productId).maybeSingle()
+    await logAudit("producto.modificadores", p?.name ?? productId, {
+      agregados: toAdd.length,
+      quitados: toRemove.length,
+      total: want.size,
+    })
+  }
   revalidateAll()
   return { success: true }
 }

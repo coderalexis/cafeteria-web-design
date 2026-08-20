@@ -18,6 +18,7 @@ import {
   Power,
   Trash2,
   Crown,
+  LockKeyhole,
 } from "lucide-react"
 import {
   addMemberByEmail,
@@ -27,6 +28,7 @@ import {
   setMemberActive,
   updateMember,
 } from "@/app/actions/team"
+import { adminSetMemberPin } from "@/app/actions/security"
 import { useAppContext } from "@/components/business-provider"
 import { ROLE_LABELS, type BusinessRole } from "@/lib/context-shape"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -170,6 +172,19 @@ export default function EquipoClient({ members }: Props) {
 
   function handleResetPassword(formData: FormData) {
     run(() => resetMemberPassword(formData), "Contraseña restablecida", false)
+  }
+
+  function handleSetPin(formData: FormData) {
+    run(() => adminSetMemberPin(formData), "PIN asignado", false)
+  }
+
+  function handleClearPin() {
+    if (!selected) return
+    const f = new FormData()
+    f.set("user_id", selected.id)
+    f.set("clear", "true")
+    f.set("member_name", selected.fullName || selected.username || "")
+    run(() => adminSetMemberPin(f), "PIN quitado", false)
   }
 
   function handleToggleActive() {
@@ -496,6 +511,45 @@ export default function EquipoClient({ members }: Props) {
                 <p className="mt-4 text-xs text-stone-400">
                   Esta persona entra con su correo y cambia su contraseña desde «Mi cuenta».
                 </p>
+              )}
+
+              {/* PIN de caja (desbloqueo del POS) */}
+              {!selectedIsOwnerLocked && (
+                <>
+                  <Separator className="my-6" />
+                  <form action={handleSetPin} className="space-y-3">
+                    <input type="hidden" name="user_id" value={selected.id} />
+                    <input type="hidden" name="member_name" value={selected.fullName || selected.username || ""} />
+                    <p className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                      <LockKeyhole className="h-4 w-4 text-stone-400" />
+                      PIN de caja
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        name="pin"
+                        type="password"
+                        inputMode="numeric"
+                        pattern="[0-9]{4,6}"
+                        minLength={4}
+                        maxLength={6}
+                        placeholder="Nuevo PIN (4 a 6 dígitos)"
+                        className="flex-1"
+                        key={selected.id + "-pin"}
+                      />
+                      <Button type="submit" variant="outline" disabled={isPending}>
+                        Asignar
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearPin}
+                      disabled={isPending}
+                      className="text-xs text-stone-400 hover:text-stone-600 hover:underline"
+                    >
+                      Quitar PIN (definirá uno nuevo al desbloquear)
+                    </button>
+                  </form>
+                </>
               )}
 
               {/* Estado / quitar */}

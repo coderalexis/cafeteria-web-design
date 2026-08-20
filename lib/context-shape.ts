@@ -20,6 +20,8 @@ export interface BusinessInfo {
   phone: string | null
   receiptHeader: string | null
   receiptFooter: string | null
+  /** `businesses.settings` crudo; parsear con `parseBusinessSettings`. */
+  settings: unknown
 }
 
 export interface Membership {
@@ -85,6 +87,7 @@ function parseBusiness(v: unknown): BusinessInfo | null {
     phone: strOrNull(b.phone),
     receiptHeader: strOrNull(b.receipt_header),
     receiptFooter: strOrNull(b.receipt_footer),
+    settings: b.settings ?? {},
   }
 }
 

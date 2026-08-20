@@ -8,6 +8,7 @@ import { isSyntheticEmail } from "@/lib/accounts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ChangePasswordCard } from "./account-client"
+import { PinCard } from "./pin-card"
 
 export const dynamic = "force-dynamic"
 
@@ -23,14 +24,17 @@ export default async function CuentaPage() {
   const synthetic = isSyntheticEmail(email)
 
   // Para cuentas de café el "usuario" vive en la membresía del negocio activo
-  const { data: activeMember } = ctx.business
-    ? await supabase
-        .from("business_members")
-        .select("username")
-        .eq("business_id", ctx.business.id)
-        .eq("user_id", ctx.userId)
-        .maybeSingle()
-    : { data: null }
+  const [{ data: activeMember }, { data: pinSet }] = ctx.business
+    ? await Promise.all([
+        supabase
+          .from("business_members")
+          .select("username")
+          .eq("business_id", ctx.business.id)
+          .eq("user_id", ctx.userId)
+          .maybeSingle(),
+        supabase.rpc("my_pin_set"),
+      ])
+    : [{ data: null }, { data: null }]
 
   return (
     <main className="min-h-screen bg-stone-100 p-4 md:p-8">
@@ -117,6 +121,8 @@ export default async function CuentaPage() {
             )}
           </CardContent>
         </Card>
+
+        {ctx.business && <PinCard hasPin={pinSet === true} businessName={ctx.business.name} />}
 
         <ChangePasswordCard />
       </div>

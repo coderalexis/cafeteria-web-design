@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
+import { logAudit } from "@/lib/audit"
 
 function revalidateAll() {
   revalidatePath("/admin", "layout")
@@ -33,6 +34,7 @@ export async function createCategory(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  await logAudit("categoria.creada", name)
   revalidateAll()
   return { success: true }
 }
@@ -58,6 +60,7 @@ export async function updateCategory(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  await logAudit("categoria.editada", name)
   revalidateAll()
   return { success: true }
 }
@@ -83,6 +86,7 @@ export async function createProduct(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  await logAudit("producto.creado", name)
   revalidateAll()
   return { success: true }
 }
@@ -108,6 +112,7 @@ export async function updateProduct(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  await logAudit("producto.editado", name)
   revalidateAll()
   return { success: true }
 }
@@ -135,6 +140,8 @@ export async function createVariant(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  const { data: product } = await supabase.from("menu_products").select("name").eq("id", productId).maybeSingle()
+  await logAudit("variante.creada", `${product?.name ?? "?"} (${name})`, { precio: price })
   revalidateAll()
   return { success: true }
 }
@@ -153,6 +160,14 @@ export async function updateVariant(formData: FormData) {
   }
 
   const supabase = await createClient()
+
+  // Estado previo solo para la bitácora (cambios de precio).
+  const { data: before } = await supabase
+    .from("menu_variants")
+    .select("price, menu_products(name)")
+    .eq("id", id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from("menu_variants")
     .update({ name, price, size_label: sizeLabel || null })
@@ -160,6 +175,15 @@ export async function updateVariant(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  const productName = (Array.isArray(before?.menu_products) ? before?.menu_products[0] : before?.menu_products)?.name
+  if (before && Number(before.price) !== price) {
+    await logAudit("precio.cambiado", `${productName ?? "?"} (${name})`, {
+      antes: Number(before.price),
+      ahora: price,
+    })
+  } else {
+    await logAudit("variante.editada", `${productName ?? "?"} (${name})`)
+  }
   revalidateAll()
   return { success: true }
 }
@@ -189,10 +213,18 @@ export async function deleteVariant(formData: FormData) {
     }
   }
 
+  const { data: before } = await supabase
+    .from("menu_variants")
+    .select("name, menu_products(name)")
+    .eq("id", id)
+    .maybeSingle()
+
   const { error } = await supabase.from("menu_variants").delete().eq("id", id)
 
   if (error) return { error: error.message }
 
+  const productName = (Array.isArray(before?.menu_products) ? before?.menu_products[0] : before?.menu_products)?.name
+  await logAudit("variante.eliminada", `${productName ?? "?"} (${before?.name ?? id})`)
   revalidateAll()
   return { success: true }
 }
@@ -216,6 +248,13 @@ export async function toggleVariantActive(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  const { data: v } = await supabase
+    .from("menu_variants")
+    .select("name, menu_products(name)")
+    .eq("id", id)
+    .maybeSingle()
+  const productName = (Array.isArray(v?.menu_products) ? v?.menu_products[0] : v?.menu_products)?.name
+  await logAudit(isActive ? "variante.activada" : "variante.desactivada", `${productName ?? "?"} (${v?.name ?? id})`)
   revalidateAll()
   return { success: true }
 }
@@ -239,6 +278,8 @@ export async function toggleProductActive(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  const { data: p } = await supabase.from("menu_products").select("name").eq("id", id).maybeSingle()
+  await logAudit(isActive ? "producto.activado" : "producto.desactivado", p?.name ?? id)
   revalidateAll()
   return { success: true }
 }
@@ -268,11 +309,14 @@ export async function deleteProduct(formData: FormData) {
     }
   }
 
+  const { data: before } = await supabase.from("menu_products").select("name").eq("id", id).maybeSingle()
+
   // Variants cascade automatically (ON DELETE CASCADE)
   const { error } = await supabase.from("menu_products").delete().eq("id", id)
 
   if (error) return { error: error.message }
 
+  await logAudit("producto.eliminado", before?.name ?? id)
   revalidateAll()
   return { success: true }
 }
@@ -301,10 +345,13 @@ export async function deleteCategory(formData: FormData) {
     }
   }
 
+  const { data: before } = await supabase.from("menu_categories").select("name").eq("id", id).maybeSingle()
+
   const { error } = await supabase.from("menu_categories").delete().eq("id", id)
 
   if (error) return { error: error.message }
 
+  await logAudit("categoria.eliminada", before?.name ?? id)
   revalidateAll()
   return { success: true }
 }

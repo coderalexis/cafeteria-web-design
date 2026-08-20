@@ -3,9 +3,10 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Store, Loader2, Printer, Clock } from "lucide-react"
+import { Store, Loader2, Printer, Clock, LockKeyhole } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
+import { LOCK_MINUTES_OPTIONS, parseBusinessSettings } from "@/lib/settings"
 import { MEXICO_TIMEZONES, dateStringInTz } from "@/lib/dates"
 import { formatDateTime } from "@/lib/format"
 import { buildTicketLines } from "@/lib/receipt"
@@ -19,6 +20,7 @@ const OTHER = "__other__"
 export default function NegocioClient({ business }: { business: BusinessInfo }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const currentSettings = parseBusinessSettings(business.settings)
 
   const inList = MEXICO_TIMEZONES.some((t) => t.value === business.timezone)
   const [tzChoice, setTzChoice] = useState<string>(inList ? business.timezone : OTHER)
@@ -221,6 +223,36 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                   onChange={(e) => setPreview((p) => ({ ...p, receiptFooter: e.target.value }))}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <LockKeyhole className="h-4 w-4 text-amber-700" />
+                Seguridad de caja
+              </CardTitle>
+              <CardDescription>
+                Tras el tiempo elegido sin actividad, el POS se bloquea y pide el PIN de quien está en caja.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <select
+                name="lock_minutes"
+                aria-label="Bloqueo por inactividad"
+                defaultValue={String(currentSettings.lockMinutes)}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                {LOCK_MINUTES_OPTIONS.map((m) => (
+                  <option key={m} value={m}>
+                    {m === 0 ? "Desactivado" : m === 1 ? "Bloquear al minuto de inactividad" : `Bloquear a los ${m} minutos de inactividad`}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-stone-400">
+                Cada quien define su PIN en «Mi cuenta» (o al momento de desbloquear); un administrador puede
+                asignarlo desde Equipo.
+              </p>
             </CardContent>
           </Card>
 

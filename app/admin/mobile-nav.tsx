@@ -18,6 +18,7 @@ const SECTION_LABELS: Record<string, string> = {
   analisis: "Análisis",
   cortes: "Cortes de caja",
   equipo: "Equipo",
+  actividad: "Actividad",
   negocio: "Negocio",
 }
 

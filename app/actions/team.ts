@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/auth"
+import { logAudit } from "@/lib/audit"
 import type { ActiveContext } from "@/lib/context"
 import type { BusinessRole } from "@/lib/context-shape"
 import {
@@ -153,6 +154,7 @@ export async function createCashierAccount(formData: FormData): Promise<ActionRe
   })
   if ("error" in result) return { error: result.error }
 
+  await logAudit("miembro.creado", `${fullName} (@${username})`, { rol: role })
   revalidateTeam()
   return { success: true }
 }
@@ -210,6 +212,7 @@ export async function addMemberByEmail(
       .eq("id", existingId)
       .is("active_business_id", null)
 
+    await logAudit("miembro.agregado", email, { rol: role })
     revalidateTeam()
     return { success: true, created: false }
   }
@@ -227,6 +230,7 @@ export async function addMemberByEmail(
   })
   if ("error" in result) return { error: result.error }
 
+  await logAudit("miembro.agregado", `${fullName} <${email}>`, { rol: role, cuenta_nueva: true })
   revalidateTeam()
   return { success: true, created: true, tempPassword }
 }
@@ -269,6 +273,7 @@ export async function updateMember(formData: FormData): Promise<ActionResult> {
     if (error) return { error: error.message }
   }
 
+  await logAudit("miembro.editado", fullName, { rol: role })
   revalidateTeam()
   return { success: true }
 }
@@ -318,6 +323,8 @@ export async function setMemberActive(formData: FormData): Promise<ActionResult>
       .is("active_business_id", null)
   }
 
+  const { data: prof } = await admin.from("profiles").select("full_name").eq("id", userId).maybeSingle()
+  await logAudit(active ? "miembro.reactivado" : "miembro.desactivado", prof?.full_name || membership.username || userId)
   revalidateTeam()
   return { success: true }
 }
@@ -348,6 +355,7 @@ export async function resetMemberPassword(formData: FormData): Promise<ActionRes
   const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword })
   if (error) return { error: error.message }
 
+  await logAudit("miembro.contrasena", membership.username ?? userId)
   return { success: true }
 }
 
@@ -406,6 +414,7 @@ export async function removeMember(formData: FormData): Promise<ActionResult> {
     }
   }
 
+  await logAudit("miembro.eliminado", membership.username ?? userId)
   revalidateTeam()
   return { success: true }
 }

@@ -1,0 +1,67 @@
+name: Respaldo de base de datos
+
+# Respaldo diario de Supabase (pg_dump cifrado como artefacto del workflow).
+# Requiere dos secrets del repositorio (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     — cadena de conexión "Session pooler" del proyecto (con contraseña)
+#   BACKUP_PASSPHRASE   — frase con la que se cifra el respaldo (guárdala aparte:
+#                         sin ella el respaldo no se puede restaurar)
+# Restaurar: descargar el artefacto y
+#   openssl enc -d -aes-256-cbc -pbkdf2 -in db.dump.enc -out db.dump  (pide la frase)
+#   pg_restore --clean --if-exists -d "$DB_URL_DESTINO" db.dump
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 09:00 UTC ≈ 03:00 en el centro de México
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Instalar cliente de PostgreSQL 17
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: pg_dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "Falta el secret SUPABASE_DB_URL" >&2
+            exit 1
+          fi
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
+            --format=custom --no-owner --no-privileges \
+            --file=db.dump
+          SIZE=$(stat -c%s db.dump)
+          echo "Tamaño del respaldo: $SIZE bytes"
+          if [ "$SIZE" -lt 20000 ]; then
+            echo "El respaldo parece demasiado pequeño; se aborta." >&2
+            exit 1
+          fi
+
+      - name: Cifrar
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "Falta el secret BACKUP_PASSPHRASE" >&2
+            exit 1
+          fi
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -in db.dump -out db.dump.enc
+          rm db.dump
+
+      - name: Guardar artefacto (30 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: db.dump.enc
+          retention-days: 30
+          if-no-files-found: error

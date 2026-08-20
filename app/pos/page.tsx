@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
+import { parseBusinessSettings } from "@/lib/settings"
 import { businessDayRange } from "@/lib/dates"
 import POSClient from "./pos-client"
 
@@ -111,7 +112,7 @@ export default async function POSPage() {
   /* ── Today's sales (día de operación CDMX, solo completadas) + caja ── */
   const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
 
-  const [{ data: todayTickets }, { data: session }] = await Promise.all([
+  const [{ data: todayTickets }, { data: session }, { data: pinSet }] = await Promise.all([
     supabase
       .from("tickets")
       .select("total")
@@ -123,7 +124,10 @@ export default async function POSPage() {
       .select("id, opened_at, opening_float")
       .eq("status", "abierta")
       .maybeSingle(),
+    supabase.rpc("my_pin_set"),
   ])
+
+  const settings = parseBusinessSettings(ctx.business.settings)
 
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
@@ -134,6 +138,8 @@ export default async function POSPage() {
       isAdmin={isAdmin}
       businessId={businessId}
       cashierId={ctx.userId}
+      lockMinutes={settings.lockMinutes}
+      hasPin={pinSet === true}
       initialTotalSales={dbTotalSales}
       openSession={
         session
