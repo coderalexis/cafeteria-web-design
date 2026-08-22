@@ -36,6 +36,14 @@ jobs:
             echo "Falta el secret SUPABASE_DB_URL" >&2
             exit 1
           fi
+          # La cadena "Direct connection" (db.<ref>.supabase.co) solo resuelve por
+          # IPv6 y los runners de GitHub no lo tienen: hay que usar Session pooler.
+          case "$SUPABASE_DB_URL" in
+            *db.*.supabase.co*)
+              echo "SUPABASE_DB_URL usa la conexión directa (IPv6). Copia la cadena del Session pooler en Supabase → Connect." >&2
+              exit 1
+              ;;
+          esac
           /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
             --format=custom --no-owner --no-privileges \
             --file=db.dump
