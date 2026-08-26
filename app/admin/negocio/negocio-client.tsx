@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Store, Loader2, Printer, Clock, LockKeyhole, Target } from "lucide-react"
+import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings } from "@/lib/settings"
@@ -267,6 +267,30 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                   defaultValue={currentSettings.monthlyGoal ?? ""}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Mail className="h-4 w-4 text-amber-700" />
+                Resumen semanal por correo
+              </CardTitle>
+              <CardDescription>
+                Cada lunes por la mañana llega un resumen de la semana (ventas, propinas, más vendidos y por cajero) a los
+                correos de los dueños y administradores.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <select
+                name="weekly_email"
+                aria-label="Resumen semanal por correo"
+                defaultValue={currentSettings.weeklyEmail ? "on" : "off"}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="on">Enviar cada lunes</option>
+                <option value="off">No enviar</option>
+              </select>
             </CardContent>
           </Card>
 

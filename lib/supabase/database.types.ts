@@ -978,6 +978,10 @@ export type Database = {
         Returns: Json
       }
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
+      weekly_summary: {
+        Args: { p_business_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
       top_variants: {
         Args: { p_days?: number; p_limit?: number }
         Returns: { qty: number; variant_id: string }[]

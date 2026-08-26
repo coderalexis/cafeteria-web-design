@@ -69,6 +69,7 @@ const settingsSchema = z.object({
     .trim()
     .transform((v) => parseGoal(v === "" ? null : v))
     .refine((v) => v === null || v >= 1, "La meta mensual debe ser un monto positivo."),
+  weeklyEmail: z.enum(["on", "off"]).transform((v) => v === "on"),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -85,6 +86,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     lockMinutes: Number(formData.get("lock_minutes") ?? 0),
     dailyGoal: formData.get("daily_goal") ?? "",
     monthlyGoal: formData.get("monthly_goal") ?? "",
+    weeklyEmail: formData.get("weekly_email") ?? "on",
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -104,6 +106,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       lockMinutes: v.lockMinutes,
       dailyGoal: v.dailyGoal,
       monthlyGoal: v.monthlyGoal,
+      weeklyEmail: v.weeklyEmail,
     }),
   }
 
@@ -139,6 +142,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if ((before.receiptFooter ?? null) !== v.receiptFooter) cambios.push("pie del ticket")
   if (prevSettings.lockMinutes !== v.lockMinutes) cambios.push("bloqueo por inactividad")
   if (prevSettings.dailyGoal !== v.dailyGoal || prevSettings.monthlyGoal !== v.monthlyGoal) cambios.push("metas de venta")
+  if (prevSettings.weeklyEmail !== v.weeklyEmail) cambios.push("resumen semanal")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })
   }

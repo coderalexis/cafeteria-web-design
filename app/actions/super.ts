@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { runWeeklySummaries, type WeeklySendResult } from "@/lib/weekly-summary"
 import { createClient } from "@/lib/supabase/server"
 import { requireSuperAdmin } from "@/lib/context"
 import { generateTempPassword, isSyntheticEmail, normalizeSlug, SLUG_PATTERN } from "@/lib/accounts"
@@ -236,4 +237,16 @@ export async function enterBusiness(formData: FormData): Promise<ActionResult<{ 
 
   revalidateSuper()
   return { success: true, redirectTo: "/admin" }
+}
+
+/* ── Resumen semanal: disparo manual desde /super ─────────────────── */
+export async function runWeeklySummariesNow(input: {
+  dry: boolean
+}): Promise<ActionResult<{ results: WeeklySendResult[] }>> {
+  const { error: authError } = await requireSuperAdmin()
+  if (authError) return { error: authError }
+
+  const { results, error } = await runWeeklySummaries({ dryRun: input.dry === true })
+  if (error) return { error }
+  return { success: true, results }
 }

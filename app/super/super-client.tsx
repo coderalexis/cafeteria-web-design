@@ -25,6 +25,7 @@ import {
   type PlatformBusiness,
 } from "@/app/actions/super"
 import { MEXICO_TIMEZONES } from "@/lib/dates"
+import { WeeklySummaryCard } from "./weekly-card"
 import { formatCurrency, formatDateTime } from "@/lib/format"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -253,6 +254,8 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
           <BusinessCard key={b.id} b={b} />
         ))}
       </div>
+
+      <WeeklySummaryCard />
 
       {templates.length > 0 && (
         <div className="space-y-3">

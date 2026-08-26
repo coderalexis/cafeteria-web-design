@@ -13,6 +13,8 @@ export interface BusinessSettings {
   monthlyGoal: number | null
   /** El dueño ocultó la checklist de arranque del dashboard. */
   hideChecklist: boolean
+  /** Resumen semanal por correo a dueños/administradores (lunes por la mañana). */
+  weeklyEmail: boolean
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   dailyGoal: null,
   monthlyGoal: null,
   hideChecklist: false,
+  weeklyEmail: true,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -42,6 +45,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     out.dailyGoal = parseGoal(r.daily_goal)
     out.monthlyGoal = parseGoal(r.monthly_goal)
     out.hideChecklist = r.hide_checklist === true
+    out.weeklyEmail = r.weekly_email !== false
   }
   return out
 }
@@ -55,5 +59,6 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     daily_goal: s.dailyGoal,
     monthly_goal: s.monthlyGoal,
     hide_checklist: s.hideChecklist,
+    weekly_email: s.weeklyEmail,
   }
 }

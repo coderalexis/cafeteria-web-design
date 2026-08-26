@@ -350,6 +350,11 @@ export default function AyudaPage() {
                 pasada, a la misma hora.
               </li>
               <li>
+                <strong>Resumen semanal por correo</strong>: cada lunes por la mañana llega a los correos de dueños y
+                administradores un resumen de la semana anterior (ventas, propinas, más vendidos, por cajero). Se puede
+                desactivar en Negocio.
+              </li>
+              <li>
                 En <strong>Negocio</strong> defines el nombre, la <strong>zona horaria</strong> (marca el «día de operación» de
                 reportes y cortes: si tu cafetería está en Tijuana o Cancún, elígela), la dirección y el teléfono, y los
                 textos de <strong>encabezado y pie del ticket</strong>. Verás una vista previa del ticket al editar.
