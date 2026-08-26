@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
+import { isCategoryColor } from "@/lib/category-colors"
 
 function revalidateAll() {
   revalidatePath("/admin", "layout")
@@ -20,6 +21,8 @@ export async function createCategory(formData: FormData) {
 
   const name = String(formData.get("name") ?? "")
   const slug = String(formData.get("slug") ?? "")
+  const colorRaw = String(formData.get("color") ?? "")
+  const color = isCategoryColor(colorRaw) ? colorRaw : null
 
   if (!name || !slug) {
     return { error: "Nombre y slug son obligatorios." }
@@ -30,7 +33,7 @@ export async function createCategory(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("menu_categories").insert({ name, slug })
+  const { error } = await supabase.from("menu_categories").insert({ name, slug, color })
 
   if (error) return { error: error.message }
 
@@ -46,6 +49,8 @@ export async function updateCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "")
   const name = String(formData.get("name") ?? "")
   const slug = String(formData.get("slug") ?? "")
+  const colorRaw = String(formData.get("color") ?? "")
+  const color = isCategoryColor(colorRaw) ? colorRaw : null
 
   if (!id || !name || !slug) {
     return { error: "ID, nombre y slug son obligatorios." }
@@ -56,7 +61,7 @@ export async function updateCategory(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("menu_categories").update({ name, slug }).eq("id", id)
+  const { error } = await supabase.from("menu_categories").update({ name, slug, color }).eq("id", id)
 
   if (error) return { error: error.message }
 

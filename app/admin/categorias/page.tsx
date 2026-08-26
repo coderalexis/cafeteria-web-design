@@ -5,14 +5,50 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { CATEGORY_COLORS, COLOR_CLASSES, isCategoryColor } from "@/lib/category-colors"
 import { Tag, Plus, Trash2 } from "lucide-react"
+
+/**
+ * Selector de color con radios nativos (sin JS): el POS pinta los chips de
+ * categoría y la franja de las tarjetas con este color.
+ */
+function ColorPicker({ value }: { value?: string | null }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <label className="cursor-pointer" title="Sin color">
+        <input
+          type="radio"
+          name="color"
+          value=""
+          defaultChecked={!isCategoryColor(value)}
+          className="peer sr-only"
+        />
+        <span className="block h-6 w-6 rounded-full border-2 border-dashed border-stone-300 bg-white peer-checked:ring-2 peer-checked:ring-stone-500 peer-checked:ring-offset-1 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500" />
+      </label>
+      {CATEGORY_COLORS.map((color) => (
+        <label key={color} className="cursor-pointer" title={COLOR_CLASSES[color].label}>
+          <input
+            type="radio"
+            name="color"
+            value={color}
+            defaultChecked={value === color}
+            className="peer sr-only"
+          />
+          <span
+            className={`block h-6 w-6 rounded-full ${COLOR_CLASSES[color].dot} peer-checked:ring-2 peer-checked:ring-stone-500 peer-checked:ring-offset-1 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500`}
+          />
+        </label>
+      ))}
+    </div>
+  )
+}
 
 export default async function CategoriasPage() {
   const supabase = await createClient()
 
   const { data: categories } = await supabase
     .from("menu_categories")
-    .select("id, name, slug, sort_order")
+    .select("id, name, slug, sort_order, color")
     .order("sort_order")
 
   // Count products per category
@@ -50,23 +86,27 @@ export default async function CategoriasPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={createCategory} className="flex gap-3">
+          <ActionForm action={createCategory} className="flex flex-wrap items-center gap-3">
             <Input
               name="name"
               placeholder="Nombre (ej: Bebidas calientes)"
               required
-              className="flex-1"
+              className="flex-1 min-w-[12rem]"
             />
             <Input
               name="slug"
               placeholder="Slug (ej: bebidas-calientes)"
               required
-              className="flex-1"
+              className="flex-1 min-w-[12rem]"
             />
+            <ColorPicker />
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700 shrink-0">
               Crear
             </Button>
           </ActionForm>
+          <p className="text-xs text-stone-400 mt-2">
+            El color pinta la categoría en el POS (chips y tarjetas) para encontrarla más rápido.
+          </p>
         </CardContent>
       </Card>
 
@@ -94,21 +134,22 @@ export default async function CategoriasPage() {
               {/* Edit form */}
               <ActionForm
                 action={updateCategory}
-                className="flex items-center gap-3 flex-1"
+                className="flex flex-wrap items-center gap-3 flex-1"
               >
                 <input type="hidden" name="id" value={category.id} />
                 <Input
                   name="name"
                   defaultValue={category.name}
                   required
-                  className="flex-1"
+                  className="flex-1 min-w-[10rem]"
                 />
                 <Input
                   name="slug"
                   defaultValue={category.slug}
                   required
-                  className="flex-1 font-mono text-sm"
+                  className="flex-1 min-w-[10rem] font-mono text-sm"
                 />
+                <ColorPicker value={category.color} />
                 <Button type="submit" variant="secondary" size="sm" className="shrink-0">
                   Guardar
                 </Button>

@@ -182,6 +182,31 @@ export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[]
 }
 
 /* ------------------------------------------------------------------ */
+/*  Ticket como texto (WhatsApp, notas, copiar y pegar)                */
+/* ------------------------------------------------------------------ */
+
+/** Versión legible del ticket para mandar por mensaje (sin monoespaciado). */
+export function buildShareText(r: ReceiptData, biz: ReceiptBusiness): string {
+  const tz = biz.timezone
+  const lines: string[] = [biz.name, `Ticket #${r.folio} · ${formatDate(r.date, tz)} ${formatTime(r.date, tz)}`, ""]
+  for (const item of r.items) {
+    lines.push(`${item.quantity}x ${item.label} — ${formatCurrency(item.lineTotal)}`)
+    for (const m of item.modifiers ?? []) lines.push(`   + ${m.name}`)
+    if (item.notes) lines.push(`   * ${item.notes}`)
+  }
+  lines.push("")
+  if ((r.discountTotal ?? 0) > 0) {
+    lines.push(`Subtotal: ${formatCurrency(r.subtotal ?? r.total + (r.discountTotal ?? 0))}`)
+    lines.push(`Descuento: -${formatCurrency(r.discountTotal ?? 0)}`)
+  }
+  lines.push(`Total: ${formatCurrency(r.total)}`)
+  lines.push(`Pago: ${paymentLabel(r.paymentMethod)}`)
+  if (biz.phone) lines.push("", `Tel. ${biz.phone}`)
+  lines.push("", biz.receiptFooter?.trim() || DEFAULT_FOOTER)
+  return lines.join("\n")
+}
+
+/* ------------------------------------------------------------------ */
 /*  Comanda para barra/cocina (sin precios: qué preparar y cómo)       */
 /* ------------------------------------------------------------------ */
 

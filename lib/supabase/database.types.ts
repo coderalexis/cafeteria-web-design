@@ -352,6 +352,7 @@ export type Database = {
       menu_categories: {
         Row: {
           business_id: string
+          color: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -362,6 +363,7 @@ export type Database = {
         }
         Insert: {
           business_id?: string
+          color?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -372,6 +374,7 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          color?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -815,6 +818,7 @@ export type Database = {
           status: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
           tax_total: number
+          tip_amount: number
           total: number
         }
         Insert: {
@@ -837,6 +841,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
           tax_total?: number
+          tip_amount?: number
           total: number
         }
         Update: {
@@ -859,6 +864,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal?: number
           tax_total?: number
+          tip_amount?: number
           total?: number
         }
         Relationships: [
@@ -923,6 +929,7 @@ export type Database = {
           p_items: Json
           p_notes?: string
           p_payment_method: Database["public"]["Enums"]["payment_method"]
+          p_tip?: number
         }
         Returns: Json
       }
@@ -971,6 +978,10 @@ export type Database = {
         Returns: Json
       }
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
+      top_variants: {
+        Args: { p_days?: number; p_limit?: number }
+        Returns: { qty: number; variant_id: string }[]
+      }
     }
     Enums: {
       business_role: "owner" | "admin" | "cajero"

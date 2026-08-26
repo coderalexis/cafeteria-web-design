@@ -46,6 +46,7 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 11. `11_platform.sql` — (M3) RPC `platform_overview()` (resumen de negocios para `/super`; solo `service_role`).
 12. `12_insights.sql` — Reportes 2: RPC `sales_insights(p_from, p_to)` (owner|admin, zona del negocio): comparativo vs. periodo anterior, por día de la semana, mapa de calor día×hora, métricas por cajero, descuentos y cancelaciones por motivo/usuario, productos sin movimiento, modificadores más pedidos, combinaciones frecuentes. Lo consume `/admin/analisis`.
 13. `13_p1_seguridad.sql` — P1: `businesses.settings` (jsonb con grant de columna; hoy `lock_minutes` del candado del POS), tabla `audit_events` + RPC `log_audit` (bitácora por negocio, solo owner|admin la lee/escribe; la consume `/admin/actividad`), y PIN de caja: tabla `member_pins` (hashes bcrypt vía pgcrypto, sin lectura para clientes) con RPCs `set_my_pin` / `my_pin_set` / `verify_my_pin` / `admin_set_member_pin`; `my_context()` ahora incluye `settings`.
+14. `14_p2_pos.sql` — P2 (POS): `tickets.tip_amount` (propina; **no** es venta: `total` sigue siendo la venta y el cobro es `total + propina`) con `create_ticket` v5 (`p_tip`), la propina sumada al efectivo esperado en `close_cash_session` y reportada en `cash_session_summary`, `sales_report` y `sales_insights`; `menu_categories.color` (paleta fija para pintar el POS) y RPC `top_variants(p_days, p_limit)` (más vendidos del negocio → fila de favoritos del POS).
 
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 

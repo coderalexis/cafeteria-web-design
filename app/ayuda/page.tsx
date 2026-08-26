@@ -142,6 +142,8 @@ export default function AyudaPage() {
                 Toca un producto para agregarlo. Si tiene tamaños, elige uno. Si el producto tiene el icono{" "}
                 <SlidersHorizontal className="inline h-3.5 w-3.5 align-text-bottom" /> se abrirá una ventana para elegir opciones
                 (tipo de leche, extras). Puedes buscar escribiendo el nombre en la barra de búsqueda.
+                Arriba, en la pestaña <strong>Todos</strong>, aparece <strong>Más vendidos</strong>: lo que más se vendió el
+                último mes, a un toque.
               </Step>
               <Step n={3} title="Ajusta cantidades y notas">
                 Con <strong>+ / −</strong> cambias la cantidad. El icono de nota en cada línea permite escribir instrucciones
@@ -151,7 +153,8 @@ export default function AyudaPage() {
               <Step n={4} title="Elige método de pago y cobra">
                 Efectivo, Transferencia o Tarjeta. Pulsa <strong>Cobrar</strong>. Aparece el ticket registrado con su{" "}
                 <strong>folio</strong>; desde ahí imprimes el <strong>Ticket</strong> para el cliente y la <strong>Comanda</strong>{" "}
-                (sin precios) para quien prepara.
+                (sin precios) para quien prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp (o lo copia para
+                pegarlo donde quieras), útil cuando no hay impresora.
               </Step>
               <Step n={5} title="Si te equivocaste antes de cobrar">
                 Quita la línea con el bote de basura o usa <strong>Vaciar</strong> para empezar de cero. Si recargas la página
@@ -163,9 +166,9 @@ export default function AyudaPage() {
           <Section id="efectivo" icon={Wallet} title="Efectivo, cambio y descuentos">
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
-                Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>: escribe lo que te dio el cliente (o usa
-                los botones $50/$100/$200/$500) y el sistema muestra el <strong>cambio</strong>. Si es menor que el total,
-                no deja cobrar.
+                Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>: escribe lo que te dio el cliente con el
+                teclado numérico en pantalla (o usa los botones $50/$100/$200/$500) y el sistema muestra el <strong>cambio</strong>.
+                Si es menor que el total, no deja cobrar. <strong>C</strong> borra lo escrito.
               </li>
               <li>
                 <strong>Descuento</strong> (<Percent className="inline h-3.5 w-3.5 align-text-bottom" /> junto al total): puede
@@ -273,7 +276,8 @@ export default function AyudaPage() {
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
                 <strong>Categorías</strong>: son las pestañas del POS. El <em>slug</em> es el identificador (minúsculas y
-                guiones, ej. <code>crepas-dulces</code>).
+                guiones, ej. <code>crepas-dulces</code>). Puedes darle un <strong>color</strong> a cada una: pinta su pestaña
+                y una franja en sus productos dentro del POS, para ubicarlos más rápido.
               </li>
               <li>
                 <strong>Productos</strong>: cada uno tiene una o más <strong>variantes</strong> (tamaños con precio). Un producto

@@ -31,7 +31,6 @@ export function PosLockScreen({
   userName: string
 }) {
   const [locked, setLocked] = useState(false)
-  const [hasPin, setHasPin] = useState(initialHasPin)
   const [mode, setMode] = useState<Mode>(initialHasPin ? "verify" : "setup")
   const [pin, setPin] = useState("")
   const [firstPin, setFirstPin] = useState("")
@@ -70,8 +69,8 @@ export function PosLockScreen({
     [],
   )
 
-  // Recibe el modo siguiente explícito: setHasPin(true) y unlock() ocurren en
-  // el mismo tick y el closure vería el hasPin viejo.
+  // Recibe el modo siguiente explícito: setMode y unlock() ocurren en el mismo
+  // tick y el closure vería el modo viejo.
   const unlock = useCallback(
     (nextMode: Mode) => {
       lastActivity.current = Date.now()
@@ -114,7 +113,6 @@ export function PosLockScreen({
           if (result?.error) {
             setError(result.error)
           } else {
-            setHasPin(true)
             toast.success("PIN guardado.")
             unlock("verify")
           }

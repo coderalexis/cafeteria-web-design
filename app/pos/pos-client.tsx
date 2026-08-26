@@ -1,8 +1,15 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS } from "@/lib/format"
-import { buildKitchenLines, buildTicketLines, printLines, receiptBusinessFrom, type ReceiptData } from "@/lib/receipt"
+import {
+  buildKitchenLines,
+  buildShareText,
+  buildTicketLines,
+  printLines,
+  receiptBusinessFrom,
+  type ReceiptData,
+} from "@/lib/receipt"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Trash2,
@@ -28,10 +35,13 @@ import {
   BookOpen,
   ChevronUp,
   UserCircle,
+  Star,
+  Share2,
 } from "lucide-react"
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
 import { OfflineBanner, PosLockScreen, POS_LOCK_EVENT } from "./lock-screen"
+import { DEFAULT_CHIP, DEFAULT_CHIP_ACTIVE, colorClasses } from "@/lib/category-colors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/kbd"
@@ -77,6 +87,7 @@ import {
   cartItemCount,
   cartSubtotal,
   computeDiscount,
+  findVariant,
   getDisplayPrice,
   getLineLabel,
   getLinePrice,
@@ -120,6 +131,8 @@ interface POSClientProps {
   lockMinutes: number
   /** ¿El usuario ya tiene PIN de caja en este negocio? */
   hasPin: boolean
+  /** Variantes más vendidas del último mes (fila de favoritos). */
+  favoriteVariantIds: string[]
   initialTotalSales: number
   openSession: OpenSession | null
 }
@@ -173,6 +186,26 @@ function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => vo
   const handleKitchen = () => {
     if (!printLines(buildKitchenLines(saleToReceipt(sale), receiptBiz), `Comanda ${sale.folio}`)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
+    }
+  }
+
+  /** Manda el ticket por WhatsApp (o lo copia si el navegador no puede compartir). */
+  const handleShare = async () => {
+    const text = buildShareText(saleToReceipt(sale), receiptBiz)
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: `Ticket #${sale.folio}`, text })
+        return
+      }
+    } catch (err) {
+      // El usuario cerró el diálogo: no es un error que valga la pena reportar.
+      if (err instanceof DOMException && err.name === "AbortError") return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("Ticket copiado: pégalo en WhatsApp.")
+    } catch {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener")
     }
   }
 
@@ -272,6 +305,15 @@ function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => vo
           <ChefHat className="h-4 w-4" />
           Comanda
         </Button>
+        <Button
+          variant="outline"
+          className="col-span-2 gap-2"
+          onClick={handleShare}
+          title="Compartir el ticket por WhatsApp o copiarlo"
+        >
+          <Share2 className="h-4 w-4" />
+          Compartir ticket
+        </Button>
         <Button className="col-span-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={onClose} autoFocus>
           Nueva venta
         </Button>
@@ -291,6 +333,7 @@ export default function POSClient({
   cashierId,
   lockMinutes,
   hasPin,
+  favoriteVariantIds,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
@@ -351,6 +394,22 @@ export default function POSClient({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.hydrated])
+
+  /* Más vendidos (últimos 30 días) que siguen en el menú */
+  const favorites = useMemo(
+    () =>
+      favoriteVariantIds
+        .map((variantId) => findVariant(products, variantId))
+        .filter((f): f is { product: Product; size?: SizeOption } => f !== null),
+    [favoriteVariantIds, products],
+  )
+
+  /** Color de cada categoría, por slug, para tarjetas y chips. */
+  const categoryColor = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    for (const c of categories) map[c.id] = c.color ?? null
+    return map
+  }, [categories])
 
   /* filtered & grouped products */
   const searchLower = searchQuery.toLowerCase().trim()
@@ -843,6 +902,23 @@ export default function POSClient({
                   : "Cambio —"}
               </span>
             </div>
+            {/* Teclado numérico: en tablet es más rápido que el teclado del sistema */}
+            <div className="grid grid-cols-6 gap-1.5">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "00", "C"].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    setCashReceivedInput((prev) =>
+                      key === "C" ? "" : (prev + key).replace(/^0+(?=\d)/, "").slice(0, 7),
+                    )
+                  }
+                  className="py-2 rounded-md bg-white border border-green-200 text-sm font-semibold text-green-900 hover:bg-green-100 active:bg-green-200"
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-1.5">
               <button
                 type="button"
@@ -1145,10 +1221,10 @@ export default function POSClient({
                   setSearchQuery("")
                   setSizePickerFor(null)
                 }}
-                className={`rounded-full shrink-0 text-sm ${
+                className={`rounded-full shrink-0 text-sm border ${
                   activeCategory === cat.id
-                    ? "bg-amber-700 hover:bg-amber-800 text-white"
-                    : "border-stone-300 text-stone-600 hover:bg-stone-100"
+                    ? colorClasses(cat.color)?.chipActive ?? DEFAULT_CHIP_ACTIVE
+                    : colorClasses(cat.color)?.chip ?? DEFAULT_CHIP
                 }`}
               >
                 {cat.label}
@@ -1173,73 +1249,107 @@ export default function POSClient({
                 <p className="text-sm">Sin resultados para «{searchQuery}»</p>
               </div>
             )}
+            {/* Más vendidos: un toque para los productos de siempre */}
+            {favorites.length > 0 && !searchLower && activeCategory === "todos" && (
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1 flex items-center gap-1.5">
+                  <Star className="h-3.5 w-3.5 text-amber-500" />
+                  Más vendidos
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {favorites.map(({ product, size }) => (
+                    <motion.button
+                      key={size?.variantId ?? product.id}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => chooseProduct(product, size)}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:border-amber-400 hover:bg-amber-100 transition-colors"
+                    >
+                      <span className="block text-sm font-semibold text-stone-800 leading-tight">
+                        {product.name}
+                        {size ? <span className="text-stone-500 font-normal"> · {size.label}</span> : null}
+                      </span>
+                      <span className="block text-xs font-bold text-amber-700">
+                        {size ? formatCurrency(size.price) : getDisplayPrice(product)}
+                      </span>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {Object.entries(grouped).map(([subcategory, items]) => (
               <div key={subcategory}>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1">
                   {subcategory}
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {items.map((product) => (
-                    <div key={product.id}>
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleProductClick(product)}
-                        className={`w-full text-left rounded-xl border transition-all duration-150 overflow-hidden ${
-                          sizePickerFor === product.id
-                            ? "border-amber-400 bg-amber-50 shadow-md"
-                            : "border-stone-200 bg-white hover:border-amber-300 hover:shadow-sm"
-                        }`}
-                      >
-                        <div className="p-3">
-                          <p className="font-semibold text-stone-800 text-sm leading-tight line-clamp-2">
-                            {product.name}
-                          </p>
-                          {product.description && product.description !== subcategory && (
-                            <p className="text-xs text-stone-400 mt-0.5 truncate">{product.description}</p>
-                          )}
-                          <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
-                            {getDisplayPrice(product)}
-                            {product.modifierGroups && (
-                              <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
+                  {items.map((product) => {
+                    const accent = colorClasses(categoryColor[product.category])?.accent
+                    return (
+                      <div key={product.id}>
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleProductClick(product)}
+                          className={`w-full text-left rounded-xl border transition-all duration-150 overflow-hidden ${
+                            sizePickerFor === product.id
+                              ? "border-amber-400 bg-amber-50 shadow-md"
+                              : "border-stone-200 bg-white hover:border-amber-300 hover:shadow-sm"
+                          }`}
+                        >
+                          <div className="p-3 relative">
+                            {accent && (
+                              <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
                             )}
-                          </p>
-                        </div>
-                      </motion.button>
+                            <p className="font-semibold text-stone-800 text-sm leading-tight line-clamp-2">
+                              {product.name}
+                            </p>
+                            {product.description && product.description !== subcategory && (
+                              <p className="text-xs text-stone-400 mt-0.5 truncate">{product.description}</p>
+                            )}
+                            <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
+                              {getDisplayPrice(product)}
+                              {product.modifierGroups && (
+                                <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
+                              )}
+                            </p>
+                          </div>
+                        </motion.button>
 
-                      {/* Size picker – inline below the card */}
-                      <AnimatePresence>
-                        {sizePickerFor === product.id && product.sizes && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="flex gap-1.5 mt-1.5">
-                              {product.sizes.map((size, index) => (
-                                <motion.button
-                                  key={size.label}
-                                  whileTap={{ scale: 0.92 }}
-                                  onClick={() => chooseProduct(product, size)}
-                                  className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
-                                >
-                                  {index < 9 && (
-                                    <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
-                                      {index + 1}
-                                    </Kbd>
-                                  )}
-                                  <span className="block text-xs font-bold">{size.label}</span>
-                                  <span className="block text-[10px] opacity-80">{size.oz}</span>
-                                  <span className="block text-xs font-bold mt-0.5">${size.price}</span>
-                                </motion.button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ))}
+                        {/* Size picker – inline below the card */}
+                        <AnimatePresence>
+                          {sizePickerFor === product.id && product.sizes && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="flex gap-1.5 mt-1.5">
+                                {product.sizes.map((size, index) => (
+                                  <motion.button
+                                    key={size.label}
+                                    whileTap={{ scale: 0.92 }}
+                                    onClick={() => chooseProduct(product, size)}
+                                    className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
+                                  >
+                                    {index < 9 && (
+                                      <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
+                                        {index + 1}
+                                      </Kbd>
+                                    )}
+                                    <span className="block text-xs font-bold">{size.label}</span>
+                                    <span className="block text-[10px] opacity-80">{size.oz}</span>
+                                    <span className="block text-xs font-bold mt-0.5">${size.price}</span>
+                                  </motion.button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}

@@ -41,6 +41,21 @@ export interface Product {
 export interface Category {
   id: string
   label: string
+  /** Color de la categoría (paleta de lib/category-colors). */
+  color?: string | null
+}
+
+/** Ubica el producto y el tamaño de una variante (para la fila de favoritos). */
+export function findVariant(
+  products: Product[],
+  variantId: string,
+): { product: Product; size?: SizeOption } | null {
+  for (const p of products) {
+    if (p.variantId === variantId) return { product: p }
+    const size = p.sizes?.find((s) => s.variantId === variantId)
+    if (size) return { product: p, size }
+  }
+  return null
 }
 
 /** Una línea del carrito. `lineId` es su identidad; `mergeKey` decide si dos altas se juntan. */

@@ -24,7 +24,7 @@ export default async function POSPage() {
   const [{ data: dbCategories }, { data: dbProducts }] = await Promise.all([
     supabase
       .from("menu_categories")
-      .select("id, name, slug, sort_order")
+      .select("id, name, slug, sort_order, color")
       .eq("is_active", true)
       .order("sort_order"),
     supabase
@@ -44,8 +44,8 @@ export default async function POSPage() {
 
   /* ── Transform categories ───────────────────────────────────────── */
   const categories = [
-    { id: "todos", label: "Todos" },
-    ...(dbCategories ?? []).map((c) => ({ id: c.slug, label: c.name })),
+    { id: "todos", label: "Todos", color: null as string | null },
+    ...(dbCategories ?? []).map((c) => ({ id: c.slug, label: c.name, color: c.color })),
   ]
 
   /* ── Transform products ─────────────────────────────────────────── */
@@ -112,7 +112,7 @@ export default async function POSPage() {
   /* ── Today's sales (día de operación CDMX, solo completadas) + caja ── */
   const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
 
-  const [{ data: todayTickets }, { data: session }, { data: pinSet }] = await Promise.all([
+  const [{ data: todayTickets }, { data: session }, { data: pinSet }, { data: topVariants }] = await Promise.all([
     supabase
       .from("tickets")
       .select("total")
@@ -125,6 +125,8 @@ export default async function POSPage() {
       .eq("status", "abierta")
       .maybeSingle(),
     supabase.rpc("my_pin_set"),
+    // Más vendidos del último mes → fila de favoritos del POS
+    supabase.rpc("top_variants", { p_days: 30, p_limit: 8 }),
   ])
 
   const settings = parseBusinessSettings(ctx.business.settings)
@@ -140,6 +142,7 @@ export default async function POSPage() {
       cashierId={ctx.userId}
       lockMinutes={settings.lockMinutes}
       hasPin={pinSet === true}
+      favoriteVariantIds={(topVariants ?? []).map((t) => t.variant_id).filter((id): id is string => !!id)}
       initialTotalSales={dbTotalSales}
       openSession={
         session
