@@ -270,14 +270,15 @@ export interface DeleteBusinessSummary {
  * transacción y exige el slug como confirmación (si la UI mandara otro id, se
  * detiene). Queda registro en `deleted_businesses`.
  *
- * Las cuentas que se quedan sin ninguna cafetería solo se borran si son
- * sintéticas (cajeros); una persona con correo real se conserva, porque puede
- * volver a otra cafetería y borrarla sería destruir de más.
+ * Las cuentas que se quedan sin NINGUNA cafetería se borran también, incluido
+ * el dueño: sin cafetería su cuenta ya no sirve para nada. El RPC excluye de
+ * esa lista a quien ejecuta el borrado y a los operadores de la plataforma, y
+ * a quien administre otra cafetería.
  */
 export async function deleteBusiness(input: {
   businessId: string
   slug: string
-}): Promise<ActionResult<{ summary: DeleteBusinessSummary; deletedUsers: number; keptUsers: number }>> {
+}): Promise<ActionResult<{ summary: DeleteBusinessSummary; deletedUsers: string[]; keptUsers: number }>> {
   const { ctx, error: authError } = await requireSuperAdmin()
   if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
 
@@ -299,19 +300,20 @@ export async function deleteBusiness(input: {
     orphan_user_ids: string[]
   }
 
-  // Limpieza de cuentas: solo las sintéticas que ya no pertenecen a ninguna parte.
-  let deletedUsers = 0
+  // Cuentas que se quedaron sin ninguna cafetería (el RPC ya excluyó a quien
+  // borra, a los operadores y a quien administre otra).
+  const deletedUsers: string[] = []
   let keptUsers = 0
   for (const userId of result.orphan_user_ids ?? []) {
     const { data: userData } = await admin.auth.admin.getUserById(userId)
-    const email = userData?.user?.email
-    if (email && isSyntheticEmail(email)) {
-      const { error: delError } = await admin.auth.admin.deleteUser(userId)
-      if (delError) keptUsers += 1
-      else deletedUsers += 1
-    } else {
+    const email = userData?.user?.email ?? ""
+    const { error: delError } = await admin.auth.admin.deleteUser(userId)
+    if (delError) {
       keptUsers += 1
+      continue
     }
+    // Un correo sintético nunca se muestra como correo: solo el usuario.
+    deletedUsers.push(email && isSyntheticEmail(email) ? email.split("@")[0] : email || userId)
   }
 
   revalidateSuper()

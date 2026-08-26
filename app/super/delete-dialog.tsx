@@ -53,11 +53,14 @@ export function DeleteBusinessDialog({
         return
       }
       const s = result.summary
+      const cuentas = result.deletedUsers
       toast.success(
         `«${business.name}» eliminada: ${s.tickets} ticket${s.tickets === 1 ? "" : "s"}, ${s.productos} productos y ${s.miembros} miembro${s.miembros === 1 ? "" : "s"}.` +
-          (result.deletedUsers > 0 ? ` Se borraron ${result.deletedUsers} cuenta(s) de cajero.` : "") +
-          (result.keptUsers > 0 ? ` Se conservaron ${result.keptUsers} cuenta(s) con correo real.` : ""),
-        { duration: 8000 },
+          (cuentas.length > 0
+            ? ` Se borraron ${cuentas.length} cuenta${cuentas.length === 1 ? "" : "s"}: ${cuentas.slice(0, 3).join(", ")}${cuentas.length > 3 ? ` y ${cuentas.length - 3} más` : ""}.`
+            : "") +
+          (result.keptUsers > 0 ? ` ${result.keptUsers} cuenta(s) no se pudieron borrar.` : ""),
+        { duration: 9000 },
       )
       setConfirmOpen(false)
       setOpen(false)
@@ -104,8 +107,9 @@ export function DeleteBusinessDialog({
               <li>· Su menú completo: categorías, productos, variantes y modificadores</li>
               <li>· Su bitácora de actividad y los PIN de caja</li>
               <li>
-                · Sus {business.active_members} miembro{business.active_members === 1 ? "" : "s"}. Las cuentas de
-                cajero que solo existían aquí se borran; las personas con correo real se conservan.
+                · Sus {business.active_members} miembro{business.active_members === 1 ? "" : "s"}, <strong>incluidas
+                sus cuentas</strong> — dueño y cajeros — si esta era su única cafetería. Quien administre otra
+                cafetería la conserva, y tu cuenta de operador nunca se toca.
               </li>
             </ul>
 
