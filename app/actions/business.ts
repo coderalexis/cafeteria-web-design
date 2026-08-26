@@ -72,6 +72,7 @@ const settingsSchema = z.object({
   weeklyEmail: z.enum(["on", "off"]).transform((v) => v === "on"),
   publicMenu: z.enum(["on", "off"]).transform((v) => v === "on"),
   autoPrint: z.enum(["none", "ticket", "comanda", "both"]),
+  parkedOrders: z.enum(["on", "off"]).transform((v) => v === "on"),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -91,6 +92,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     weeklyEmail: formData.get("weekly_email") ?? "on",
     publicMenu: formData.get("public_menu") ?? "off",
     autoPrint: formData.get("auto_print") ?? "none",
+    parkedOrders: formData.get("parked_orders") ?? "on",
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -113,6 +115,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       weeklyEmail: v.weeklyEmail,
       publicMenu: v.publicMenu,
       autoPrint: v.autoPrint,
+      parkedOrders: v.parkedOrders,
     }),
   }
 
@@ -151,6 +154,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.weeklyEmail !== v.weeklyEmail) cambios.push("resumen semanal")
   if (prevSettings.publicMenu !== v.publicMenu) cambios.push(v.publicMenu ? "menú público activado" : "menú público desactivado")
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")
+  if (prevSettings.parkedOrders !== v.parkedOrders) cambios.push("módulo de pedidos en espera")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })
   }

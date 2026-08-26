@@ -41,6 +41,7 @@ import {
   Copy,
   RotateCcw,
   Pencil,
+  PauseCircle,
 } from "lucide-react"
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
@@ -84,6 +85,9 @@ import {
 import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { ModifierSheet } from "./modifier-sheet"
+import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
+import { useParkedOrders } from "./use-parked-orders"
+import { autoName, type ParkedOrder } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { usePosCart } from "./use-pos-cart"
@@ -143,6 +147,8 @@ interface POSClientProps {
   favoriteVariantIds: string[]
   /** Qué imprimir en automático al cobrar (ajuste del negocio). */
   autoPrint: "none" | "ticket" | "comanda" | "both"
+  /** Módulo de pedidos en espera activado para esta cafetería. */
+  parkedOrders: boolean
   initialTotalSales: number
   openSession: OpenSession | null
 }
@@ -425,6 +431,7 @@ export default function POSClient({
   hasPin,
   favoriteVariantIds,
   autoPrint,
+  parkedOrders: parkedEnabled,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
@@ -482,6 +489,10 @@ export default function POSClient({
   } | null>(null)
   // Teclear la cantidad exacta en vez de tocar «+» once veces
   const [editingQtyFor, setEditingQtyFor] = useState<string | null>(null)
+  // Pedidos en espera (este dispositivo, por cafetería)
+  const parked = useParkedOrders(businessId)
+  const [showPark, setShowPark] = useState(false)
+  const [showTray, setShowTray] = useState(false)
   // Última venta cobrada, para «Repetir» (sobrevive recargas)
   const [lastSale, setLastSale] = useState<{ folio: number; payload: unknown } | null>(null)
   const lastSaleKey = `pos-last:${businessId}:${cashierId}`
@@ -587,6 +598,62 @@ export default function POSClient({
       : Math.round(total * tipChoice) / 100
   // Lo que el cliente paga: la venta más la propina.
   const due = Math.round((total + tipAmount) * 100) / 100
+
+  /** Estado actual del carrito, tal como lo persiste el hook. */
+  const cartStateNow = useCallback(
+    () => ({ saleRef, paymentMethod, ticketNotes, cashReceivedInput, discount, lines }),
+    [saleRef, paymentMethod, ticketNotes, cashReceivedInput, discount, lines],
+  )
+
+  const parkCurrent = useCallback(
+    (name: string) => {
+      if (lines.length === 0) return
+      if (!parked.park(cartStateNow(), name)) {
+        toast.error(`Ya hay ${parked.orders.length} pedidos en espera; cobra o descarta alguno.`)
+        return
+      }
+      clearTip()
+      clearCart()
+      vibra(12)
+      toast.success(`Pedido «${name}» guardado.`)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines.length, parked, cartStateNow, clearCart],
+  )
+
+  /**
+   * Retoma un pedido. Si hay algo en el carrito se guarda solo antes: con
+   * prisa nadie debe poder tirar una venta a medias por contestar mal un
+   * "¿seguro?".
+   */
+  const resumeParked = useCallback(
+    (order: ParkedOrder) => {
+      const estado = rehydrateCart(order.cart, products, Date.now())
+      if (!estado || estado.lines.length === 0) {
+        toast.error("Ese pedido ya no se puede retomar; el menú cambió o caducó.")
+        return
+      }
+      if (lines.length > 0) {
+        const auto = autoName(new Date())
+        if (!parked.park(cartStateNow(), auto)) {
+          toast.error("La bandeja está llena: cobra o descarta un pedido antes de cambiar.")
+          return
+        }
+        toast.info(`Tu pedido en curso se guardó como «${auto}».`)
+      }
+      parked.remove(order.id)
+      restoreLines(estado.lines)
+      setTicketNotes(estado.ticketNotes)
+      clearTip()
+      setShowTray(false)
+      vibra(12)
+      if (estado.lines.length < order.cart.lines.length) {
+        toast.info("Se retomó, pero algún artículo ya no está en el menú.")
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, lines.length, parked, cartStateNow, restoreLines, setTicketNotes],
+  )
 
   const clearTip = useCallback(() => {
     setTipChoice(0)
@@ -851,6 +918,28 @@ export default function POSClient({
             <h2 className="text-lg font-bold text-stone-800">Venta Actual</h2>
           </div>
           <div className="flex items-center gap-2">
+            {parkedEnabled && (parked.orders.length > 0 || lines.length > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700"
+                onClick={() => (lines.length > 0 ? setShowPark(true) : setShowTray(true))}
+                title={lines.length > 0 ? "Guardar este pedido para retomarlo después" : "Ver pedidos en espera"}
+              >
+                <PauseCircle className="h-3.5 w-3.5" />
+                {lines.length > 0 ? "Guardar" : "En espera"}
+              </Button>
+            )}
+            {parkedEnabled && parked.orders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowTray(true)}
+                title="Pedidos en espera"
+                className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-amber-600 px-1.5 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                {parked.orders.length}
+              </button>
+            )}
             {lines.length > 0 && (
               <>
                 <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
@@ -1483,6 +1572,12 @@ export default function POSClient({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
+                    {parkedEnabled && parked.orders.length > 0 && (
+                      <DropdownMenuItem onSelect={() => setShowTray(true)}>
+                        <PauseCircle className="h-4 w-4 mr-2" />
+                        Pedidos en espera ({parked.orders.length})
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onSelect={() => setShowTickets(true)}>
                       <Receipt className="h-4 w-4 mr-2" /> Tickets del día
                     </DropdownMenuItem>
@@ -1743,9 +1838,29 @@ export default function POSClient({
       )}
 
       {/* ── Dialogs ── */}
-      <CashSessionDialog open={showCashDialog} onOpenChange={setShowCashDialog} session={openSession} />
+      <CashSessionDialog
+        open={showCashDialog}
+        onOpenChange={setShowCashDialog}
+        session={openSession}
+        parkedCount={parkedEnabled ? parked.orders.length : 0}
+      />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
       <ShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
+      <ParkDialog
+        open={showPark}
+        onOpenChange={setShowPark}
+        sugerido={autoName(new Date())}
+        onPark={parkCurrent}
+      />
+      <ParkedTrayDialog
+        open={showTray}
+        onOpenChange={setShowTray}
+        orders={parked.orders}
+        products={products}
+        cartHasLines={lines.length > 0}
+        onResume={resumeParked}
+        onRemove={parked.remove}
+      />
       <ModifierSheet
         pending={pendingModifiers}
         onClose={() => setPendingModifiers(null)}

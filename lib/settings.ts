@@ -19,6 +19,8 @@ export interface BusinessSettings {
   publicMenu: boolean
   /** Qué imprimir solo al cobrar, sin pasos extra del cajero. */
   autoPrint: "none" | "ticket" | "comanda" | "both"
+  /** Módulo del POS: guardar pedidos a medias y retomarlos. */
+  parkedOrders: boolean
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -29,6 +31,9 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   weeklyEmail: true,
   publicMenu: false,
   autoPrint: "none",
+  // Encendido por defecto: no asume hardware ni expone datos, y le sirve a
+  // cualquier cafetería con fila.
+  parkedOrders: true,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -56,6 +61,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     if (r.auto_print === "ticket" || r.auto_print === "comanda" || r.auto_print === "both") {
       out.autoPrint = r.auto_print
     }
+    out.parkedOrders = r.parked_orders !== false
   }
   return out
 }
@@ -72,5 +78,6 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     weekly_email: s.weeklyEmail,
     public_menu: s.publicMenu,
     auto_print: s.autoPrint,
+    parked_orders: s.parkedOrders,
   }
 }

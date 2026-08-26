@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target, QrCode } from "lucide-react"
+import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target, QrCode, PauseCircle } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings } from "@/lib/settings"
@@ -268,6 +268,37 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                   defaultValue={currentSettings.monthlyGoal ?? ""}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <PauseCircle className="h-4 w-4 text-amber-700" />
+                Módulos del POS
+              </CardTitle>
+              <CardDescription>
+                Funciones que aparecen o se ocultan en la pantalla de venta. Apaga las que tu cafetería no use para
+                dejarle el POS más limpio a quien cobra.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <label htmlFor="parked_orders" className="text-sm font-medium text-stone-700">
+                Pedidos en espera
+              </label>
+              <select
+                id="parked_orders"
+                name="parked_orders"
+                defaultValue={currentSettings.parkedOrders ? "on" : "off"}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="on">Activado</option>
+                <option value="off">Desactivado</option>
+              </select>
+              <p className="text-xs text-stone-400">
+                Deja a medias el pedido de un cliente indeciso, cobra al siguiente y retómalo después. Los pedidos se
+                guardan en ese dispositivo, no se cobran solos y se pierden si se limpia el navegador.
+              </p>
             </CardContent>
           </Card>
 

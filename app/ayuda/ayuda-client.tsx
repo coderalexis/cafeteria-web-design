@@ -11,6 +11,7 @@ import {
   Coffee,
   Keyboard,
   Lock,
+  PauseCircle,
   Percent,
   Printer,
   Receipt,
@@ -166,6 +167,55 @@ export function AyudaClient({ ticket, corte }: Props) {
             </Step>
           </ol>
           <TicketImpreso lineas={ticket} titulo="Un ticket de este sistema, tal cual sale de la impresora" />
+        </>
+      ),
+    },
+    {
+      id: "espera",
+      grupo: "cajero",
+      icon: PauseCircle,
+      titulo: "Pedidos en espera",
+      palabras: "guardar pausar retomar bandeja mesa indeciso fila pendiente",
+      href: "/pos",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            Para cuando un cliente se tarda en decidir y atrás hay fila: guardas su pedido a medias, cobras al
+            siguiente y lo retomas después. Nadie paga nada mientras espera.
+          </p>
+          <ol className="mt-3 space-y-3">
+            <Step n={1} title="Guarda el pedido">
+              Con artículos en el carrito, toca <strong>Guardar</strong> arriba. Ponle un nombre con los botones
+              rápidos (<em>Mesa 1</em>, <em>Para llevar</em>…) o escríbelo (<em>«Sra. suéter rojo»</em>). Si lo dejas
+              vacío se llama con la hora. El carrito queda libre.
+            </Step>
+            <Step n={2} title="Retómalo cuando regrese">
+              El número naranja junto a <strong>En espera</strong> dice cuántos hay. Ábrelo y toca{" "}
+              <strong>Retomar</strong>: el pedido vuelve al carrito con sus notas, y ya puedes cobrarlo.
+            </Step>
+            <Step n={3} title="Si tenías algo en el carrito">
+              No se pierde: se guarda solo antes de traer el otro, con la hora como nombre. Nunca se descarta una venta
+              a medias por error.
+            </Step>
+          </ol>
+          <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              Los pedidos viven <strong>en esa tablet</strong>, no en el servidor: quien entre después en ese mismo
+              aparato los ve y los puede cobrar, y la venta se registra a nombre de quien cobra.
+            </li>
+            <li>
+              Si el menú cambió mientras esperaba (un producto se desactivó o caducó tras 12 horas), la bandeja lo
+              marca en ámbar y no deja retomarlo a ciegas.
+            </li>
+            <li>
+              Cerrar la caja con pedidos en espera <strong>no</strong> afecta el corte: no son ventas. El sistema te
+              avisa que se quedan para el siguiente turno.
+            </li>
+            <li>
+              ¿No lo usas? El dueño puede apagar el módulo en <strong>Negocio → Módulos del POS</strong> y los botones
+              desaparecen.
+            </li>
+          </ul>
         </>
       ),
     },
@@ -413,7 +463,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Store,
       titulo: "Datos del negocio, metas y menú con QR",
-      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir",
+      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera",
       href: "/admin/negocio",
       nodo: (
         <>
@@ -431,6 +481,10 @@ export function AyudaClient({ ticket, corte }: Props) {
           </ul>
           <DemoQR />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
+              <strong>Pedidos en espera</strong>. Lo que no usa tu cafetería no le estorba a quien cobra.
+            </li>
             <li>
               <strong>Impresión al cobrar</strong>: elige qué imprimir en automático al registrar cada venta (ticket,
               comanda o ambos) y el cajero se ahorra esos toques. Si el navegador bloquea la ventana, el POS avisa y

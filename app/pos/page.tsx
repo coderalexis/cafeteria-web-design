@@ -142,6 +142,7 @@ export default async function POSPage() {
       cashierId={ctx.userId}
       lockMinutes={settings.lockMinutes}
       autoPrint={settings.autoPrint}
+      parkedOrders={settings.parkedOrders}
       hasPin={pinSet === true}
       favoriteVariantIds={(topVariants ?? []).map((t) => t.variant_id).filter((id): id is string => !!id)}
       initialTotalSales={dbTotalSales}

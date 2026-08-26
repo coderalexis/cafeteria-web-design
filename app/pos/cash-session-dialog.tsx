@@ -30,6 +30,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   session: OpenSession | null
+  /** Pedidos en espera de este dispositivo, solo para avisar al cerrar. */
+  parkedCount?: number
 }
 
 const FLOAT_PRESETS = [0, 200, 500, 1000]
@@ -39,12 +41,12 @@ function parseMoney(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
-export function CashSessionDialog({ open, onOpenChange, session }: Props) {
+export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         {session ? (
-          <CloseSessionForm session={session} onDone={() => onOpenChange(false)} />
+          <CloseSessionForm session={session} parkedCount={parkedCount} onDone={() => onOpenChange(false)} />
         ) : (
           <OpenSessionForm onDone={() => onOpenChange(false)} />
         )}
@@ -152,7 +154,15 @@ function OpenSessionForm({ onDone }: { onDone: () => void }) {
 /* ------------------------------------------------------------------ */
 /*  Cerrar caja (corte)                                                */
 /* ------------------------------------------------------------------ */
-function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: () => void }) {
+function CloseSessionForm({
+  session,
+  parkedCount,
+  onDone,
+}: {
+  session: OpenSession
+  parkedCount: number
+  onDone: () => void
+}) {
   const router = useRouter()
   const business = useBusiness()
   const [summary, setSummary] = useState<CashSessionSummary | null>(null)
@@ -432,6 +442,13 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
               <span>{formatCurrency(expected ?? 0)}</span>
             </div>
           </div>
+
+          {parkedCount > 0 && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Tienes {parkedCount} pedido{parkedCount === 1 ? "" : "s"} en espera. No son ventas ni afectan este corte:
+              se quedan guardados para el siguiente turno en esta tablet.
+            </p>
+          )}
 
           {/* Conteo */}
           <div className="space-y-2">
