@@ -274,6 +274,32 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
+                <Printer className="h-4 w-4 text-amber-700" />
+                Impresión al cobrar
+              </CardTitle>
+              <CardDescription>
+                Imprime en automático en cuanto se registra la venta, sin que el cajero toque nada más. Si el navegador
+                bloquea la ventana, el POS lo avisa y quedan los botones de siempre.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <select
+                name="auto_print"
+                aria-label="Impresión automática al cobrar"
+                defaultValue={currentSettings.autoPrint}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="none">No imprimir nada (botones manuales)</option>
+                <option value="ticket">Ticket del cliente</option>
+                <option value="comanda">Comanda para preparación</option>
+                <option value="both">Ticket y comanda</option>
+              </select>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-amber-700" />
                 Menú público (código QR)
               </CardTitle>

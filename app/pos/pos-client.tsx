@@ -38,6 +38,9 @@ import {
   Star,
   Share2,
   HandCoins,
+  Copy,
+  RotateCcw,
+  Pencil,
 } from "lucide-react"
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
@@ -89,6 +92,8 @@ import {
   cartSubtotal,
   computeDiscount,
   findVariant,
+  rehydrateCart,
+  serializeCart,
   getDisplayPrice,
   getLineLabel,
   getLinePrice,
@@ -136,11 +141,40 @@ interface POSClientProps {
   hasPin: boolean
   /** Variantes más vendidas del último mes (fila de favoritos). */
   favoriteVariantIds: string[]
+  /** Qué imprimir en automático al cobrar (ajuste del negocio). */
+  autoPrint: "none" | "ticket" | "comanda" | "both"
   initialTotalSales: number
   openSession: OpenSession | null
 }
 
 const CASH_QUICK_AMOUNTS = [50, 100, 200, 500]
+
+/**
+ * Billetes probables para ESTE total (una cuenta de $87 se paga con $90, $100
+ * o $200 — no con $50). Redondeos típicos hacia arriba, sin repetidos.
+ */
+function cashSuggestions(due: number): number[] {
+  if (due <= 0) return CASH_QUICK_AMOUNTS.slice(0, 3)
+  const up = (m: number) => Math.ceil(due / m) * m
+  const out: number[] = []
+  for (const c of [up(10), up(20), up(50), up(100), up(200), up(500)]) {
+    if (c > due && !out.includes(c)) out.push(c)
+    if (out.length === 3) break
+  }
+  return out
+}
+
+/** Vibración corta si el aparato puede: confirma el toque sin mirar. */
+function vibra(ms: number) {
+  try {
+    navigator.vibrate?.(ms)
+  } catch {
+    /* sin soporte */
+  }
+}
+
+/** Notas rápidas de un toque; el texto libre sigue disponible. */
+const QUICK_NOTES = ["Para llevar", "Aquí"]
 
 /** Opciones de propina: porcentaje del total, "sin propina" o monto libre. */
 type TipChoice = number | "otro"
@@ -179,7 +213,15 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
   }
 }
 
-function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => void }) {
+function ReceiptView({
+  sale,
+  autoPrint,
+  onClose,
+}: {
+  sale: CompletedSale
+  autoPrint: "none" | "ticket" | "comanda" | "both"
+  onClose: () => void
+}) {
   const paymentInfo = PAYMENT_METHODS[sale.paymentMethod]
   const PaymentIcon = paymentInfo.icon
   const business = useBusiness()
@@ -196,6 +238,25 @@ function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => vo
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }
+
+  const [printedAuto, setPrintedAuto] = useState(false)
+  useEffect(() => {
+    if (autoPrint === "none") return
+    const r = saleToReceipt(sale)
+    const lineas =
+      autoPrint === "ticket"
+        ? buildTicketLines(r, receiptBiz)
+        : autoPrint === "comanda"
+        ? buildKitchenLines(r, receiptBiz)
+        : [...buildTicketLines(r, receiptBiz), "", "", "- - - - - ✂ - - - - -", "", ...buildKitchenLines(r, receiptBiz)]
+    if (printLines(lineas, `Venta ${sale.folio}`)) {
+      setPrintedAuto(true)
+    } else {
+      toast.error("El navegador bloqueó la impresión automática; usa los botones.")
+    }
+    // Solo al montar: una venta = una impresión automática.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** Manda el ticket por WhatsApp (o lo copia si el navegador no puede compartir). */
   const handleShare = async () => {
@@ -317,6 +378,13 @@ function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => vo
         )}
       </div>
 
+      {printedAuto && (
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+          <Printer className="h-3.5 w-3.5" />
+          {autoPrint === "both" ? "Ticket y comanda enviados a imprimir" : autoPrint === "ticket" ? "Ticket enviado a imprimir" : "Comanda enviada a imprimir"}
+        </p>
+      )}
+
       {/* Actions */}
       <div className="grid grid-cols-2 gap-2 mt-5 w-full">
         <Button variant="outline" className="gap-2" onClick={handlePrint}>
@@ -356,6 +424,7 @@ export default function POSClient({
   lockMinutes,
   hasPin,
   favoriteVariantIds,
+  autoPrint,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
@@ -377,6 +446,10 @@ export default function POSClient({
     addLine,
     removeLine,
     updateQuantity,
+    setQuantityTo,
+    duplicateLine,
+    setLineModifiers,
+    restoreLines,
     setLineNotes,
     clearCart,
     resetAfterSale,
@@ -398,8 +471,55 @@ export default function POSClient({
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
-  // Producto/tamaño esperando elección de modificadores
-  const [pendingModifiers, setPendingModifiers] = useState<{ product: Product; size?: SizeOption } | null>(null)
+  // Producto/tamaño esperando modificadores: alta nueva, o edición de una
+  // línea existente (lineId presente = "mejor con avena" sin rearmar todo).
+  const [pendingModifiers, setPendingModifiers] = useState<{
+    product: Product
+    size?: SizeOption
+    initial?: CartLine["modifiers"]
+    editing?: boolean
+    lineId?: string
+  } | null>(null)
+  // Teclear la cantidad exacta en vez de tocar «+» once veces
+  const [editingQtyFor, setEditingQtyFor] = useState<string | null>(null)
+  // Última venta cobrada, para «Repetir» (sobrevive recargas)
+  const [lastSale, setLastSale] = useState<{ folio: number; payload: unknown } | null>(null)
+  const lastSaleKey = `pos-last:${businessId}:${cashierId}`
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(lastSaleKey)
+      if (raw) setLastSale(JSON.parse(raw))
+    } catch {
+      /* dato corrupto: sin repetir */
+    }
+  }, [lastSaleKey])
+
+  /* Pantalla despierta mientras la caja esté abierta: una tablet que se
+     bloquea sola a media fila es un "toca-espera-desbloquea" constante. */
+  useEffect(() => {
+    if (!openSession) return
+    let sentinel: { release?: () => Promise<void> } | null = null
+    let activo = true
+    const pedir = async () => {
+      try {
+        sentinel = await (navigator as Navigator & { wakeLock?: { request: (t: "screen") => Promise<never> } })
+          .wakeLock?.request("screen") ?? null
+      } catch {
+        /* sin soporte o sin permiso: no pasa nada */
+      }
+    }
+    const alVolver = () => {
+      if (document.visibilityState === "visible" && activo) void pedir()
+    }
+    void pedir()
+    document.addEventListener("visibilitychange", alVolver)
+    return () => {
+      activo = false
+      document.removeEventListener("visibilitychange", alVolver)
+      void sentinel?.release?.()
+    }
+  }, [openSession])
   // Layout: en pantallas chicas el carrito vive en una hoja inferior
   const isMobile = useIsMobile()
   const [cartOpen, setCartOpen] = useState(false)
@@ -522,6 +642,19 @@ export default function POSClient({
         })
         // El total del día son ventas: la propina no suma aquí.
         setTotalSales((prev) => prev + result.total)
+        // Guardar las líneas para «Repetir última venta» (validadas contra el
+        // menú vigente al momento de repetir, no ahora).
+        try {
+          const payload = serializeCart(
+            { saleRef: "", paymentMethod, ticketNotes: "", cashReceivedInput: "", discount: null, lines },
+            Date.now(),
+          )
+          window.localStorage.setItem(lastSaleKey, JSON.stringify({ folio: result.folio, payload }))
+          setLastSale({ folio: result.folio, payload })
+        } catch {
+          /* sin espacio: solo se pierde el botón de repetir */
+        }
+        vibra(30)
         clearTip()
         resetAfterSale()
         setCartOpen(false)
@@ -538,7 +671,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, tipAmount, discount, lines, clearTip, resetAfterSale])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, tipAmount, discount, lines, lastSaleKey, clearTip, resetAfterSale])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -548,6 +681,7 @@ export default function POSClient({
         setPendingModifiers({ product, size })
       } else {
         addLine(product, size)
+        vibra(12)
       }
     },
     [addLine],
@@ -746,6 +880,30 @@ export default function POSClient({
               <ShoppingBag className="h-14 w-14 mb-3 opacity-40" />
               <p className="text-base font-medium text-stone-400">No hay productos</p>
               <p className="text-sm text-stone-300">Toca un producto para agregarlo</p>
+              {lastSale && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Se valida contra el menú DE HOY: si algo cambió de precio
+                    // o se desactivó, esa línea no regresa (y se avisa).
+                    const estado = rehydrateCart(lastSale.payload, products, Date.now())
+                    if (!estado || estado.lines.length === 0) {
+                      toast.error("El menú cambió y ya no se puede repetir esa venta.")
+                      return
+                    }
+                    restoreLines(estado.lines)
+                    vibra(12)
+                    const guardadas = (lastSale.payload as { lines?: unknown[] }).lines?.length ?? 0
+                    if (estado.lines.length < guardadas) {
+                      toast.info("Se repitió la venta, pero algún artículo ya no está en el menú.")
+                    }
+                  }}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-600 hover:border-amber-300 hover:text-amber-700"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Repetir última venta · #{lastSale.folio}
+                </button>
+              )}
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
@@ -777,11 +935,29 @@ export default function POSClient({
                           </Badge>
                         )}
                       </div>
-                      {line.modifiers.length > 0 && (
-                        <p className="text-[11px] text-amber-700 mt-0.5 truncate">
-                          {line.modifiers.map((m) => `+ ${m.name}`).join(" · ")}
-                        </p>
-                      )}
+                      {line.product.modifierGroups && line.product.modifierGroups.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingModifiers({
+                              product: line.product,
+                              size: line.size,
+                              initial: line.modifiers,
+                              editing: true,
+                              lineId: line.lineId,
+                            })
+                          }
+                          title="Cambiar las opciones de esta línea"
+                          className="mt-0.5 flex max-w-full items-center gap-1 truncate text-left text-[11px] text-amber-700 hover:underline"
+                        >
+                          <Pencil className="h-3 w-3 shrink-0 opacity-60" />
+                          <span className="truncate">
+                            {line.modifiers.length > 0
+                              ? line.modifiers.map((m) => `+ ${m.name}`).join(" · ")
+                              : "sin opciones — cambiar"}
+                          </span>
+                        </button>
+                      ) : null}
                       {line.notes && editingNoteFor !== line.lineId && (
                         <button
                           type="button"
@@ -805,7 +981,37 @@ export default function POSClient({
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </Button>
-                      <span className="w-6 text-center text-sm font-bold text-stone-700">{line.quantity}</span>
+                      {editingQtyFor === line.lineId ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={99}
+                          defaultValue={line.quantity}
+                          onBlur={(e) => {
+                            const n = Number(e.target.value)
+                            if (Number.isFinite(n) && n >= 1) setQuantityTo(line.lineId, n)
+                            setEditingQtyFor(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === "Escape") {
+                              e.preventDefault()
+                              ;(e.target as HTMLInputElement).blur()
+                            }
+                          }}
+                          className="h-8 w-11 rounded-md border border-amber-300 bg-white text-center text-sm font-bold text-stone-800"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingQtyFor(line.lineId)}
+                          title="Teclear la cantidad"
+                          className="w-8 rounded text-center text-sm font-bold text-stone-700 hover:bg-stone-100"
+                        >
+                          {line.quantity}
+                        </button>
+                      )}
                       <Button
                         variant="outline"
                         size="icon"
@@ -822,6 +1028,19 @@ export default function POSClient({
                     </span>
 
                     <div className="flex items-center shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 md:h-8 md:w-8 text-stone-300 hover:text-amber-700 hover:bg-amber-50"
+                        onClick={() => {
+                          duplicateLine(line.lineId)
+                          vibra(12)
+                        }}
+                        title="Duplicar esta línea (otro igual)"
+                        aria-label="Duplicar esta línea"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -877,7 +1096,32 @@ export default function POSClient({
 
       {/* Checkout */}
       <div className="shrink-0 p-4 border-t border-stone-200 bg-stone-50/80 space-y-3">
-        {/* Ticket notes */}
+        {/* Nota del ticket: chips de un toque + texto libre */}
+        <div className="flex gap-1.5">
+          {QUICK_NOTES.map((qn) => {
+            const activa = ticketNotes === qn || ticketNotes.startsWith(qn + " · ")
+            return (
+              <button
+                key={qn}
+                type="button"
+                onClick={() => {
+                  const resto = QUICK_NOTES.reduce(
+                    (t, otro) => (t === otro ? "" : t.startsWith(otro + " · ") ? t.slice(otro.length + 3) : t),
+                    ticketNotes,
+                  )
+                  setTicketNotes(activa ? resto : resto ? `${qn} · ${resto}` : qn)
+                }}
+                className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  activa
+                    ? "border-amber-600 bg-amber-600 text-white"
+                    : "border-stone-200 bg-white text-stone-500 hover:border-amber-300"
+                }`}
+              >
+                {qn}
+              </button>
+            )
+          })}
+        </div>
         <Input
           placeholder="Nota del ticket: mesa, nombre, para llevar..."
           value={ticketNotes}
@@ -1016,7 +1260,7 @@ export default function POSClient({
               >
                 Exacto
               </button>
-              {CASH_QUICK_AMOUNTS.map((amount) => (
+              {cashSuggestions(due).map((amount) => (
                 <button
                   key={amount}
                   type="button"
@@ -1506,7 +1750,12 @@ export default function POSClient({
         pending={pendingModifiers}
         onClose={() => setPendingModifiers(null)}
         onConfirm={(product, size, modifiers) => {
-          addLine(product, size, modifiers)
+          if (pendingModifiers?.editing && pendingModifiers.lineId) {
+            setLineModifiers(pendingModifiers.lineId, modifiers)
+          } else {
+            addLine(product, size, modifiers)
+          }
+          vibra(12)
           setPendingModifiers(null)
         }}
       />
@@ -1555,7 +1804,9 @@ export default function POSClient({
           <DialogHeader>
             <DialogTitle className="sr-only">Ticket de venta</DialogTitle>
           </DialogHeader>
-          {completedSale && <ReceiptView sale={completedSale} onClose={() => setCompletedSale(null)} />}
+          {completedSale && (
+            <ReceiptView sale={completedSale} autoPrint={autoPrint} onClose={() => setCompletedSale(null)} />
+          )}
         </DialogContent>
       </Dialog>
     </div>

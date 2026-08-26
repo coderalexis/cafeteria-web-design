@@ -123,7 +123,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: Coffee,
       titulo: "Abrir el turno y vender",
-      palabras: "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio",
+      palabras: "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir duplicar cantidad para llevar",
       href: "/pos",
       nodo: (
         <>
@@ -153,7 +153,14 @@ export function AyudaClient({ ticket, corte }: Props) {
               imprimes el <strong>Ticket</strong> para el cliente y la <strong>Comanda</strong> (sin precios) para quien
               prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp — útil si no hay impresora.
             </Step>
-            <Step n={5} title="Si te equivocaste antes de cobrar">
+            <Step n={5} title="Atajos del carrito">
+              Toca la <strong>cantidad</strong> para teclearla (12 conchas sin doce toques), el icono de{" "}
+              <strong>copiar</strong> duplica una línea («otro igual, pero sin azúcar»), y tocando las{" "}
+              <strong>opciones</strong> de una línea las cambias sin rearmarla. Con el carrito vacío aparece{" "}
+              <strong>Repetir última venta</strong>. Sobre la nota del ticket hay chips de{" "}
+              <strong>Para llevar / Aquí</strong> de un toque.
+            </Step>
+            <Step n={6} title="Si te equivocaste antes de cobrar">
               Quita la línea con el bote de basura o usa <strong>Vaciar</strong>. Si recargas la página por accidente,
               la venta en curso se restaura sola.
             </Step>
@@ -174,8 +181,9 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ul className="space-y-2 text-sm text-stone-600">
             <li>
               Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>: escribe lo que te dio el cliente
-              con el teclado en pantalla (o usa los botones de billetes) y el sistema calcula el{" "}
-              <strong>cambio</strong>. Si no alcanza, no deja cobrar. <strong>C</strong> borra lo escrito.
+              con el teclado en pantalla o usa los botones de billetes, que se{" "}
+              <strong>calculan según el total</strong> (para una cuenta de $87 ofrece $90, $100 y $200). El sistema
+              calcula el <strong>cambio</strong>; si no alcanza, no deja cobrar. <strong>C</strong> borra lo escrito.
             </li>
           </ul>
           <DemoEfectivo />
@@ -405,7 +413,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Store,
       titulo: "Datos del negocio, metas y menú con QR",
-      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo",
+      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir",
       href: "/admin/negocio",
       nodo: (
         <>
@@ -423,6 +431,11 @@ export function AyudaClient({ ticket, corte }: Props) {
           </ul>
           <DemoQR />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Impresión al cobrar</strong>: elige qué imprimir en automático al registrar cada venta (ticket,
+              comanda o ambos) y el cajero se ahorra esos toques. Si el navegador bloquea la ventana, el POS avisa y
+              quedan los botones manuales.
+            </li>
             <li>
               <strong>Resumen semanal por correo</strong>: cada lunes por la mañana llega a dueños y administradores el
               resumen de la semana anterior (ventas, propinas, más vendidos, por cajero). Se puede apagar ahí mismo.

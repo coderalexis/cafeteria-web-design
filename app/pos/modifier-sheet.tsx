@@ -14,7 +14,14 @@ import { formatCurrency } from "@/lib/format"
 import type { ModifierGroup, ModifierOption, Product, SizeOption } from "./cart"
 
 interface Props {
-  pending: { product: Product; size?: SizeOption } | null
+  pending: {
+    product: Product
+    size?: SizeOption
+    /** Opciones ya elegidas (al editar una línea del carrito). */
+    initial?: ModifierOption[]
+    /** true = está corrigiendo una línea, no agregando una nueva. */
+    editing?: boolean
+  } | null
   onClose: () => void
   onConfirm: (product: Product, size: SizeOption | undefined, modifiers: ModifierOption[]) => void
 }
@@ -34,10 +41,20 @@ function groupHint(g: ModifierGroup): string {
 export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
   const [selection, setSelection] = useState<Selection>({})
 
-  // Reiniciar la selección cada vez que se abre para otro producto
+  // Al abrir: en blanco para un producto nuevo, o sembrada con lo ya elegido
+  // cuando se edita una línea del carrito.
   useEffect(() => {
-    setSelection({})
-  }, [pending?.product.id, pending?.size?.label])
+    if (!pending?.initial?.length) {
+      setSelection({})
+      return
+    }
+    const semilla: Selection = {}
+    for (const g of pending.product.modifierGroups ?? []) {
+      const ids = pending.initial.filter((m) => g.options.some((o) => o.id === m.id)).map((m) => m.id)
+      if (ids.length > 0) semilla[g.id] = ids
+    }
+    setSelection(semilla)
+  }, [pending])
 
   const groups = useMemo<ModifierGroup[]>(() => pending?.product.modifierGroups ?? [], [pending])
   const basePrice = pending ? (pending.size ? pending.size.price : pending.product.price ?? 0) : 0
@@ -172,7 +189,7 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
                 disabled={!canConfirm}
                 onClick={() => onConfirm(pending.product, pending.size, chosen)}
               >
-                Agregar {formatCurrency(unitPrice)}
+                {pending.editing ? "Guardar" : "Agregar"} {formatCurrency(unitPrice)}
               </Button>
             </div>
           </>

@@ -17,6 +17,8 @@ export interface BusinessSettings {
   weeklyEmail: boolean
   /** Menú público en /menu/<slug> para el QR. Apagado hasta que el dueño lo active. */
   publicMenu: boolean
+  /** Qué imprimir solo al cobrar, sin pasos extra del cajero. */
+  autoPrint: "none" | "ticket" | "comanda" | "both"
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   hideChecklist: false,
   weeklyEmail: true,
   publicMenu: false,
+  autoPrint: "none",
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -50,6 +53,9 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     out.hideChecklist = r.hide_checklist === true
     out.weeklyEmail = r.weekly_email !== false
     out.publicMenu = r.public_menu === true
+    if (r.auto_print === "ticket" || r.auto_print === "comanda" || r.auto_print === "both") {
+      out.autoPrint = r.auto_print
+    }
   }
   return out
 }
@@ -65,5 +71,6 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     hide_checklist: s.hideChecklist,
     weekly_email: s.weeklyEmail,
     public_menu: s.publicMenu,
+    auto_print: s.autoPrint,
   }
 }

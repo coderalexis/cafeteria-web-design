@@ -112,6 +112,55 @@ export function usePosCart(storageKey: string, products: Product[]) {
     [touch],
   )
 
+  /** Fija la cantidad exacta (teclear en vez de tocar + once veces). */
+  const setQuantityTo = useCallback(
+    (lineId: string, qty: number) => {
+      const clamped = Math.min(99, Math.max(1, Math.round(qty)))
+      if (!Number.isFinite(clamped)) return
+      touch()
+      setLines((prev) => prev.map((l) => (l.lineId === lineId ? { ...l, quantity: clamped } : l)))
+    },
+    [touch],
+  )
+
+  /** Copia una línea (mismo tamaño y opciones) justo después de la original. */
+  const duplicateLine = useCallback(
+    (lineId: string) => {
+      touch()
+      setLines((prev) => {
+        const i = prev.findIndex((l) => l.lineId === lineId)
+        if (i === -1) return prev
+        const copia = { ...prev[i], lineId: crypto.randomUUID(), quantity: 1, isNew: true }
+        const next = prev.map((l) => ({ ...l, isNew: false }))
+        next.splice(i + 1, 0, copia)
+        return next
+      })
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => {
+        setLines((prev) => (prev.some((l) => l.isNew) ? prev.map((l) => ({ ...l, isNew: false })) : prev))
+      }, NEW_LINE_FLASH_MS)
+    },
+    [touch],
+  )
+
+  /** Reemplaza las opciones de una línea ya agregada ("mejor con avena"). */
+  const setLineModifiers = useCallback(
+    (lineId: string, modifiers: ModifierOption[]) => {
+      touch()
+      setLines((prev) => prev.map((l) => (l.lineId === lineId ? { ...l, modifiers } : l)))
+    },
+    [touch],
+  )
+
+  /** Rearma el carrito con líneas ya validadas (repetir la última venta). */
+  const restoreLines = useCallback(
+    (nuevas: CartLine[]) => {
+      touch()
+      setLines(nuevas.map((l) => ({ ...l, lineId: crypto.randomUUID(), isNew: false })))
+    },
+    [touch],
+  )
+
   const setLineNotes = useCallback(
     (lineId: string, notes: string) => {
       touch()
@@ -158,6 +207,10 @@ export function usePosCart(storageKey: string, products: Product[]) {
     addLine,
     removeLine,
     updateQuantity,
+    setQuantityTo,
+    duplicateLine,
+    setLineModifiers,
+    restoreLines,
     setLineNotes,
     clearCart,
     resetAfterSale,

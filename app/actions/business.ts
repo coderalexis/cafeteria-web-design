@@ -71,6 +71,7 @@ const settingsSchema = z.object({
     .refine((v) => v === null || v >= 1, "La meta mensual debe ser un monto positivo."),
   weeklyEmail: z.enum(["on", "off"]).transform((v) => v === "on"),
   publicMenu: z.enum(["on", "off"]).transform((v) => v === "on"),
+  autoPrint: z.enum(["none", "ticket", "comanda", "both"]),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -89,6 +90,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     monthlyGoal: formData.get("monthly_goal") ?? "",
     weeklyEmail: formData.get("weekly_email") ?? "on",
     publicMenu: formData.get("public_menu") ?? "off",
+    autoPrint: formData.get("auto_print") ?? "none",
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -110,6 +112,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       monthlyGoal: v.monthlyGoal,
       weeklyEmail: v.weeklyEmail,
       publicMenu: v.publicMenu,
+      autoPrint: v.autoPrint,
     }),
   }
 
@@ -147,6 +150,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.dailyGoal !== v.dailyGoal || prevSettings.monthlyGoal !== v.monthlyGoal) cambios.push("metas de venta")
   if (prevSettings.weeklyEmail !== v.weeklyEmail) cambios.push("resumen semanal")
   if (prevSettings.publicMenu !== v.publicMenu) cambios.push(v.publicMenu ? "menú público activado" : "menú público desactivado")
+  if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })
   }
