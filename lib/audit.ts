@@ -55,6 +55,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "miembro.reactivado": "Miembro reactivado",
   "miembro.eliminado": "Miembro quitado del equipo",
   "miembro.contrasena": "Contraseña restablecida",
+  "miembro.correo": "Correo de miembro cambiado",
   "miembro.pin": "PIN de caja cambiado",
   "negocio.ajustes": "Ajustes del negocio",
 }

@@ -378,6 +378,12 @@ export default function AyudaPage() {
           <Section id="admin-equipo" icon={Users} title="Equipo y accesos">
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
+                <strong>¿Le quedó mal el correo a alguien?</strong> Toca a esa persona y corrige su <strong>correo de acceso</strong>. Es
+                la única salida: con el correo equivocado no puede entrar ni recibir el de recuperación, así que no puede
+                arreglarlo sola. El correo nuevo queda listo de inmediato y con él ya puede usar «¿Olvidaste tu
+                contraseña?». Solo el dueño puede cambiar el correo de otro dueño.
+              </li>
+              <li>
                 En <strong>Equipo</strong> das acceso a tu cafetería. <strong>Usuario de café</strong>: creas una cuenta con
                 usuario y contraseña (entra con usuario + café), ideal para cajeros. <strong>Por correo</strong>: das acceso a
                 alguien con su correo; si no tiene cuenta, se crea con una contraseña temporal que verás una sola vez.

@@ -24,6 +24,7 @@ import {
   addMemberByEmail,
   createCashierAccount,
   removeMember,
+  changeMemberEmail,
   resetMemberPassword,
   setMemberActive,
   updateMember,
@@ -46,6 +47,8 @@ export interface TeamMember {
   fullName: string
   /** usuario de café; null si entra con correo real */
   username: string | null
+  /** correo con el que entra; null en cuentas de café (su correo es interno) */
+  email: string | null
   role: BusinessRole
   isActive: boolean
   createdAt: string
@@ -172,6 +175,10 @@ export default function EquipoClient({ members }: Props) {
 
   function handleResetPassword(formData: FormData) {
     run(() => resetMemberPassword(formData), "Contraseña restablecida", false)
+  }
+
+  function handleChangeEmail(formData: FormData) {
+    run(() => changeMemberEmail(formData), "Correo actualizado", false)
   }
 
   function handleSetPin(formData: FormData) {
@@ -481,6 +488,45 @@ export default function EquipoClient({ members }: Props) {
                   Guardar cambios
                 </Button>
               </form>
+
+              {/* Correo de acceso (solo cuentas con correo real) */}
+              {!selected.username && !selectedIsOwnerLocked && (
+                <>
+                  <Separator className="my-6" />
+                  <form action={handleChangeEmail} className="space-y-3">
+                    <input type="hidden" name="user_id" value={selected.id} />
+                    <p className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-stone-400" />
+                      Correo de acceso
+                    </p>
+                    <Input
+                      name="email"
+                      type="email"
+                      autoComplete="off"
+                      defaultValue={selected.email ?? ""}
+                      placeholder="correo@ejemplo.com"
+                      required
+                      key={selected.id + "-email"}
+                    />
+                    <p className="text-xs text-stone-400">
+                      Con este correo entra y recupera su contraseña. Si quedó mal escrito, corrígelo aquí: la persona
+                      no puede hacerlo sola porque no recibiría el correo de recuperación.
+                    </p>
+                    <Button type="submit" variant="outline" disabled={isPending} className="w-full">
+                      Cambiar correo
+                    </Button>
+                  </form>
+                </>
+              )}
+              {!selected.username && selectedIsOwnerLocked && (
+                <>
+                  <Separator className="my-6" />
+                  <p className="text-sm text-stone-500">
+                    Correo de acceso: <span className="font-medium text-stone-700">{selected.email ?? "—"}</span>
+                  </p>
+                  <p className="text-xs text-stone-400 mt-1">Solo el dueño puede cambiar el correo de otro dueño.</p>
+                </>
+              )}
 
               {/* Contraseña (solo cuentas de café) */}
               {selected.username && !selectedIsOwnerLocked && (

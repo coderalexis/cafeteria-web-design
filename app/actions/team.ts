@@ -418,3 +418,90 @@ export async function removeMember(formData: FormData): Promise<ActionResult> {
   revalidateTeam()
   return { success: true }
 }
+
+/* ── Correo de acceso ─────────────────────────────────────────────── */
+
+/**
+ * Correos de los miembros, para mostrarlos en /admin/equipo. Viven en
+ * `auth.users`, así que hacen falta permisos de servicio. De las cuentas de
+ * café se devuelve null: su correo es interno y no se enseña como correo.
+ */
+export async function getMemberEmails(
+  userIds: string[],
+): Promise<ActionResult<{ emails: Record<string, string | null> }>> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const admin = createAdminClient()
+  const emails: Record<string, string | null> = {}
+  for (const id of userIds.slice(0, 100)) {
+    if (!uuid.safeParse(id).success) continue
+    const { data } = await admin.auth.admin.getUserById(id)
+    const email = data?.user?.email ?? null
+    emails[id] = email && !isSyntheticEmail(email) ? email : null
+  }
+  return { success: true, emails }
+}
+
+/**
+ * Corrige el correo con el que entra un miembro. Es la única salida cuando el
+ * correo quedó mal escrito: esa persona no puede entrar NI recuperar su
+ * contraseña, así que no puede arreglarlo ella misma desde «Mi cuenta».
+ *
+ * El correo nuevo queda confirmado de inmediato (a propósito): pedir
+ * confirmación al correo viejo sería pedírsela a un buzón que no existe.
+ */
+export async function changeMemberEmail(formData: FormData): Promise<ActionResult<{ email: string }>> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+
+  const userId = String(formData.get("user_id") ?? "")
+  const email = String(formData.get("email") ?? "").trim().toLowerCase()
+  if (!uuid.safeParse(userId).success) return { error: "Miembro inválido." }
+  if (!z.string().email().safeParse(email).success) return { error: "Escribe un correo válido." }
+  if (isSyntheticEmail(email)) {
+    return { error: "Ese dominio es interno del sistema; usa el correo real de la persona." }
+  }
+
+  const admin = createAdminClient()
+  const membership = await getMembership(admin, ctx.business.id, userId)
+  if (!membership) return { error: "Esa persona no pertenece a esta cafetería." }
+  if (membership.role === "owner" && ctx.role !== "owner" && userId !== ctx.userId) {
+    return { error: "Solo el dueño puede cambiar el correo de otro dueño." }
+  }
+
+  const { data: target } = await admin.auth.admin.getUserById(userId)
+  const currentEmail = target?.user?.email ?? ""
+  if (!currentEmail) return { error: "No se encontró la cuenta de esa persona." }
+  if (isSyntheticEmail(currentEmail)) {
+    return {
+      error: "Esa cuenta entra con usuario y café, no con correo. Para darle acceso por correo, agrégala de nuevo con su correo.",
+    }
+  }
+
+  // Un administrador de cafetería no puede apoderarse de la cuenta de un
+  // operador de la plataforma cambiándole el correo.
+  const { data: targetProfile } = await admin
+    .from("profiles")
+    .select("full_name, is_platform_admin")
+    .eq("id", userId)
+    .maybeSingle()
+  if (targetProfile?.is_platform_admin && !ctx.isPlatformAdmin) {
+    return { error: "No puedes cambiar el correo de un operador de la plataforma." }
+  }
+
+  if (currentEmail === email) return { error: "Ese ya es su correo actual." }
+
+  const { data: taken } = await admin.rpc("find_user_id_by_email", { p_email: email })
+  if (taken && taken !== userId) return { error: "Ya existe una cuenta con ese correo." }
+
+  const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true })
+  if (error) return { error: error.message }
+
+  await logAudit("miembro.correo", targetProfile?.full_name || email, {
+    antes: currentEmail,
+    ahora: email,
+  })
+  revalidateTeam()
+  return { success: true, email }
+}
