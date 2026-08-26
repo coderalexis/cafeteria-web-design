@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/menu"
 import { setProductModifierGroups } from "@/app/actions/modifiers"
 import { ActionForm } from "@/components/action-form"
+import { BulkPricesButton, ReorderButton } from "./tools"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -109,6 +110,20 @@ export default function ProductosClient({
   const [sheetOpen, setSheetOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
 
+  /* Variantes aplanadas para la vista previa de "Precios en lote" */
+  const priceVariants = useMemo(
+    () =>
+      products.flatMap((p) =>
+        p.variants.map((v) => ({
+          id: v.id,
+          price: v.price,
+          categoryId: p.categoryId,
+          label: v.name !== "Único" ? `${p.name} · ${v.name}` : p.name,
+        })),
+      ),
+    [products],
+  )
+
   /* ── Filtering ──────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
     let result = products
@@ -171,13 +186,19 @@ export default function ProductosClient({
               {products.length} productos · Clic en un producto para editarlo
             </p>
           </div>
-          <Button
-            onClick={openCreateNew}
-            className="bg-emerald-600 hover:bg-emerald-700 gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo producto
-          </Button>
+          <div className="flex gap-2">
+            <BulkPricesButton
+              categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+              variants={priceVariants}
+            />
+            <Button
+              onClick={openCreateNew}
+              className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo producto
+            </Button>
+          </div>
         </div>
 
         {/* Search bar */}
@@ -236,11 +257,18 @@ export default function ProductosClient({
         <div className="space-y-6">
           {Object.entries(grouped).map(([catName, catProducts]) => (
             <div key={catName}>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1 flex items-center gap-2">
                 {catName}
-                <span className="ml-2 text-stone-300 font-normal normal-case tracking-normal">
+                <span className="text-stone-300 font-normal normal-case tracking-normal">
                   ({catProducts.length})
                 </span>
+                {catProducts.length > 1 && catProducts[0].categoryId && (
+                  <ReorderButton
+                    categoryId={catProducts[0].categoryId}
+                    categoryName={catName}
+                    products={catProducts.map((p) => ({ id: p.id, name: p.name, isActive: p.isActive }))}
+                  />
+                )}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {catProducts.map((product) => (

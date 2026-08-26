@@ -2,7 +2,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getContext } from "@/lib/context"
 import { homePathFor } from "@/lib/context-shape"
-import { dateStringInTz } from "@/lib/dates"
+import { addDays, dateStringInTz, formatDateString, hourInTz, startOfMonth } from "@/lib/dates"
+import { parseBusinessSettings } from "@/lib/settings"
+import { hideStartupChecklist } from "@/app/actions/business"
+import { ActionForm } from "@/components/action-form"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
 import type { SalesReport } from "@/app/admin/ventas/params"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +21,13 @@ import {
   Star,
   Wallet,
   SlidersHorizontal,
+  Target,
+  ListChecks,
+  CheckCircle2,
+  Circle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -29,6 +39,10 @@ export default async function AdminDashboard() {
   if (!ctx?.business) redirect(homePathFor(ctx))
   const tz = ctx.business.timezone
   const today = dateStringInTz(tz)
+  const yesterday = addDays(today, -1)
+  const lastWeekDay = addDays(today, -7)
+  const monthStart = startOfMonth(today)
+  const settings = parseBusinessSettings(ctx.business.settings)
 
   const [
     { count: categoryCount },
@@ -53,6 +67,70 @@ export default async function AdminDashboard() {
       .order("created_at", { ascending: false })
       .limit(5),
   ])
+
+  // Comparativo y meta mensual: 3 reportes más, en paralelo.
+  const [{ data: yData }, { data: wData }, { data: mData }] = await Promise.all([
+    supabase.rpc("sales_report", { p_from: yesterday, p_to: yesterday }),
+    supabase.rpc("sales_report", { p_from: lastWeekDay, p_to: lastWeekDay }),
+    supabase.rpc("sales_report", { p_from: monthStart, p_to: today }),
+  ])
+  const yReport = (yData as unknown as SalesReport | null) ?? null
+  const wReport = (wData as unknown as SalesReport | null) ?? null
+  const monthRevenue = (mData as unknown as SalesReport | null)?.totals.revenue ?? 0
+
+  // Checklist de arranque: solo consulta si no está oculta.
+  let checklist: Array<{ label: string; hint: string; done: boolean; href: string }> | null = null
+  if (!settings.hideChecklist) {
+    const [{ count: cashierCount }, { count: ticketEver }, { count: closedSessions }] = await Promise.all([
+      supabase
+        .from("business_members")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "cajero")
+        .eq("is_active", true),
+      supabase.from("tickets").select("*", { count: "exact", head: true }),
+      supabase.from("cash_sessions").select("*", { count: "exact", head: true }).eq("status", "cerrada"),
+    ])
+    const biz = ctx.business
+    checklist = [
+      {
+        label: "Arma tu menú",
+        hint: "Categorías, productos y precios",
+        done: (productCount ?? 0) > 0,
+        href: "/admin/productos",
+      },
+      {
+        label: "Completa los datos del negocio",
+        hint: "Dirección, teléfono o encabezado del ticket",
+        done: !!(biz.address || biz.phone || biz.receiptHeader || biz.receiptFooter),
+        href: "/admin/negocio",
+      },
+      {
+        label: "Da de alta a tu equipo",
+        hint: "Al menos un cajero con su usuario",
+        done: (cashierCount ?? 0) > 0,
+        href: "/admin/equipo",
+      },
+      {
+        label: "Activa la seguridad de caja",
+        hint: "Bloqueo por inactividad con PIN",
+        done: settings.lockMinutes > 0,
+        href: "/admin/negocio",
+      },
+      {
+        label: "Registra tu primera venta",
+        hint: "Abre la caja y cobra desde el POS",
+        done: (ticketEver ?? 0) > 0,
+        href: "/pos",
+      },
+      {
+        label: "Cierra tu primer corte",
+        hint: "Cuenta el efectivo al terminar el turno",
+        done: (closedSessions ?? 0) > 0,
+        href: "/admin/cortes",
+      },
+    ]
+    if (checklist.every((c) => c.done)) checklist = null
+  }
 
   const report = (reportData as unknown as SalesReport | null) ?? null
   const todaySales = report?.totals.revenue ?? 0
@@ -117,6 +195,29 @@ export default async function AdminDashboard() {
     },
   ]
 
+  /* ── Comparativo: hoy vs. ayer y vs. hace 7 días, a esta hora ──── */
+  const nowHour = hourInTz(tz)
+  const revenueUpTo = (r: SalesReport | null, hour: number) =>
+    (r?.by_hour ?? []).reduce((sum, h) => (h.hour <= hour ? sum + h.revenue : sum), 0)
+  const comparisons = [
+    {
+      label: "Ayer a esta hora",
+      closing: `Ayer cerró en ${formatCurrency(yReport?.totals.revenue ?? 0)}`,
+      value: revenueUpTo(yReport, nowHour),
+    },
+    {
+      label: `El ${formatDateString(lastWeekDay, { weekday: "long" })} pasado a esta hora`,
+      closing: `Ese día cerró en ${formatCurrency(wReport?.totals.revenue ?? 0)}`,
+      value: revenueUpTo(wReport, nowHour),
+    },
+  ]
+
+  /* ── Metas ─────────────────────────────────────────────────────── */
+  const goals = [
+    settings.dailyGoal ? { label: "Meta del día", goal: settings.dailyGoal, actual: todaySales } : null,
+    settings.monthlyGoal ? { label: "Meta del mes", goal: settings.monthlyGoal, actual: monthRevenue } : null,
+  ].filter((g): g is { label: string; goal: number; actual: number } => g !== null)
+
   // Etiquetas e iconos desde lib/format; colores de barra propios del dashboard.
   const paymentMethods = [
     { ...PAYMENT_METHODS.efectivo, color: "text-emerald-600", barColor: "bg-emerald-500" },
@@ -133,6 +234,52 @@ export default async function AdminDashboard() {
           Resumen general de tu menú y ventas
         </p>
       </div>
+
+      {/* Checklist de arranque (solo mientras falte algo) */}
+      {checklist && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-amber-700" />
+                Primeros pasos ({checklist.filter((c) => c.done).length}/{checklist.length})
+              </CardTitle>
+              <ActionForm action={hideStartupChecklist}>
+                <button type="submit" className="text-xs text-stone-400 hover:text-stone-600 underline underline-offset-2">
+                  Ocultar
+                </button>
+              </ActionForm>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {checklist.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-start gap-2.5 rounded-lg border p-3 transition-colors ${
+                    item.done
+                      ? "border-emerald-200 bg-emerald-50/60"
+                      : "border-stone-200 bg-white hover:border-amber-300"
+                  }`}
+                >
+                  {item.done ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-stone-300 shrink-0 mt-0.5" />
+                  )}
+                  <span>
+                    <span className={`block text-sm font-medium ${item.done ? "text-emerald-800 line-through decoration-emerald-300" : "text-stone-800"}`}>
+                      {item.label}
+                    </span>
+                    <span className="block text-xs text-stone-400">{item.hint}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -157,6 +304,104 @@ export default async function AdminDashboard() {
             </Card>
           </Link>
         ))}
+      </div>
+
+      {/* Comparativo + metas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              ¿Cómo va el día?
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-stone-500">
+              Hoy llevas <span className="font-bold text-stone-800">{formatCurrency(todaySales)}</span>
+              {todayCount > 0 && <span> en {todayCount} venta{todayCount === 1 ? "" : "s"}</span>}.
+            </p>
+            {comparisons.map((c) => {
+              const delta = c.value > 0 ? Math.round(((todaySales - c.value) / c.value) * 100) : null
+              const up = delta !== null && delta > 0
+              const down = delta !== null && delta < 0
+              return (
+                <div key={c.label} className="rounded-lg border border-stone-200 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-stone-600">{c.label}</span>
+                    <span className="text-sm font-semibold text-stone-800">{formatCurrency(c.value)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <span className="text-xs text-stone-400">{c.closing}</span>
+                    {delta === null ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-stone-400">
+                        <Minus className="h-3 w-3" /> sin base
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs font-semibold ${
+                          up ? "text-emerald-700" : down ? "text-red-600" : "text-stone-500"
+                        }`}
+                      >
+                        {up ? <ArrowUpRight className="h-3 w-3" /> : down ? <ArrowDownRight className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                        {delta > 0 ? "+" : ""}
+                        {delta}% hoy
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Target className="h-5 w-5 text-amber-600" />
+              Metas de venta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {goals.length === 0 ? (
+              <div className="py-4 text-center">
+                <p className="text-sm text-stone-500">Aún no defines metas de venta.</p>
+                <p className="text-xs text-stone-400 mt-1">
+                  Con una meta diaria o mensual, aquí verás el avance.{" "}
+                  <Link href="/admin/negocio" className="text-amber-700 underline underline-offset-2">
+                    Definir metas
+                  </Link>
+                </p>
+              </div>
+            ) : (
+              goals.map((g) => {
+                const pct = Math.round((g.actual / g.goal) * 100)
+                const width = Math.min(pct, 100)
+                const reached = pct >= 100
+                return (
+                  <div key={g.label}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-stone-600">{g.label}</span>
+                      <span className={`font-semibold ${reached ? "text-emerald-700" : "text-stone-800"}`}>
+                        {formatCurrency(g.actual)} <span className="text-stone-400 font-normal">/ {formatCurrency(g.goal)}</span>
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-3 rounded-full bg-stone-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${reached ? "bg-emerald-500" : "bg-amber-500"}`}
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                    <p className={`mt-1 text-xs ${reached ? "text-emerald-700 font-medium" : "text-stone-400"}`}>
+                      {reached
+                        ? `¡Meta superada! (${pct}%)`
+                        : `${pct}% · faltan ${formatCurrency(Math.max(0, g.goal - g.actual))}`}
+                    </p>
+                  </div>
+                )
+              })
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Revenue + Best seller + Payment breakdown */}

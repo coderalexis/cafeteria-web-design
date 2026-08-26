@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
-import { createCategory, updateCategory, deleteCategory } from "@/app/actions/menu"
+import { createCategory, updateCategory, deleteCategory, moveCategory } from "@/app/actions/menu"
 import { ActionForm } from "@/components/action-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORY_COLORS, COLOR_CLASSES, isCategoryColor } from "@/lib/category-colors"
-import { Tag, Plus, Trash2 } from "lucide-react"
+import { Tag, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react"
 
 /**
  * Selector de color con radios nativos (sin JS): el POS pinta los chips de
@@ -126,9 +126,35 @@ export default async function CategoriasPage() {
               key={category.id}
               className="flex items-center gap-3 rounded-lg border border-stone-200 p-3 hover:border-stone-300 transition-colors"
             >
-              {/* Sort order badge */}
+              {/* Orden: subir / bajar (es el orden de las pestañas del POS) */}
+              <div className="flex flex-col shrink-0">
+                <ActionForm action={moveCategory}>
+                  <input type="hidden" name="id" value={category.id} />
+                  <input type="hidden" name="direction" value="up" />
+                  <button
+                    type="submit"
+                    disabled={index === 0}
+                    title="Subir"
+                    className="flex h-4 w-6 items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-30"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                </ActionForm>
+                <ActionForm action={moveCategory}>
+                  <input type="hidden" name="id" value={category.id} />
+                  <input type="hidden" name="direction" value="down" />
+                  <button
+                    type="submit"
+                    disabled={index === (categories?.length ?? 0) - 1}
+                    title="Bajar"
+                    className="flex h-4 w-6 items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-30"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </ActionForm>
+              </div>
               <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-stone-100 text-xs font-bold text-stone-500 shrink-0">
-                {category.sort_order ?? index + 1}
+                {index + 1}
               </span>
 
               {/* Edit form */}

@@ -24,21 +24,25 @@ export default async function VentasPage({
   // Cliente de sesión: el RLS ya da acceso total al admin, sin service-role.
   const supabase = await createClient()
 
-  let ticketsQuery = supabase
-    .from("tickets")
-    .select(TICKET_SELECT, { count: "exact" })
-    .gte("created_at", fromIso)
-    .lt("created_at", toIso)
-  if (filters.cajero) ticketsQuery = ticketsQuery.eq("cashier_id", filters.cajero)
-  if (filters.pago) ticketsQuery = ticketsQuery.eq("payment_method", filters.pago)
+  // Búsqueda por folio: encuentra el ticket sin importar fecha ni filtros.
+  let ticketsQuery = supabase.from("tickets").select(TICKET_SELECT, { count: "exact" })
+  if (filters.folio !== null) {
+    ticketsQuery = ticketsQuery.eq("folio", filters.folio)
+  } else {
+    ticketsQuery = ticketsQuery.gte("created_at", fromIso).lt("created_at", toIso)
+    if (filters.cajero) ticketsQuery = ticketsQuery.eq("cashier_id", filters.cajero)
+    if (filters.pago) ticketsQuery = ticketsQuery.eq("payment_method", filters.pago)
+  }
 
   const [reportResult, ticketsResult, members] = await Promise.all([
-    supabase.rpc("sales_report", {
-      p_from: filters.from,
-      p_to: filters.to,
-      p_cashier: filters.cajero ?? undefined,
-      p_method: filters.pago ?? undefined,
-    }),
+    filters.folio !== null
+      ? Promise.resolve({ data: null, error: null })
+      : supabase.rpc("sales_report", {
+          p_from: filters.from,
+          p_to: filters.to,
+          p_cashier: filters.cajero ?? undefined,
+          p_method: filters.pago ?? undefined,
+        }),
     ticketsQuery.order("created_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1),
     getMemberDirectory(supabase),
   ])

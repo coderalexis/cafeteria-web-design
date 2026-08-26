@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
 import { homePathFor, parseContext } from "@/lib/context-shape"
 import { isValidTimeZone } from "@/lib/dates"
-import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, serializeBusinessSettings } from "@/lib/settings"
+import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings } from "@/lib/settings"
 import type { ActionResult } from "./types"
 
 /**
@@ -58,6 +58,17 @@ const settingsSchema = z.object({
     .number()
     .int()
     .refine((n) => (LOCK_MINUTES_OPTIONS as readonly number[]).includes(n), "Valor de bloqueo inválido."),
+  // Metas en pesos: campo vacío = sin meta.
+  dailyGoal: z
+    .string()
+    .trim()
+    .transform((v) => parseGoal(v === "" ? null : v))
+    .refine((v) => v === null || v >= 1, "La meta diaria debe ser un monto positivo."),
+  monthlyGoal: z
+    .string()
+    .trim()
+    .transform((v) => parseGoal(v === "" ? null : v))
+    .refine((v) => v === null || v >= 1, "La meta mensual debe ser un monto positivo."),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -72,6 +83,8 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     receiptHeader: formData.get("receipt_header") ?? "",
     receiptFooter: formData.get("receipt_footer") ?? "",
     lockMinutes: Number(formData.get("lock_minutes") ?? 0),
+    dailyGoal: formData.get("daily_goal") ?? "",
+    monthlyGoal: formData.get("monthly_goal") ?? "",
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -83,7 +96,16 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     ctx.business.settings && typeof ctx.business.settings === "object"
       ? (ctx.business.settings as Record<string, unknown>)
       : {}
-  const nextSettings = { ...currentSettings, ...serializeBusinessSettings({ lockMinutes: v.lockMinutes }) }
+  const prevSettings = parseBusinessSettings(ctx.business.settings)
+  const nextSettings = {
+    ...currentSettings,
+    ...serializeBusinessSettings({
+      ...prevSettings,
+      lockMinutes: v.lockMinutes,
+      dailyGoal: v.dailyGoal,
+      monthlyGoal: v.monthlyGoal,
+    }),
+  }
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -115,11 +137,37 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if ((before.phone ?? null) !== v.phone) cambios.push("teléfono")
   if ((before.receiptHeader ?? null) !== v.receiptHeader) cambios.push("encabezado del ticket")
   if ((before.receiptFooter ?? null) !== v.receiptFooter) cambios.push("pie del ticket")
-  if (parseBusinessSettings(before.settings).lockMinutes !== v.lockMinutes) cambios.push("bloqueo por inactividad")
+  if (prevSettings.lockMinutes !== v.lockMinutes) cambios.push("bloqueo por inactividad")
+  if (prevSettings.dailyGoal !== v.dailyGoal || prevSettings.monthlyGoal !== v.monthlyGoal) cambios.push("metas de venta")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })
   }
 
   revalidatePath("/", "layout")
+  return { success: true }
+}
+
+/**
+ * Oculta la checklist de arranque del dashboard (queda en settings.hide_checklist;
+ * merge para no pisar otras claves).
+ */
+export async function hideStartupChecklist(): Promise<ActionResult> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+
+  const currentSettings =
+    ctx.business.settings && typeof ctx.business.settings === "object"
+      ? (ctx.business.settings as Record<string, unknown>)
+      : {}
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("businesses")
+    .update({ settings: { ...currentSettings, hide_checklist: true } as never })
+    .eq("id", ctx.business.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath("/admin", "layout")
   return { success: true }
 }

@@ -206,7 +206,7 @@ export default function VentasClient({
           <Receipt className="h-6 w-6 text-amber-600" />
           Historial de Ventas
         </h1>
-        <p className="text-sm text-stone-500 mt-1 capitalize">{periodLabel}</p>
+        <p className="text-sm text-stone-500 mt-1 capitalize">{filters.folio !== null ? `Folio ${filters.folio}` : periodLabel}</p>
       </div>
 
       {/* Filters */}
@@ -219,7 +219,8 @@ export default function VentasClient({
         </div>
       )}
 
-      {/* Stats row — del rango filtrado */}
+      {/* Stats row — del rango filtrado (oculto en búsqueda por folio) */}
+      {filters.folio === null && (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label="Ventas"
@@ -260,6 +261,8 @@ export default function VentasClient({
         />
       </div>
 
+      )}
+
       {/* Chart por día (solo si el rango tiene más de un día) */}
       {chartData.length > 1 && (
         <Card>
@@ -295,6 +298,7 @@ export default function VentasClient({
         </Card>
       )}
 
+      {filters.folio === null && (
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Por método */}
         <Card className="xl:col-span-2">
@@ -382,8 +386,10 @@ export default function VentasClient({
           )}
         </div>
       </div>
+      )}
 
       {/* Top productos */}
+      {filters.folio === null && (
       <Card>
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-4">
@@ -424,6 +430,7 @@ export default function VentasClient({
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Table */}
       <Card>

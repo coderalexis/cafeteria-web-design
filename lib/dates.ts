@@ -140,6 +140,13 @@ export function businessDayRange(tz: string, reference: Date = new Date()): DayR
 /*  Aritmética de YYYY-MM-DD (independiente de zona)                   */
 /* ------------------------------------------------------------------ */
 
+/** Hora local (0-23) en la zona dada; para comparar "a esta hora" entre dias. */
+export function hourInTz(tz: string, reference: Date = new Date()): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "2-digit", hourCycle: "h23" }).format(reference),
+  )
+}
+
 /** Suma `days` (puede ser negativo) a una fecha YYYY-MM-DD. */
 export function addDays(date: DateString, days: number): DateString {
   const d = new Date(`${date}T00:00:00Z`)

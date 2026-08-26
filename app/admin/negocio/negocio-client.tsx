@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Store, Loader2, Printer, Clock, LockKeyhole } from "lucide-react"
+import { Store, Loader2, Printer, Clock, LockKeyhole, Target } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings } from "@/lib/settings"
@@ -221,6 +221,50 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                   rows={2}
                   placeholder="¡Gracias por tu compra! (por defecto)"
                   onChange={(e) => setPreview((p) => ({ ...p, receiptFooter: e.target.value }))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Target className="h-4 w-4 text-amber-700" />
+                Metas de venta
+              </CardTitle>
+              <CardDescription>
+                El dashboard muestra el avance del día y del mes contra estas metas. Deja el campo vacío para no usar meta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="daily_goal" className="text-sm font-medium text-stone-700">
+                  Meta diaria ($)
+                </label>
+                <Input
+                  id="daily_goal"
+                  name="daily_goal"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  placeholder="Sin meta"
+                  defaultValue={currentSettings.dailyGoal ?? ""}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="monthly_goal" className="text-sm font-medium text-stone-700">
+                  Meta mensual ($)
+                </label>
+                <Input
+                  id="monthly_goal"
+                  name="monthly_goal"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  placeholder="Sin meta"
+                  defaultValue={currentSettings.monthlyGoal ?? ""}
                 />
               </div>
             </CardContent>

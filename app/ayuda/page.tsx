@@ -293,6 +293,15 @@ export default function AyudaPage() {
                 producto puedes ocultarlo del POS (<em>Desactivar</em>), y lo mismo con cada variante (icono de ojo).
               </li>
               <li>
+                <strong>Orden</strong>: en Categorías, las flechas ↑↓ cambian el orden de las pestañas del POS; en Productos,
+                el botón <em>Ordenar</em> de cada categoría acomoda sus productos.
+              </li>
+              <li>
+                <strong>Precios en lote</strong> (en Productos): sube o baja los precios de una categoría o de todo el menú de
+                un jalón, por porcentaje o por monto, con redondeo al peso o a los 50 centavos. Muestra una vista previa antes
+                de aplicar y queda registrado en Actividad.
+              </li>
+              <li>
                 Un producto o variante que <strong>ya tiene ventas no se puede borrar</strong> (para no perder el historial);
                 desactívalo.
               </li>
@@ -335,6 +344,11 @@ export default function AyudaPage() {
 
           <Section id="admin-negocio" icon={Coffee} title="Datos del negocio">
             <ul className="space-y-2 text-sm text-stone-600">
+              <li>
+                <strong>Metas de venta</strong>: define una meta diaria y/o mensual; el Dashboard muestra el avance con una
+                barra. Ahí mismo verás <strong>¿Cómo va el día?</strong>: hoy contra ayer y contra el mismo día de la semana
+                pasada, a la misma hora.
+              </li>
               <li>
                 En <strong>Negocio</strong> defines el nombre, la <strong>zona horaria</strong> (marca el «día de operación» de
                 reportes y cortes: si tu cafetería está en Tijuana o Cancún, elígela), la dirección y el teléfono, y los
@@ -382,6 +396,10 @@ export default function AyudaPage() {
                 <strong>Ventas</strong>: elige el periodo (Hoy, Ayer, 7 días, 30 días, Este mes o un rango con el calendario),
                 filtra por cajero o método de pago. Los indicadores, la gráfica por día, la hora pico y los productos más vendidos
                 corresponden al periodo elegido.
+              </li>
+              <li>
+                <strong>Buscar por folio</strong>: escribe el número del ticket y lo encuentra sin importar la fecha (útil
+                cuando un cliente regresa con su ticket).
               </li>
               <li>
                 Toca un ticket para ver el detalle, <strong>reimprimirlo</strong> o <strong>cancelarlo</strong> con motivo.

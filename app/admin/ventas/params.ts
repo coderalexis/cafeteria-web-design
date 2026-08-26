@@ -16,6 +16,8 @@ export interface VentasFilters {
   cajero: string | null
   pago: PaymentMethodKey | null
   page: number
+  /** Búsqueda directa por folio: ignora fechas y demás filtros. */
+  folio: number | null
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -48,7 +50,11 @@ export function parseVentasFilters(raw: RawParams, today: DateString): VentasFil
   const pageRaw = Number.parseInt(first(raw.page) ?? "1", 10)
   const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? pageRaw : 1
 
-  return { from, to, cajero, pago, page }
+  const folioRaw = first(raw.folio)
+  const folioNum = folioRaw && /^[0-9]{1,10}$/.test(folioRaw) ? Number.parseInt(folioRaw, 10) : null
+  const folio = folioNum && folioNum >= 1 ? folioNum : null
+
+  return { from, to, cajero, pago, page, folio }
 }
 
 /** Serializa filtros a query string (omite defaults para URLs limpias). */
@@ -58,6 +64,7 @@ export function filtersToSearchParams(filters: Partial<VentasFilters>): URLSearc
   if (filters.to) sp.set("to", filters.to)
   if (filters.cajero) sp.set("cajero", filters.cajero)
   if (filters.pago) sp.set("pago", filters.pago)
+  if (filters.folio) sp.set("folio", String(filters.folio))
   if (filters.page && filters.page > 1) sp.set("page", String(filters.page))
   return sp
 }

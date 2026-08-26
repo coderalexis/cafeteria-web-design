@@ -36,6 +36,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "variante.creada": "Variante creada",
   "variante.editada": "Variante editada",
   "precio.cambiado": "Precio cambiado",
+  "precios.lote": "Cambio de precios en lote",
   "variante.eliminada": "Variante eliminada",
   "variante.activada": "Variante activada",
   "variante.desactivada": "Variante desactivada",

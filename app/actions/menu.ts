@@ -1,10 +1,12 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
 import { isCategoryColor } from "@/lib/category-colors"
+import { computeBulkPrice, type BulkPricesInput } from "@/lib/pricing"
 
 function revalidateAll() {
   revalidatePath("/admin", "layout")
@@ -357,6 +359,160 @@ export async function deleteCategory(formData: FormData) {
   if (error) return { error: error.message }
 
   await logAudit("categoria.eliminada", before?.name ?? id)
+  revalidateAll()
+  return { success: true }
+}
+
+/* ------------------------------------------------------------------ */
+/*  P3: precios en lote y reordenamiento                               */
+/* ------------------------------------------------------------------ */
+
+const bulkPricesSchema = z.object({
+  /** null = todo el menú. */
+  categoryId: z.string().uuid().nullable(),
+  direction: z.enum(["subir", "bajar"]),
+  kind: z.enum(["percent", "amount"]),
+  value: z.number().finite().positive().max(500),
+  rounding: z.enum(["peso", "cincuenta", "exacto"]),
+})
+
+/**
+ * Cambia todos los precios de una categoría (o del menú completo) de un jalón.
+ * Incluye variantes de productos ocultos, para que al reactivarlos el precio
+ * ya esté al día. El servidor recalcula: no confía en la vista previa.
+ */
+export async function bulkUpdatePrices(
+  input: BulkPricesInput,
+): Promise<{ error: string } | { success: true; updated: number }> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+
+  const parsed = bulkPricesSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
+  }
+  const v = parsed.data
+
+  const supabase = await createClient()
+  let query = supabase.from("menu_variants").select("id, price, menu_products!inner(category_id)")
+  if (v.categoryId) query = query.eq("menu_products.category_id", v.categoryId)
+  const { data: variants, error } = await query
+  if (error) return { error: error.message }
+
+  const changes = (variants ?? [])
+    .map((row) => ({ id: row.id, price: computeBulkPrice(row.price, v) }))
+    .filter((c, i) => c.price !== (variants ?? [])[i].price)
+
+  // Lotes chicos en paralelo: cada update pasa por RLS.
+  const CHUNK = 15
+  for (let i = 0; i < changes.length; i += CHUNK) {
+    const results = await Promise.all(
+      changes.slice(i, i + CHUNK).map((c) => supabase.from("menu_variants").update({ price: c.price }).eq("id", c.id)),
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) return { error: `Se actualizaron ${i} precios y falló: ${failed.error.message}` }
+  }
+
+  let scopeName = "todo el menú"
+  if (v.categoryId) {
+    const { data: cat } = await supabase.from("menu_categories").select("name").eq("id", v.categoryId).maybeSingle()
+    scopeName = cat?.name ?? "categoría"
+  }
+  await logAudit("precios.lote", scopeName, {
+    direccion: v.direction,
+    tipo: v.kind === "percent" ? "porcentaje" : "monto",
+    valor: v.value,
+    redondeo: v.rounding,
+    variantes: changes.length,
+  })
+  revalidateAll()
+  return { success: true, updated: changes.length }
+}
+
+const reorderSchema = z.object({
+  categoryId: z.string().uuid(),
+  orderedIds: z.array(z.string().uuid()).min(1).max(200),
+})
+
+/** Guarda el orden de los productos de una categoría (1..n). */
+export async function reorderProducts(
+  input: z.infer<typeof reorderSchema>,
+): Promise<{ error: string } | { success: true }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const parsed = reorderSchema.safeParse(input)
+  if (!parsed.success) return { error: "Datos inválidos." }
+  const { categoryId, orderedIds } = parsed.data
+
+  const supabase = await createClient()
+  const { data: rows, error } = await supabase
+    .from("menu_products")
+    .select("id, sort_order")
+    .eq("category_id", categoryId)
+  if (error) return { error: error.message }
+
+  const current = new Map((rows ?? []).map((r) => [r.id, r.sort_order]))
+  if (current.size !== orderedIds.length || orderedIds.some((id) => !current.has(id))) {
+    return { error: "La lista cambió en otra pestaña. Recarga e intenta de nuevo." }
+  }
+
+  const changes = orderedIds
+    .map((id, index) => ({ id, sort_order: index + 1 }))
+    .filter((c) => current.get(c.id) !== c.sort_order)
+
+  const CHUNK = 15
+  for (let i = 0; i < changes.length; i += CHUNK) {
+    const results = await Promise.all(
+      changes
+        .slice(i, i + CHUNK)
+        .map((c) => supabase.from("menu_products").update({ sort_order: c.sort_order }).eq("id", c.id)),
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) return { error: failed.error.message }
+  }
+
+  revalidateAll()
+  return { success: true }
+}
+
+/** Sube o baja una categoría un lugar (renumera para deshacer empates). */
+export async function moveCategory(formData: FormData) {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const id = String(formData.get("id") ?? "")
+  const direction = String(formData.get("direction") ?? "")
+  if (!id || (direction !== "up" && direction !== "down")) {
+    return { error: "Datos inválidos." }
+  }
+
+  const supabase = await createClient()
+  const { data: rows, error } = await supabase
+    .from("menu_categories")
+    .select("id, sort_order")
+    .order("sort_order")
+    .order("name")
+  if (error) return { error: error.message }
+
+  const list = rows ?? []
+  const index = list.findIndex((r) => r.id === id)
+  if (index === -1) return { error: "Categoría no encontrada." }
+  const target = direction === "up" ? index - 1 : index + 1
+  if (target < 0 || target >= list.length) return { success: true }
+
+  const nextOrder = [...list]
+  ;[nextOrder[index], nextOrder[target]] = [nextOrder[target], nextOrder[index]]
+
+  const changes = nextOrder
+    .map((r, i) => ({ id: r.id, sort_order: i + 1 }))
+    .filter((c) => list.find((r) => r.id === c.id)?.sort_order !== c.sort_order)
+
+  for (const c of changes) {
+    const { error: upErr } = await supabase.from("menu_categories").update({ sort_order: c.sort_order }).eq("id", c.id)
+    if (upErr) return { error: upErr.message }
+  }
+
   revalidateAll()
   return { success: true }
 }

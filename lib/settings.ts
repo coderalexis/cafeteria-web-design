@@ -7,10 +7,26 @@
 export interface BusinessSettings {
   /** Minutos de inactividad para bloquear el POS con PIN (0 = desactivado). */
   lockMinutes: number
+  /** Meta de venta diaria en pesos (null = sin meta). */
+  dailyGoal: number | null
+  /** Meta de venta mensual en pesos (null = sin meta). */
+  monthlyGoal: number | null
+  /** El dueño ocultó la checklist de arranque del dashboard. */
+  hideChecklist: boolean
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
   lockMinutes: 0,
+  dailyGoal: null,
+  monthlyGoal: null,
+  hideChecklist: false,
+}
+
+/** Meta en pesos: entero positivo con tope sano. */
+export function parseGoal(value: unknown): number | null {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.min(Math.round(n), 99_999_999)
 }
 
 export const LOCK_MINUTES_OPTIONS = [0, 1, 2, 5, 10, 15, 30] as const
@@ -23,11 +39,21 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     if (Number.isFinite(lock) && lock >= 0 && lock <= 120) {
       out.lockMinutes = Math.round(lock)
     }
+    out.dailyGoal = parseGoal(r.daily_goal)
+    out.monthlyGoal = parseGoal(r.monthly_goal)
+    out.hideChecklist = r.hide_checklist === true
   }
   return out
 }
 
 /** Forma persistida (claves snake_case en el jsonb). */
 export function serializeBusinessSettings(s: BusinessSettings): Record<string, unknown> {
-  return { lock_minutes: s.lockMinutes }
+  // Claves explícitas (incluso en null): al mezclar sobre el jsonb existente,
+  // borrar una meta debe borrarla de verdad, no dejar el valor viejo.
+  return {
+    lock_minutes: s.lockMinutes,
+    daily_goal: s.dailyGoal,
+    monthly_goal: s.monthlyGoal,
+    hide_checklist: s.hideChecklist,
+  }
 }
