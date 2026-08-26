@@ -12,40 +12,82 @@ import {
   ShieldCheck,
   Mail,
   Smartphone,
+  Boxes,
+  Stamp,
+  Hammer,
+  Check,
 } from "lucide-react"
+import { buildTicketLines } from "@/lib/receipt"
 
 /**
  * Página pública de cafecitopos.com para quien todavía no tiene cuenta.
- * Solo se promete lo que el sistema hace hoy: nada de inventario, lealtad ni
- * facturación, que aún no existen.
+ * Solo se promete lo que el sistema hace HOY; lo que está en camino va en su
+ * propia sección y marcado como tal.
  */
 
 const CONTACTO = "soporte@cafecitopos.com"
 
-function Seccion({
+/** Clases completas: Tailwind no resuelve nombres armados al vuelo. */
+const TONOS = {
+  amber: { chip: "bg-amber-100 text-amber-700", borde: "hover:border-amber-300", punto: "bg-amber-500" },
+  emerald: { chip: "bg-emerald-100 text-emerald-700", borde: "hover:border-emerald-300", punto: "bg-emerald-500" },
+  blue: { chip: "bg-blue-100 text-blue-700", borde: "hover:border-blue-300", punto: "bg-blue-500" },
+  indigo: { chip: "bg-indigo-100 text-indigo-700", borde: "hover:border-indigo-300", punto: "bg-indigo-500" },
+  rose: { chip: "bg-rose-100 text-rose-700", borde: "hover:border-rose-300", punto: "bg-rose-500" },
+  teal: { chip: "bg-teal-100 text-teal-700", borde: "hover:border-teal-300", punto: "bg-teal-500" },
+} as const
+
+type Tono = keyof typeof TONOS
+
+/** El mismo ticket que imprime el sistema, con datos de muestra. */
+const TICKET_MUESTRA = buildTicketLines(
+  {
+    folio: 128,
+    date: new Date("2026-03-14T17:42:00Z"),
+    paymentMethod: "efectivo",
+    items: [
+      { label: "Latte (Grande)", quantity: 2, unitPrice: 60, lineTotal: 120, modifiers: [{ name: "Leche de avena", price: 12 }] },
+      { label: "Croissant", quantity: 1, unitPrice: 38, lineTotal: 38 },
+    ],
+    subtotal: 158,
+    total: 158,
+    tip: 16,
+    cashReceived: 200,
+    changeDue: 26,
+  },
+  {
+    name: "Café de ejemplo",
+    timezone: "America/Mexico_City",
+    address: "Av. Juárez 123, Centro",
+    receiptFooter: "¡Gracias por tu visita!",
+  },
+)
+
+function Bloque({
   icon: Icon,
+  tono,
   titulo,
   entrada,
   puntos,
 }: {
   icon: typeof Zap
+  tono: Tono
   titulo: string
   entrada: string
   puntos: string[]
 }) {
+  const t = TONOS[tono]
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
-          <Icon className="h-5 w-5 text-amber-700" />
-        </div>
-        <h2 className="text-xl font-bold text-stone-800">{titulo}</h2>
+    <section className={`rounded-2xl border border-stone-200 bg-white p-6 transition-colors ${t.borde}`}>
+      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${t.chip}`}>
+        <Icon className="h-5 w-5" />
       </div>
-      <p className="mt-3 text-stone-600">{entrada}</p>
+      <h3 className="mt-4 text-lg font-bold text-stone-800">{titulo}</h3>
+      <p className="mt-1.5 text-sm text-stone-500">{entrada}</p>
       <ul className="mt-4 space-y-2">
         {puntos.map((p) => (
           <li key={p} className="flex gap-2.5 text-sm text-stone-600">
-            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span aria-hidden className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${t.punto}`} />
             <span>{p}</span>
           </li>
         ))}
@@ -57,9 +99,8 @@ function Seccion({
 export function Landing() {
   return (
     <div className="min-h-screen bg-stone-50">
-      {/* Barra */}
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-700">
               <Coffee className="h-5 w-5 text-white" />
@@ -68,128 +109,266 @@ export function Landing() {
           </div>
           <Link
             href="/login"
-            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800"
+            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
           >
             Entrar
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
-        {/* Portada */}
-        <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-amber-700">
-            Punto de venta para cafeterías
-          </p>
-          <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-bold leading-tight text-stone-900 sm:text-5xl">
-            Cobra rápido, cuadra tu caja y entérate de cuánto <em className="not-italic text-amber-700">ganas</em>
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-stone-600">
-            No solo de cuánto vendes. Cafecito POS lleva tu mostrador, tu corte de caja y tus números en el mismo
-            lugar, desde la tablet que ya tienes.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 rounded-xl bg-amber-700 px-6 py-3 font-semibold text-white hover:bg-amber-800"
-            >
-              Entrar al sistema
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href={`mailto:${CONTACTO}?subject=Quiero%20probar%20Cafecito%20POS`}
-              className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-6 py-3 font-semibold text-stone-700 hover:bg-stone-50"
-            >
-              <Mail className="h-4 w-4" />
-              Quiero probarlo
-            </a>
+      {/* ── Portada ─────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden border-b border-stone-200 bg-gradient-to-b from-amber-50 via-stone-50 to-stone-50">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl"
+        />
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:py-20 lg:grid-cols-[1.1fr_auto] lg:items-center">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-800">
+              <Coffee className="h-3.5 w-3.5" />
+              Punto de venta para cafeterías
+            </span>
+            <h1 className="mt-5 text-4xl font-bold leading-[1.1] tracking-tight text-stone-900 sm:text-5xl">
+              Cobra rápido, cuadra tu caja
+              <br className="hidden sm:block" /> y entérate de cuánto{" "}
+              <span className="text-amber-700">ganas</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-lg leading-relaxed text-stone-600">
+              No solo de cuánto vendes. Tu mostrador, tu corte de caja y tus números en un mismo lugar, desde la tablet
+              que ya tienes.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-700 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-amber-800"
+              >
+                Entrar al sistema
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <a
+                href={`mailto:${CONTACTO}?subject=Quiero%20probar%20Cafecito%20POS`}
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-6 py-3 font-semibold text-stone-700 transition-colors hover:bg-stone-50"
+              >
+                <Mail className="h-4 w-4" />
+                Quiero probarlo
+              </a>
+            </div>
+            <p className="mt-4 text-sm text-stone-500">
+              Ahorita estamos en pruebas con cafeterías reales, sin costo.
+            </p>
           </div>
-          <p className="mt-4 text-sm text-stone-500">
-            Ahorita estamos en pruebas con cafeterías reales, sin costo.
+
+          {/* Ticket real, generado con la misma función que imprime el sistema */}
+          <div className="mx-auto w-full max-w-[19rem] lg:mx-0">
+            <div className="rotate-1 rounded-lg bg-white p-4 shadow-xl ring-1 ring-stone-200">
+              <pre className="overflow-hidden whitespace-pre font-mono text-[10px] leading-[1.45] text-stone-700">
+                {TICKET_MUESTRA.join("\n")}
+              </pre>
+            </div>
+            <p className="mt-3 text-center text-xs text-stone-400">
+              Así sale el ticket de tu impresora térmica
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-6xl px-4 py-16">
+        {/* ── Lo que hace ───────────────────────────────────────── */}
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-stone-900">Todo lo que pide una cafetería</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-stone-600">
+            Nada de módulos que nunca vas a abrir. Esto es lo que el sistema hace hoy.
           </p>
         </div>
 
-        {/* Lo que hace */}
-        <div className="mt-16 space-y-5">
-          <Seccion
+        <div className="mt-10 grid gap-5 md:grid-cols-2">
+          <Bloque
             icon={Zap}
+            tono="amber"
             titulo="En el mostrador"
-            entrada="Pensado para cobrar con fila enfrente, no para llenar formularios."
+            entrada="Pensado para cobrar con fila enfrente."
             puntos={[
-              "Productos con tamaños y extras (tipo de leche, shot adicional) en dos toques.",
-              "Lo más vendido del mes aparece arriba, y cada categoría con su color para ubicarla de un vistazo.",
-              "Efectivo sin calculadora: teclado en pantalla, botones de $50/$100/$200 y el cambio calculado solo.",
-              "Propinas de 5, 10, 15 % o el monto que sea. Se cobran aparte y nunca se confunden con tu venta.",
-              "Descuentos que siempre piden motivo, para que después sepas por qué se dio.",
-              "Si se va el internet no pierdes la venta: se queda guardada y la cobras cuando vuelve, sin duplicarla.",
+              "Tamaños y extras (tipo de leche, shot adicional) en dos toques.",
+              "Lo más vendido del mes aparece arriba; cada categoría con su color.",
+              "Efectivo sin calculadora: teclado en pantalla y cambio automático.",
+              "Propinas de 5, 10, 15 % o monto libre, siempre aparte de tu venta.",
+              "Descuentos que piden motivo, para saber después por qué se dieron.",
+              "Si se va el internet, la venta en curso se guarda y la cobras al volver.",
             ]}
           />
-
-          <Seccion
+          <Bloque
             icon={Wallet}
+            tono="emerald"
             titulo="La caja cuadrada al cerrar"
-            entrada="El momento que más pleitos causa en una cafetería, resuelto paso a paso."
+            entrada="El momento que más pleitos causa, resuelto paso a paso."
             puntos={[
-              "Abres el turno con tu fondo y registras entradas y salidas de efectivo con su motivo.",
-              "Al cerrar ves el efectivo esperado contra el contado, y la diferencia marcada como cuadró, sobrante o faltante.",
-              "Las propinas cobradas en efectivo cuentan en el cajón, porque ahí están.",
-              "El corte se imprime y queda guardado; puedes reimprimir cualquiera después.",
-              "Un cajero solo cancela sus propias ventas mientras su caja siga abierta.",
+              "Abres turno con tu fondo; entradas y salidas quedan con su motivo.",
+              "Al cerrar: efectivo esperado contra contado, y la diferencia a la vista.",
+              "Las propinas en efectivo cuentan en el cajón, porque ahí están.",
+              "El corte se imprime y queda guardado para reimprimirlo cuando sea.",
+              "Un cajero solo cancela sus ventas mientras su caja siga abierta.",
             ]}
           />
-
-          <Seccion
-            icon={TrendingUp}
-            titulo="Saber cómo va el negocio"
-            entrada="La diferencia entre vender mucho y ganar dinero se ve aquí."
-            puntos={[
-              "Costo por producto y margen real: cuáles te dejan más y cuáles estás casi regalando.",
-              "Metas de venta diaria y mensual, con el avance y cuánto falta.",
-              "Hoy contra ayer y contra el mismo día de la semana pasada, a la misma hora.",
-              "Qué días y a qué horas vendes más, con mapa de calor por hora y día.",
-              "Desempeño por cajero, descuentos, cancelaciones y productos que nadie pide.",
-              "Cada lunes te llega por correo el resumen de la semana anterior.",
-              "Todo se exporta a Excel cuando lo necesitas.",
-            ]}
-          />
-
-          <Seccion
+          <Bloque
             icon={Users}
+            tono="indigo"
             titulo="Tu equipo, con los permisos justos"
             entrada="Cada quien ve lo suyo, y tú ves quién hizo qué."
             puntos={[
-              "Tus cajeros entran con usuario y contraseña. No necesitan correo ni instalar nada.",
-              "Tres roles: dueño, administrador y cajero. Un cajero no entra a tus reportes.",
+              "Tus cajeros entran con usuario y contraseña: no necesitan correo.",
+              "Tres roles: dueño, administrador y cajero.",
               "PIN de caja y bloqueo por inactividad, para que nadie cobre con la sesión de otro.",
               "Bitácora de cambios de precio, descuentos, cancelaciones y accesos.",
             ]}
           />
-
-          <Seccion
+          <Bloque
             icon={QrCode}
+            tono="rose"
             titulo="Tu menú en el celular del cliente"
             entrada="Un código QR en la mesa y listo."
             puntos={[
-              "Publicas tu carta con un clic y el sistema te da el QR listo para imprimir.",
-              "Cambias un precio y el menú se actualiza solo: el QR impreso nunca se reemplaza.",
-              "Muestra lo que verían en una carta; tus costos y tus ventas nunca salen de ahí.",
+              "Publicas tu carta con un clic y el sistema te da el QR para imprimir.",
+              "Cambias un precio y el menú se actualiza solo: el QR nunca se reemplaza.",
+              "Muestra lo que verían en una carta impresa; tus costos jamás salen de ahí.",
             ]}
           />
-
-          <Seccion
+          <Bloque
             icon={Store}
+            tono="teal"
             titulo="¿Más de una sucursal?"
-            entrada="Cada cafetería con su menú, sus precios, su caja y su equipo."
+            entrada="Cada cafetería con su menú, su caja y su equipo."
             puntos={[
               "Los números de una nunca se mezclan con los de otra.",
-              "Si administras varias, cambias entre ellas desde el mismo usuario.",
-              "Cada sucursal con su zona horaria, para que el corte del día cierre a la hora correcta.",
+              "Si administras varias, cambias entre ellas con el mismo usuario.",
+              "Cada una con su zona horaria, para que el corte cierre a la hora correcta.",
+            ]}
+          />
+          <Bloque
+            icon={ShieldCheck}
+            tono="blue"
+            titulo="Sin sustos"
+            entrada="Lo aburrido que agradeces cuando pasa algo."
+            puntos={[
+              "Copia de seguridad diaria y cifrada, sin que tengas que acordarte.",
+              "Cada venta se registra una sola vez, aunque el internet falle a medias.",
+              "Cancelar no borra: deja constancia de quién, cuándo y por qué.",
             ]}
           />
         </div>
 
-        {/* Requisitos */}
-        <section className="mt-12 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
+        {/* ── El diferenciador ──────────────────────────────────── */}
+        <section className="mt-16 overflow-hidden rounded-2xl border border-stone-800 bg-stone-900">
+          <div className="grid gap-8 p-8 sm:p-10 lg:grid-cols-2 lg:items-center">
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/15">
+                <TrendingUp className="h-5 w-5 text-emerald-400" />
+              </div>
+              <h2 className="mt-4 text-2xl font-bold text-white sm:text-3xl">
+                Vender mucho no es ganar dinero
+              </h2>
+              <p className="mt-3 text-stone-300">
+                El frappé de $75 se ve mejor que el espresso de $22 en cualquier reporte. Pero si uno te cuesta $38 de
+                insumos y el otro $6, el que sostiene tu negocio es el otro. Cafecito POS te dice cuál es cuál.
+              </p>
+              <ul className="mt-5 space-y-2.5">
+                {[
+                  "Margen real por producto, no solo cuánto vendiste.",
+                  "Qué se te está yendo con margen bajo, para subirle el precio o bajarle el costo.",
+                  "Metas del día y del mes, con cuánto llevas y cuánto falta.",
+                  "Hoy contra ayer y contra el mismo día de la semana pasada, a la misma hora.",
+                  "Cada lunes, el resumen de la semana en tu correo.",
+                ].map((p) => (
+                  <li key={p} className="flex gap-2.5 text-sm text-stone-200">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Muestra del panel */}
+            <div className="rounded-xl bg-stone-800/60 p-5 ring-1 ring-stone-700">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">Meta del mes</p>
+              <p className="mt-1 text-2xl font-bold text-white">
+                $38,400 <span className="text-base font-medium text-stone-400">/ $50,000</span>
+              </p>
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-700">
+                <div className="h-full w-[77%] rounded-full bg-emerald-500" />
+              </div>
+              <p className="mt-1.5 text-xs text-stone-400">77 % · faltan $11,600</p>
+
+              <div className="mt-6 space-y-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">Los que más dejan</p>
+                {[
+                  { n: "Latte · Grande", v: "$4,180", p: "70 %" },
+                  { n: "Espresso · Chico", v: "$2,940", p: "73 %" },
+                  { n: "Frappé · Grande", v: "$1,220", p: "38 %" },
+                ].map((r) => (
+                  <div key={r.n} className="flex items-center justify-between text-sm">
+                    <span className="text-stone-300">{r.n}</span>
+                    <span className="font-semibold text-white">
+                      {r.v} <span className="text-xs font-normal text-emerald-400">{r.p}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── En camino ─────────────────────────────────────────── */}
+        <section className="mt-16">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-stone-200">
+              <Hammer className="h-5 w-5 text-stone-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-stone-900">En qué estamos trabajando</h2>
+              <p className="text-sm text-stone-500">
+                El sistema se sigue construyendo con las cafeterías que ya lo usan. Esto viene en camino.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {[
+              {
+                icon: Boxes,
+                titulo: "Inventario",
+                texto:
+                  "Existencias de lo que se cuenta por pieza —pan, pasteles, botellas—, con descuento automático al vender, alertas de que se está acabando y registro de mermas.",
+              },
+              {
+                icon: Stamp,
+                titulo: "Lealtad de clientes",
+                texto:
+                  "Tarjeta de sellos digital: el cliente se identifica con su teléfono, junta sellos y a la décima va por cuenta de la casa. Sin plásticos que se pierden.",
+              },
+            ].map(({ icon: Icon, titulo, texto }) => (
+              <div key={titulo} className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6">
+                <div className="flex items-center gap-3">
+                  <Icon className="h-5 w-5 text-stone-500" />
+                  <h3 className="font-bold text-stone-800">{titulo}</h3>
+                  <span className="ml-auto rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-500">
+                    En desarrollo
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-stone-600">{texto}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-4 text-sm text-stone-500">
+            ¿Te falta algo que no está aquí?{" "}
+            <a href={`mailto:${CONTACTO}?subject=Sugerencia%20para%20Cafecito%20POS`} className="font-medium text-amber-700 underline underline-offset-2">
+              Dinos qué necesitas
+            </a>{" "}
+            — lo que piden las cafeterías es lo que se construye primero.
+          </p>
+        </section>
+
+        {/* ── Requisitos ────────────────────────────────────────── */}
+        <section className="mt-16 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
           <h2 className="text-xl font-bold text-stone-800">Funciona con lo que ya tienes</h2>
           <div className="mt-5 grid gap-5 sm:grid-cols-3">
             <div className="flex gap-3">
@@ -207,25 +386,27 @@ export function Landing() {
               </p>
             </div>
             <div className="flex gap-3">
-              <ShieldCheck className="h-5 w-5 shrink-0 text-amber-700" />
+              <Wallet className="h-5 w-5 shrink-0 text-amber-700" />
               <p className="text-sm text-stone-600">
-                <strong className="text-stone-800">Tus datos, respaldados.</strong> Copia de seguridad diaria y cifrada,
-                sin que tengas que hacer nada.
+                <strong className="text-stone-800">Tu terminal de siempre.</strong> Cobras la tarjeta con la que ya
+                usas; aquí solo se registra la venta.
               </p>
             </div>
           </div>
         </section>
 
-        {/* Cierre */}
-        <section className="mt-12 rounded-2xl bg-amber-700 px-6 py-10 text-center sm:px-8">
-          <h2 className="text-2xl font-bold text-white">¿Tienes una cafetería y quieres probarlo?</h2>
+        {/* ── Cierre ────────────────────────────────────────────── */}
+        <section className="mt-16 overflow-hidden rounded-2xl bg-amber-700 px-6 py-12 text-center sm:px-10">
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">
+            ¿Tienes una cafetería y quieres probarlo?
+          </h2>
           <p className="mx-auto mt-3 max-w-xl text-amber-50">
-            Estamos trabajando de la mano con unas cuantas cafeterías para afinarlo. Si te interesa entrar, escríbenos
-            y lo dejamos listo con tu menú y tus precios.
+            Estamos afinándolo junto a unas cuantas cafeterías. Si te interesa entrar, escríbenos y lo dejamos listo
+            con tu menú y tus precios.
           </p>
           <a
             href={`mailto:${CONTACTO}?subject=Quiero%20probar%20Cafecito%20POS`}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-amber-800 hover:bg-amber-50"
+            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-50"
           >
             <Mail className="h-4 w-4" />
             {CONTACTO}
@@ -234,15 +415,18 @@ export function Landing() {
       </main>
 
       <footer className="border-t border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-stone-500 sm:flex-row">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-stone-500 sm:flex-row">
           <p>Cafecito POS · Hecho en México para cafeterías</p>
-          <div className="flex gap-4">
+          <div className="flex gap-5">
             <Link href="/login" className="hover:text-amber-700">
               Entrar
             </Link>
             <Link href="/ayuda" className="hover:text-amber-700">
               Guía de uso
             </Link>
+            <a href={`mailto:${CONTACTO}`} className="hover:text-amber-700">
+              Contacto
+            </a>
           </div>
         </div>
       </footer>
