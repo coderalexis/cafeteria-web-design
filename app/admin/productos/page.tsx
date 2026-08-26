@@ -14,7 +14,7 @@ export default async function ProductosPage() {
       .select(
         `id, name, description, category_id, sort_order, is_active,
          menu_categories(id, name, slug),
-         menu_variants(id, name, size_label, price, sort_order, is_active),
+         menu_variants(id, name, size_label, price, cost, sort_order, is_active),
          product_modifier_groups(group_id)`
       )
       .order("sort_order"),
@@ -60,6 +60,7 @@ export default async function ProductosPage() {
         name: v.name,
         sizeLabel: v.size_label || "",
         price: v.price,
+        cost: v.cost,
         sortOrder: v.sort_order,
         isActive: v.is_active,
       })),

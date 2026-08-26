@@ -16,6 +16,8 @@ export interface TicketItemRecord {
   id: string
   quantity: number
   unitPrice: number
+  /** Costo unitario fotografiado al vender (0 = no se había capturado). */
+  unitCost: number
   lineTotal: number
   notes: string
   productName: string
@@ -52,7 +54,7 @@ export const TICKET_SELECT = `
   id, folio, payment_method, subtotal, discount_total, discount_reason, total, tip_amount, notes, created_at, cashier_id,
   status, cancelled_at, cancelled_by, cancel_reason, cash_received, change_due,
   ticket_items(
-    id, quantity, unit_price, line_total, notes, product_name, variant_name, size_label,
+    id, quantity, unit_price, unit_cost, line_total, notes, product_name, variant_name, size_label,
     ticket_item_modifiers(id, modifier_name, modifier_price)
   )
 ` as const
@@ -80,6 +82,7 @@ export interface TicketRow {
     id: string
     quantity: number
     unit_price: number
+    unit_cost: number
     line_total: number
     notes: string | null
     product_name: string
@@ -126,6 +129,7 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
       id: item.id,
       quantity: item.quantity,
       unitPrice: item.unit_price,
+      unitCost: item.unit_cost ?? 0,
       lineTotal: item.line_total,
       notes: item.notes || "",
       productName: item.product_name,

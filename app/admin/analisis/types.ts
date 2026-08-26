@@ -85,3 +85,34 @@ export const WEEKDAY_LONG: Record<number, string> = {
   6: "sábado",
   7: "domingo",
 }
+
+/** Forma del jsonb que devuelve el RPC margin_report (migración 16). */
+export interface MarginProduct {
+  product_name: string
+  variant_name: string
+  size_label: string | null
+  qty: number
+  revenue: number
+  cost?: number
+  margin: number
+  margin_pct: number
+  unit_cost?: number
+}
+
+export interface MarginReport {
+  from: string
+  to: string
+  totals: {
+    revenue: number
+    cost: number
+    margin: number
+    items_sold: number
+    margin_pct: number
+    /** Piezas vendidas de variantes sin costo capturado: inflan el margen. */
+    sold_without_cost: number
+  }
+  by_product: MarginProduct[]
+  losers: MarginProduct[]
+  missing_cost: Array<{ product_name: string; variant_name: string; price: number }>
+  priced_count: number
+}

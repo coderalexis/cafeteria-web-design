@@ -297,6 +297,12 @@ export default function AyudaPage() {
                 el botón <em>Ordenar</em> de cada categoría acomoda sus productos.
               </li>
               <li>
+                <strong>Costo</strong>: junto al precio de cada variante puedes capturar cuánto te cuesta prepararla
+                (leche, café, vaso). Con eso, <strong>Análisis</strong> te dice cuánto <em>ganas</em>, no solo cuánto
+                vendes: margen del periodo, qué productos dejan más y cuáles se venden con margen bajo. El costo se
+                guarda con cada venta, así que corregirlo hoy no altera los reportes de días pasados.
+              </li>
+              <li>
                 <strong>Precios en lote</strong> (en Productos): sube o baja los precios de una categoría o de todo el menú de
                 un jalón, por porcentaje o por monto, con redondeo al peso o a los 50 centavos. Muestra una vista previa antes
                 de aplicar y queda registrado en Actividad.
@@ -411,7 +417,7 @@ export default function AyudaPage() {
               </li>
               <li>
                 <strong>CSV</strong> descarga el detalle del periodo (se abre en Excel) con folio, fecha, cajero, método,
-                importes, descuento, propina y artículos.
+                importes, descuento, costo, margen, propina y artículos.
               </li>
             </ul>
           </Section>

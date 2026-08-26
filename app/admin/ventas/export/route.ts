@@ -14,6 +14,11 @@ import { parseVentasFilters } from "../params"
 
 const MAX_ROWS = 20_000
 
+/** Costo de lo vendido en un ticket (0 en lo que no tenía costo capturado). */
+function ticketCost(t: { items: Array<{ unitCost: number; quantity: number }> }): number {
+  return Math.round(t.items.reduce((sum, i) => sum + i.unitCost * i.quantity, 0) * 100) / 100
+}
+
 function csvCell(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return ""
   const s = String(value)
@@ -64,6 +69,8 @@ export async function GET(request: Request) {
     "Descuento",
     "Motivo descuento",
     "Total",
+    "Costo",
+    "Margen",
     "Propina",
     "Efectivo recibido",
     "Cambio",
@@ -87,6 +94,8 @@ export async function GET(request: Request) {
         t.discountTotal.toFixed(2),
         t.discountReason ?? "",
         t.total.toFixed(2),
+        ticketCost(t).toFixed(2),
+        (t.total - ticketCost(t)).toFixed(2),
         t.tip.toFixed(2),
         t.cashReceived != null ? t.cashReceived.toFixed(2) : "",
         t.changeDue != null ? t.changeDue.toFixed(2) : "",

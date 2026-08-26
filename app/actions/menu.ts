@@ -17,6 +17,15 @@ function revalidateAll() {
 // ese filtro silenciosamente.
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
+/** Costo del formulario: vacío = 0. Devuelve null si el valor es inválido. */
+function parseCost(raw: FormDataEntryValue | null): number | null {
+  const text = String(raw ?? "").trim()
+  if (!text) return 0
+  const n = Number(text)
+  if (!Number.isFinite(n) || n < 0) return null
+  return Math.round(n * 100) / 100
+}
+
 export async function createCategory(formData: FormData) {
   const { error: authError } = await requireAdmin()
   if (authError) return { error: authError }
@@ -131,10 +140,14 @@ export async function createVariant(formData: FormData) {
   const productId = String(formData.get("product_id") ?? "")
   const name = String(formData.get("name") ?? "")
   const price = Number(formData.get("price") ?? 0)
+  const cost = parseCost(formData.get("cost"))
   const sizeLabel = String(formData.get("size_label") ?? "")
 
   if (!productId || !name || !Number.isFinite(price) || price < 0) {
     return { error: "Producto, nombre y precio (mayor o igual a 0) son obligatorios." }
+  }
+  if (cost === null) {
+    return { error: "El costo debe ser un monto mayor o igual a 0." }
   }
 
   const supabase = await createClient()
@@ -142,13 +155,14 @@ export async function createVariant(formData: FormData) {
     product_id: productId,
     name,
     price,
+    cost,
     size_label: sizeLabel || null,
   })
 
   if (error) return { error: error.message }
 
   const { data: product } = await supabase.from("menu_products").select("name").eq("id", productId).maybeSingle()
-  await logAudit("variante.creada", `${product?.name ?? "?"} (${name})`, { precio: price })
+  await logAudit("variante.creada", `${product?.name ?? "?"} (${name})`, { precio: price, costo: cost })
   revalidateAll()
   return { success: true }
 }
@@ -160,10 +174,14 @@ export async function updateVariant(formData: FormData) {
   const id = String(formData.get("id") ?? "")
   const name = String(formData.get("name") ?? "")
   const price = Number(formData.get("price") ?? 0)
+  const cost = parseCost(formData.get("cost"))
   const sizeLabel = String(formData.get("size_label") ?? "")
 
   if (!id || !name || !Number.isFinite(price) || price < 0) {
     return { error: "ID, nombre y precio (mayor o igual a 0) son obligatorios." }
+  }
+  if (cost === null) {
+    return { error: "El costo debe ser un monto mayor o igual a 0." }
   }
 
   const supabase = await createClient()
@@ -171,13 +189,13 @@ export async function updateVariant(formData: FormData) {
   // Estado previo solo para la bitácora (cambios de precio).
   const { data: before } = await supabase
     .from("menu_variants")
-    .select("price, menu_products(name)")
+    .select("price, cost, menu_products(name)")
     .eq("id", id)
     .maybeSingle()
 
   const { error } = await supabase
     .from("menu_variants")
-    .update({ name, price, size_label: sizeLabel || null })
+    .update({ name, price, cost, size_label: sizeLabel || null })
     .eq("id", id)
 
   if (error) return { error: error.message }
@@ -187,6 +205,12 @@ export async function updateVariant(formData: FormData) {
     await logAudit("precio.cambiado", `${productName ?? "?"} (${name})`, {
       antes: Number(before.price),
       ahora: price,
+      costo: cost,
+    })
+  } else if (before && Number(before.cost) !== cost) {
+    await logAudit("costo.cambiado", `${productName ?? "?"} (${name})`, {
+      antes: Number(before.cost),
+      ahora: cost,
     })
   } else {
     await logAudit("variante.editada", `${productName ?? "?"} (${name})`)

@@ -450,6 +450,7 @@ export type Database = {
       menu_variants: {
         Row: {
           business_id: string
+          cost: number
           created_at: string
           id: string
           is_active: boolean
@@ -462,6 +463,7 @@ export type Database = {
         }
         Insert: {
           business_id?: string
+          cost?: number
           created_at?: string
           id?: string
           is_active?: boolean
@@ -474,6 +476,7 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          cost?: number
           created_at?: string
           id?: string
           is_active?: boolean
@@ -734,6 +737,7 @@ export type Database = {
           quantity: number
           size_label: string | null
           ticket_id: string
+          unit_cost: number
           unit_price: number
           variant_id: string | null
           variant_name: string
@@ -748,6 +752,7 @@ export type Database = {
           quantity: number
           size_label?: string | null
           ticket_id: string
+          unit_cost?: number
           unit_price: number
           variant_id?: string | null
           variant_name: string
@@ -762,6 +767,7 @@ export type Database = {
           quantity?: number
           size_label?: string | null
           ticket_id?: string
+          unit_cost?: number
           unit_price?: number
           variant_id?: string | null
           variant_name?: string
@@ -978,6 +984,10 @@ export type Database = {
         Returns: Json
       }
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
+      margin_report: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
       weekly_summary: {
         Args: { p_business_id: string; p_from: string; p_to: string }
         Returns: Json

@@ -12,6 +12,7 @@ import {
   toggleVariantActive,
 } from "@/app/actions/menu"
 import { setProductModifierGroups } from "@/app/actions/modifiers"
+import { formatCurrency } from "@/lib/format"
 import { ActionForm } from "@/components/action-form"
 import { BulkPricesButton, ReorderButton } from "./tools"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,7 @@ interface Variant {
   name: string
   sizeLabel: string
   price: number
+  cost: number
   sortOrder: number
   isActive: boolean
 }
@@ -90,6 +92,24 @@ interface ProductosClientProps {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
+/**
+ * Margen de una variante. Sin costo capturado NO decimos "100%": decimos que
+ * falta el costo, que es la verdad.
+ */
+function MarginHint({ price, cost }: { price: number; cost: number }) {
+  if (!cost) {
+    return <span className="text-[11px] text-stone-400">Sin costo → margen desconocido</span>
+  }
+  const margin = price - cost
+  const pct = price > 0 ? Math.round((margin / price) * 100) : 0
+  const tone = margin <= 0 ? "text-red-600" : pct < 40 ? "text-amber-700" : "text-emerald-700"
+  return (
+    <span className={`text-[11px] font-medium ${tone}`}>
+      Margen {formatCurrency(margin)} ({pct}%)
+    </span>
+  )
+}
+
 function getPriceDisplay(p: Product): string {
   if (p.variantCount === 0) return "Sin precio"
   if (p.minPrice === p.maxPrice) return `$${p.minPrice}`
@@ -568,7 +588,7 @@ function EditProductSheet({
                   {/* El form de eliminar vive FUERA del de editar (display:
                       contents mantiene el grid); anidarlos hacía que el botón
                       de borrar enviara el update */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     <ActionForm action={updateVariant} className="contents">
                     <input type="hidden" name="id" value={variant.id} />
                     <Input
@@ -599,6 +619,22 @@ function EditProductSheet({
                           className="text-sm pl-6 font-semibold"
                         />
                       </div>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-stone-400">$</span>
+                      <Input
+                        name="cost"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        defaultValue={variant.cost || ""}
+                        placeholder="Costo"
+                        title="Cuánto te cuesta prepararlo (insumos)"
+                        className="text-sm pl-6"
+                      />
+                    </div>
+                    <div className="col-span-2 flex items-center">
+                      <MarginHint price={variant.price} cost={variant.cost} />
                     </div>
                     <div className="col-span-2 flex">
                       <Button
@@ -656,8 +692,22 @@ function EditProductSheet({
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="0"
+                      placeholder="Precio"
                       required
+                      className="text-sm pl-6"
+                    />
+                  </div>
+                  <div className="relative flex-1">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-stone-400">
+                      $
+                    </span>
+                    <Input
+                      name="cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Costo"
+                      title="Cuánto te cuesta prepararlo (opcional)"
                       className="text-sm pl-6"
                     />
                   </div>

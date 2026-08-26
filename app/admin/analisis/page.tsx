@@ -4,7 +4,7 @@ import { getContext } from "@/lib/context"
 import { homePathFor } from "@/lib/context-shape"
 import { dateStringInTz, daysBetween, parseDateString, presetRange } from "@/lib/dates"
 import AnalisisClient from "./analisis-client"
-import type { SalesInsights } from "./types"
+import type { MarginReport, SalesInsights } from "./types"
 
 export const dynamic = "force-dynamic"
 
@@ -27,11 +27,15 @@ export default async function AnalisisPage({
   if (daysBetween(from, to) > 366) from = to
 
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc("sales_insights", { p_from: from, p_to: to })
+  const [{ data, error }, { data: marginData }] = await Promise.all([
+    supabase.rpc("sales_insights", { p_from: from, p_to: to }),
+    supabase.rpc("margin_report", { p_from: from, p_to: to }),
+  ])
 
   return (
     <AnalisisClient
       insights={(data as unknown as SalesInsights | null) ?? null}
+      margin={(marginData as unknown as MarginReport | null) ?? null}
       error={error?.message ?? null}
       from={from}
       to={to}

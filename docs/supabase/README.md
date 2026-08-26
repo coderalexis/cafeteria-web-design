@@ -50,6 +50,8 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 
 15. `15_p3_resumen.sql` — P3b: RPC `weekly_summary(p_business_id, p_from, p_to)` (solo `service_role`): agregado de una semana (ventas, propinas aparte, por día, top 5, por cajero, canceladas) para el correo del lunes. Lo consumen `/api/resumen-semanal` (cron de Vercel, lunes 14:00 UTC, requiere env `CRON_SECRET`) y el botón de `/super`; cada negocio puede apagarlo en Negocio → Resumen semanal (`settings.weekly_email`).
 
+16. `16_p4_costos.sql` — P4: `menu_variants.cost` (cuánto cuesta preparar cada variante) y `ticket_items.unit_cost` (**fotografía** del costo al vender, como `unit_price`: subir un costo hoy no debe mover el margen de meses cerrados). `create_ticket` pasa a v7 (misma firma) y guarda el costo; nuevo RPC `margin_report(p_from, p_to)` para owner|admin: venta, costo, margen y % del periodo, los productos que más dejan, los de margen bajo (<40 %) y **cuáles variantes activas no tienen costo capturado** (sin eso, un producto sin costo aparentaría 100 % de margen). Lo consume `/admin/analisis`.
+
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 
 Prueba de aislamiento entre negocios (impersonación con `set_config('request.jwt.claims', …)` + `set local role authenticated` en una transacción con rollback): usuario de A no ve menú/tickets/cajas/perfiles de B, `cash_session_summary(sesión de B)` → null, `cancel_ticket(ticket de B)` → "Ticket no encontrado.", `sales_report` solo agrega A, un insert de menú toma `business_id` de A por default y la FK compuesta rechaza padres de otro negocio.

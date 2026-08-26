@@ -12,6 +12,8 @@ import {
   ShoppingBag,
   Percent,
   HandCoins,
+  Coins,
+  TriangleAlert,
   Ban,
   Users,
   CalendarDays,
@@ -26,10 +28,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { formatDateString, type DateString } from "@/lib/dates"
-import { WEEKDAY_LABELS, WEEKDAY_LONG, type SalesInsights } from "./types"
+import { WEEKDAY_LABELS, WEEKDAY_LONG, type MarginReport, type SalesInsights } from "./types"
 
 interface Props {
   insights: SalesInsights | null
+  margin: MarginReport | null
   error: string | null
   from: DateString
   to: DateString
@@ -139,7 +142,7 @@ function heatColor(value: number, max: number): string {
 
 /* ────────────────────────────────────────────────────── component */
 
-export default function AnalisisClient({ insights, error, from, to, today, timezone }: Props) {
+export default function AnalisisClient({ insights, margin, error, from, to, today, timezone }: Props) {
   const weekdayData = useMemo(
     () =>
       (insights?.by_weekday ?? []).map((w) => ({
@@ -445,6 +448,142 @@ export default function AnalisisClient({ insights, error, from, to, today, timez
               )}
             </CardContent>
           </Card>
+
+          {/* ── Costos y margen ──────────────────────────────────── */}
+          {margin && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-emerald-700" />
+                  Costos y margen
+                </CardTitle>
+                <CardDescription>
+                  Cuánto queda después de pagar los insumos. Usa el costo con el que se vendió cada artículo, así que
+                  subir un costo hoy no cambia el margen de días ya cerrados.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-stone-200 p-3">
+                    <p className="text-xs text-stone-500">Ventas</p>
+                    <p className="text-xl font-bold text-stone-800">{formatCurrency(margin.totals.revenue)}</p>
+                  </div>
+                  <div className="rounded-lg border border-stone-200 p-3">
+                    <p className="text-xs text-stone-500">Costo de lo vendido</p>
+                    <p className="text-xl font-bold text-stone-800">{formatCurrency(margin.totals.cost)}</p>
+                  </div>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                    <p className="text-xs text-emerald-800">Margen bruto</p>
+                    <p className="text-xl font-bold text-emerald-800">
+                      {formatCurrency(margin.totals.margin)}{" "}
+                      <span className="text-sm font-medium">({margin.totals.margin_pct}%)</span>
+                    </p>
+                  </div>
+                </div>
+
+                {margin.missing_cost.length > 0 && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <TriangleAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">
+                        {margin.missing_cost.length} de {margin.priced_count} variantes no tienen costo capturado.
+                      </p>
+                      <p className="text-xs mt-0.5">
+                        El margen de arriba está inflado
+                        {margin.totals.sold_without_cost > 0
+                          ? ` (${margin.totals.sold_without_cost} pieza${margin.totals.sold_without_cost === 1 ? "" : "s"} vendida${margin.totals.sold_without_cost === 1 ? "" : "s"} sin costo)`
+                          : ""}
+                        . Captúralo en Productos:{" "}
+                        {margin.missing_cost
+                          .slice(0, 3)
+                          .map((m) => `${m.product_name} · ${m.variant_name}`)
+                          .join(", ")}
+                        {margin.missing_cost.length > 3 ? `, y ${margin.missing_cost.length - 3} más` : ""}.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {margin.by_product.length === 0 ? (
+                  <p className="text-sm text-stone-400 py-4 text-center">Sin ventas en el periodo.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-stone-50 text-xs text-stone-500">
+                        <tr>
+                          <th className="text-left font-medium px-4 py-2">Los que más dejan</th>
+                          <th className="text-right font-medium px-3 py-2">Uds</th>
+                          <th className="text-right font-medium px-3 py-2">Venta</th>
+                          <th className="text-right font-medium px-3 py-2">Costo</th>
+                          <th className="text-right font-medium px-4 py-2">Margen</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {margin.by_product.map((m, i) => {
+                          const label =
+                            m.variant_name && m.variant_name !== "Único"
+                              ? `${m.product_name} · ${m.variant_name}`
+                              : m.product_name
+                          const sinCosto = !m.unit_cost
+                          return (
+                            <tr key={`${label}-${i}`}>
+                              <td className="px-4 py-2 font-medium text-stone-800">{label}</td>
+                              <td className="px-3 py-2 text-right text-stone-700">{m.qty}</td>
+                              <td className="px-3 py-2 text-right text-stone-700">{formatCurrency(m.revenue)}</td>
+                              <td className="px-3 py-2 text-right text-stone-500">
+                                {sinCosto ? <span className="text-stone-300">—</span> : formatCurrency(m.cost ?? 0)}
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                {sinCosto ? (
+                                  <Badge variant="outline" className="border-amber-300 text-amber-800">
+                                    sin costo
+                                  </Badge>
+                                ) : (
+                                  <span className="font-semibold text-emerald-700">
+                                    {formatCurrency(m.margin)}{" "}
+                                    <span className="text-xs font-normal text-stone-500">({m.margin_pct}%)</span>
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {margin.losers.length > 0 && (
+                  <div className="rounded-lg border border-stone-200 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 mb-2">
+                      Margen bajo (menos del 40%)
+                    </p>
+                    <div className="space-y-1">
+                      {margin.losers.map((m, i) => {
+                        const label =
+                          m.variant_name && m.variant_name !== "Único"
+                            ? `${m.product_name} · ${m.variant_name}`
+                            : m.product_name
+                        return (
+                          <div key={`${label}-${i}`} className="flex items-center justify-between text-sm">
+                            <span className="text-stone-600 truncate">{label}</span>
+                            <span
+                              className={`font-medium ml-2 shrink-0 ${m.margin < 0 ? "text-red-600" : "text-amber-700"}`}
+                            >
+                              {formatCurrency(m.margin)} ({m.margin_pct}%)
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-stone-400 mt-2">
+                      Súbeles el precio o baja su costo; si son gancho para vender otra cosa, déjalos a propósito.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* ── Descuentos y cancelaciones ───────────────────────── */}
           <section className="grid gap-4 xl:grid-cols-2">
