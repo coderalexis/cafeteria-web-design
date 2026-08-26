@@ -52,6 +52,8 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 
 16. `16_p4_costos.sql` — P4: `menu_variants.cost` (cuánto cuesta preparar cada variante) y `ticket_items.unit_cost` (**fotografía** del costo al vender, como `unit_price`: subir un costo hoy no debe mover el margen de meses cerrados). `create_ticket` pasa a v7 (misma firma) y guarda el costo; nuevo RPC `margin_report(p_from, p_to)` para owner|admin: venta, costo, margen y % del periodo, los productos que más dejan, los de margen bajo (<40 %) y **cuáles variantes activas no tienen costo capturado** (sin eso, un producto sin costo aparentaría 100 % de margen). Lo consume `/admin/analisis`.
 
+17. `17_p4_menu_publico.sql` — P4: RPC `public_menu(p_slug)`, **el único con grant a `anon`** (la página `/menu/<slug>` no tiene sesión, así que no hay RLS que la cubra). Solo responde si `settings.public_menu = true`, el negocio está activo y no es plantilla; en cualquier otro caso devuelve null y la app da 404 sin distinguir "no existe" de "no publicado". Columnas explícitas: `menu_variants.cost` NUNCA sale de aquí.
+
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 
 Prueba de aislamiento entre negocios (impersonación con `set_config('request.jwt.claims', …)` + `set local role authenticated` en una transacción con rollback): usuario de A no ve menú/tickets/cajas/perfiles de B, `cash_session_summary(sesión de B)` → null, `cancel_ticket(ticket de B)` → "Ticket no encontrado.", `sales_report` solo agrega A, un insert de menú toma `business_id` de A por default y la FK compuesta rechaza padres de otro negocio.

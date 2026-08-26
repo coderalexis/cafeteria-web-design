@@ -15,6 +15,8 @@ export interface BusinessSettings {
   hideChecklist: boolean
   /** Resumen semanal por correo a dueños/administradores (lunes por la mañana). */
   weeklyEmail: boolean
+  /** Menú público en /menu/<slug> para el QR. Apagado hasta que el dueño lo active. */
+  publicMenu: boolean
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   monthlyGoal: null,
   hideChecklist: false,
   weeklyEmail: true,
+  publicMenu: false,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -46,6 +49,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     out.monthlyGoal = parseGoal(r.monthly_goal)
     out.hideChecklist = r.hide_checklist === true
     out.weeklyEmail = r.weekly_email !== false
+    out.publicMenu = r.public_menu === true
   }
   return out
 }
@@ -60,5 +64,6 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     monthly_goal: s.monthlyGoal,
     hide_checklist: s.hideChecklist,
     weekly_email: s.weeklyEmail,
+    public_menu: s.publicMenu,
   }
 }

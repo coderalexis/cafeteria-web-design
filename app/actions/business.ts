@@ -70,6 +70,7 @@ const settingsSchema = z.object({
     .transform((v) => parseGoal(v === "" ? null : v))
     .refine((v) => v === null || v >= 1, "La meta mensual debe ser un monto positivo."),
   weeklyEmail: z.enum(["on", "off"]).transform((v) => v === "on"),
+  publicMenu: z.enum(["on", "off"]).transform((v) => v === "on"),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -87,6 +88,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     dailyGoal: formData.get("daily_goal") ?? "",
     monthlyGoal: formData.get("monthly_goal") ?? "",
     weeklyEmail: formData.get("weekly_email") ?? "on",
+    publicMenu: formData.get("public_menu") ?? "off",
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -107,6 +109,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       dailyGoal: v.dailyGoal,
       monthlyGoal: v.monthlyGoal,
       weeklyEmail: v.weeklyEmail,
+      publicMenu: v.publicMenu,
     }),
   }
 
@@ -143,11 +146,14 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.lockMinutes !== v.lockMinutes) cambios.push("bloqueo por inactividad")
   if (prevSettings.dailyGoal !== v.dailyGoal || prevSettings.monthlyGoal !== v.monthlyGoal) cambios.push("metas de venta")
   if (prevSettings.weeklyEmail !== v.weeklyEmail) cambios.push("resumen semanal")
+  if (prevSettings.publicMenu !== v.publicMenu) cambios.push(v.publicMenu ? "menú público activado" : "menú público desactivado")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })
   }
 
   revalidatePath("/", "layout")
+  // El menú público se sirve estático: apagarlo o encenderlo debe verse ya.
+  revalidatePath(`/menu/${ctx.business.slug}`)
   return { success: true }
 }
 

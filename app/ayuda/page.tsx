@@ -356,6 +356,12 @@ export default function AyudaPage() {
                 pasada, a la misma hora.
               </li>
               <li>
+                <strong>Menú público con QR</strong>: activa «Publicar el menú» y el sistema te da un código QR para
+                imprimir y poner en las mesas. Quien lo escanee ve tu carta y tus precios en el celular, sin instalar
+                nada. Se actualiza solo cuando cambias precios o productos, así que el QR impreso nunca hay que
+                reemplazarlo. No muestra costos, ventas ni nada interno; los productos desactivados tampoco aparecen.
+              </li>
+              <li>
                 <strong>Resumen semanal por correo</strong>: cada lunes por la mañana llega a los correos de dueños y
                 administradores un resumen de la semana anterior (ventas, propinas, más vendidos, por cajero). Se puede
                 desactivar en Negocio.

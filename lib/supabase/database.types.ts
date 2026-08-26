@@ -984,6 +984,10 @@ export type Database = {
         Returns: Json
       }
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
+      public_menu: {
+        Args: { p_slug: string }
+        Returns: Json
+      }
       margin_report: {
         Args: { p_from: string; p_to: string }
         Returns: Json

@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target } from "lucide-react"
+import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target, QrCode } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings } from "@/lib/settings"
@@ -11,6 +11,7 @@ import { MEXICO_TIMEZONES, dateStringInTz } from "@/lib/dates"
 import { formatDateTime } from "@/lib/format"
 import { buildTicketLines } from "@/lib/receipt"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { MenuQrCard } from "./qr-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -273,6 +274,34 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-amber-700" />
+                Menú público (código QR)
+              </CardTitle>
+              <CardDescription>
+                Publica tu menú y precios en una página que cualquiera puede abrir con el QR, sin instalar nada. No
+                muestra tus costos ni tus ventas: solo lo que verían en una carta impresa.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <select
+                name="public_menu"
+                aria-label="Menú público"
+                defaultValue={currentSettings.publicMenu ? "on" : "off"}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="off">No publicar</option>
+                <option value="on">Publicar el menú</option>
+              </select>
+              <p className="text-xs text-stone-400">
+                Se publica en <code className="rounded bg-stone-100 px-1 py-0.5">/menu/{business.slug}</code>. Los
+                productos y variantes desactivados no aparecen.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
                 <Mail className="h-4 w-4 text-amber-700" />
                 Resumen semanal por correo
               </CardTitle>
@@ -330,8 +359,13 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
           </Button>
         </form>
 
-        {/* Vista previa del ticket */}
-        <div className="lg:sticky lg:top-6 h-fit">
+        {/* Vista previa del ticket + QR */}
+        <div className="lg:sticky lg:top-6 h-fit space-y-6">
+          <MenuQrCard
+            businessName={business.name}
+            slug={business.slug}
+            active={currentSettings.publicMenu}
+          />
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Vista previa del ticket</CardTitle>
