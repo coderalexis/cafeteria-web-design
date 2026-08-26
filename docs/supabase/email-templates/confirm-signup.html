@@ -1,0 +1,51 @@
+<!-- Plantilla para Supabase → Authentication → Emails → "Confirm signup".
+     Asunto sugerido: Confirma tu correo y abre tu cafetería — Cafecito POS
+
+     Lo importante es el ENLACE: usa {{ .TokenHash }} y apunta directo a
+     nuestro sitio, no al de Supabase. Así el correo se puede abrir en otro
+     dispositivo (quien se registra en la tablet del negocio suele abrir el
+     correo en su celular). El enlace de fábrica ({{ .ConfirmationURL }}) usa
+     PKCE y solo funciona en el mismo navegador donde se llenó el formulario. -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f4;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border:1px solid #e7e5e4;border-radius:12px;padding:32px;">
+        <tr>
+          <td align="center" style="padding-bottom:16px;">
+            <div style="font-size:28px;line-height:1;">☕</div>
+            <div style="font-size:18px;font-weight:bold;color:#292524;padding-top:8px;">Cafecito POS</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="color:#44403c;font-size:14px;line-height:1.6;">
+            <p style="margin:0 0 12px;">¡Bienvenida, bienvenido!</p>
+            <p style="margin:0 0 20px;">
+              Solo falta confirmar que este correo (<strong>{{ .Email }}</strong>) es tuyo.
+              Toca el botón y tu cafetería queda lista al instante, con un menú de ejemplo
+              para que empieces a cobrar.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:4px 0 20px;">
+            <a href="{{ .SiteURL }}/registro/confirmar?token_hash={{ .TokenHash }}&type=signup"
+               style="background:#b45309;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 28px;border-radius:10px;display:inline-block;">
+              Confirmar y abrir mi cafetería
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="color:#78716c;font-size:12px;line-height:1.6;">
+            <p style="margin:0 0 8px;">Tienes 7 días de prueba, sin tarjeta y sin compromiso.</p>
+            <p style="margin:0 0 8px;">
+              Si el botón no funciona, copia y pega esta dirección en tu navegador:<br />
+              <span style="word-break:break-all;color:#57534e;">{{ .SiteURL }}/registro/confirmar?token_hash={{ .TokenHash }}&type=signup</span>
+            </p>
+            <p style="margin:0;">Si tú no te registraste, ignora este correo: la cuenta no se activa sola.</p>
+          </td>
+        </tr>
+      </table>
+      <div style="color:#a8a29e;font-size:11px;padding-top:16px;">Cafecito POS · Sistema de punto de venta para cafeterías</div>
+    </td>
+  </tr>
+</table>
