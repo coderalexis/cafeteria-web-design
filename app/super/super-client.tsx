@@ -26,6 +26,7 @@ import {
 } from "@/app/actions/super"
 import { MEXICO_TIMEZONES } from "@/lib/dates"
 import { WeeklySummaryCard } from "./weekly-card"
+import { DeleteBusinessDialog } from "./delete-dialog"
 import { formatCurrency, formatDateTime } from "@/lib/format"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -210,6 +211,16 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
                 {suspended ? "Reactivar" : "Suspender"}
               </Button>
             )}
+            <DeleteBusinessDialog
+              business={{
+                id: b.id,
+                name: b.name,
+                slug: b.slug,
+                active_members: b.active_members,
+                tickets_30d: b.tickets_30d,
+              }}
+              onDeleted={() => router.refresh()}
+            />
           </div>
         </CardContent>
       </Card>

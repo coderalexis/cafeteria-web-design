@@ -984,6 +984,10 @@ export type Database = {
         Returns: Json
       }
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
+      delete_business: {
+        Args: { p_business_id: string; p_slug: string; p_actor?: string; p_actor_name?: string }
+        Returns: Json
+      }
       public_menu: {
         Args: { p_slug: string }
         Returns: Json

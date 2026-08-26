@@ -250,3 +250,70 @@ export async function runWeeklySummariesNow(input: {
   if (error) return { error }
   return { success: true, results }
 }
+
+/* ── Borrado real de una cafetería ────────────────────────────────── */
+
+export interface DeleteBusinessSummary {
+  tickets: number
+  ventas_total: number
+  cortes: number
+  categorias: number
+  productos: number
+  variantes: number
+  miembros: number
+  eventos_bitacora: number
+  era_plantilla: boolean
+}
+
+/**
+ * Borra una cafetería y TODO lo suyo. Irreversible: el RPC lo hace en una sola
+ * transacción y exige el slug como confirmación (si la UI mandara otro id, se
+ * detiene). Queda registro en `deleted_businesses`.
+ *
+ * Las cuentas que se quedan sin ninguna cafetería solo se borran si son
+ * sintéticas (cajeros); una persona con correo real se conserva, porque puede
+ * volver a otra cafetería y borrarla sería destruir de más.
+ */
+export async function deleteBusiness(input: {
+  businessId: string
+  slug: string
+}): Promise<ActionResult<{ summary: DeleteBusinessSummary; deletedUsers: number; keptUsers: number }>> {
+  const { ctx, error: authError } = await requireSuperAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+
+  if (!uuid.safeParse(input.businessId).success) return { error: "Cafetería inválida." }
+  const slug = normalizeSlug(String(input.slug ?? ""))
+  if (!slug) return { error: "Escribe el identificador de la cafetería para confirmar." }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc("delete_business", {
+    p_business_id: input.businessId,
+    p_slug: slug,
+    p_actor: ctx.userId,
+    p_actor_name: ctx.fullName,
+  })
+  if (error) return { error: error.message }
+
+  const result = data as unknown as {
+    summary: DeleteBusinessSummary
+    orphan_user_ids: string[]
+  }
+
+  // Limpieza de cuentas: solo las sintéticas que ya no pertenecen a ninguna parte.
+  let deletedUsers = 0
+  let keptUsers = 0
+  for (const userId of result.orphan_user_ids ?? []) {
+    const { data: userData } = await admin.auth.admin.getUserById(userId)
+    const email = userData?.user?.email
+    if (email && isSyntheticEmail(email)) {
+      const { error: delError } = await admin.auth.admin.deleteUser(userId)
+      if (delError) keptUsers += 1
+      else deletedUsers += 1
+    } else {
+      keptUsers += 1
+    }
+  }
+
+  revalidateSuper()
+  return { success: true, summary: result.summary, deletedUsers, keptUsers }
+}

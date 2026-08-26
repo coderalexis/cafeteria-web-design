@@ -54,6 +54,8 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 
 17. `17_p4_menu_publico.sql` — P4: RPC `public_menu(p_slug)`, **el único con grant a `anon`** (la página `/menu/<slug>` no tiene sesión, así que no hay RLS que la cubra). Solo responde si `settings.public_menu = true`, el negocio está activo y no es plantilla; en cualquier otro caso devuelve null y la app da 404 sin distinguir "no existe" de "no publicado". Columnas explícitas: `menu_variants.cost` NUNCA sale de aquí.
 
+18. `18_p4_borrar_cafeteria.sql` — P4: RPC `delete_business(p_business_id, p_slug, p_actor, p_actor_name)` (solo `service_role`): borra una cafetería y sus 15 tablas dependientes en UNA transacción (con `on delete restrict` en todas, un borrado parcial dejaría el negocio mutilado). Exige el slug como confirmación y lo verifica en el servidor. Registra en `deleted_businesses` (tabla sin políticas RLS, sobrevive al negocio) quién, cuándo y un resumen de lo borrado. NO toca `auth.users`: devuelve `orphan_user_ids` y la app borra solo las cuentas sintéticas de cajero, conservando a las personas con correo real. La suspensión sigue existiendo como opción reversible.
+
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 
 Prueba de aislamiento entre negocios (impersonación con `set_config('request.jwt.claims', …)` + `set local role authenticated` en una transacción con rollback): usuario de A no ve menú/tickets/cajas/perfiles de B, `cash_session_summary(sesión de B)` → null, `cancel_ticket(ticket de B)` → "Ticket no encontrado.", `sales_report` solo agrega A, un insert de menú toma `business_id` de A por default y la FK compuesta rechaza padres de otro negocio.
