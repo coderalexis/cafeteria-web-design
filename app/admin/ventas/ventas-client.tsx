@@ -232,7 +232,14 @@ export default function VentasClient({
         <StatCard
           label="Ingresos"
           value={formatCurrency(revenue)}
-          hint={totals && totals.cancelled_amount > 0 ? `${formatCurrency(totals.cancelled_amount)} en canceladas` : undefined}
+          hint={
+            [
+              totals && totals.cancelled_amount > 0 ? `${formatCurrency(totals.cancelled_amount)} en canceladas` : null,
+              totals && (totals.tips_total ?? 0) > 0 ? `+${formatCurrency(totals.tips_total)} en propinas` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
           icon={DollarSign}
           color="text-emerald-600"
           bg="bg-emerald-50"
@@ -361,7 +368,12 @@ export default function VentasClient({
                       <span className="text-stone-600 truncate">
                         {c.name} <span className="text-xs text-stone-400">({c.tickets})</span>
                       </span>
-                      <span className="font-medium text-stone-800 ml-2">{formatCurrency(c.revenue)}</span>
+                      <span className="font-medium text-stone-800 ml-2">
+                        {formatCurrency(c.revenue)}
+                        {(c.tips ?? 0) > 0 && (
+                          <span className="text-xs font-normal text-emerald-700"> +{formatCurrency(c.tips)}</span>
+                        )}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -651,6 +663,22 @@ export default function VentasClient({
                     {formatCurrency(selectedTicket.total)}
                   </p>
                 </div>
+
+                {/* Propina: se cobró encima del total, no cuenta como venta */}
+                {selectedTicket.tip > 0 && (
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center justify-between text-emerald-700">
+                      <p>Propina</p>
+                      <p>+{formatCurrency(selectedTicket.tip)}</p>
+                    </div>
+                    <div className="flex items-center justify-between text-stone-500">
+                      <p>Cobrado al cliente</p>
+                      <p className="font-medium text-stone-700">
+                        {formatCurrency(selectedTicket.total + selectedTicket.tip)}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Payment badge */}
                 <div className="flex items-center justify-between">

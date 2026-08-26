@@ -57,6 +57,7 @@ export default async function AdminDashboard() {
   const report = (reportData as unknown as SalesReport | null) ?? null
   const todaySales = report?.totals.revenue ?? 0
   const todayCount = report?.totals.tickets ?? 0
+  const todayTips = report?.totals.tips_total ?? 0
 
   /* ── Payment method breakdown ──────────────────────────────────── */
   const paymentBreakdown = {
@@ -176,6 +177,11 @@ export default async function AdminDashboard() {
               {todayCount} {todayCount === 1 ? "venta" : "ventas"} registradas
               hoy
             </p>
+            {todayTips > 0 && (
+              <p className="text-sm text-emerald-700 mt-1">
+                + {formatCurrency(todayTips)} en propinas (aparte de la venta)
+              </p>
+            )}
           </CardContent>
         </Card>
 

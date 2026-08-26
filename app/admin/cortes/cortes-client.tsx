@@ -26,6 +26,9 @@ export interface CashSessionRecord {
   closingNotes: string | null
   movementsIn: number
   movementsOut: number
+  /** Propinas del turno (no son venta; las de efectivo sí están en la caja). */
+  tipsTotal: number
+  tipsCash: number
 }
 
 function DifferenceBadge({ value }: { value: number | null }) {
@@ -145,6 +148,7 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                     <th className="text-left px-4 py-3 font-medium text-stone-500">Abrió / Cerró</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Fondo</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Efectivo vendido</th>
+                    <th className="text-right px-4 py-3 font-medium text-stone-500">Propinas</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Entradas / Salidas</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Esperado</th>
                     <th className="text-right px-4 py-3 font-medium text-stone-500">Contado</th>
@@ -154,8 +158,9 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                 </thead>
                 <tbody>
                   {closed.map((s) => {
-                    // esperado = fondo + efectivo vendido + entradas − salidas
-                    const cashSales = (s.expectedCash ?? 0) - s.openingFloat - s.movementsIn + s.movementsOut
+                    // esperado = fondo + efectivo vendido + propinas en efectivo + entradas − salidas
+                    const cashSales =
+                      (s.expectedCash ?? 0) - s.openingFloat - s.movementsIn + s.movementsOut - s.tipsCash
                     return (
                       <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-amber-50/40">
                         <td className="px-4 py-3 text-stone-700">
@@ -175,6 +180,13 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                         </td>
                         <td className="px-4 py-3 text-right text-stone-600">{formatCurrency(s.openingFloat)}</td>
                         <td className="px-4 py-3 text-right text-stone-600">{formatCurrency(cashSales)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {s.tipsTotal > 0 ? (
+                            <span className="text-emerald-700">{formatCurrency(s.tipsTotal)}</span>
+                          ) : (
+                            <span className="text-stone-300">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right text-xs">
                           {s.movementsIn === 0 && s.movementsOut === 0 ? (
                             <span className="text-stone-300">—</span>

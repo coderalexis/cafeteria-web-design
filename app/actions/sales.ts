@@ -41,6 +41,8 @@ const createTicketSchema = z.object({
   paymentMethod: z.enum(["efectivo", "transferencia", "tarjeta_clip"]),
   notes: z.string().trim().max(500).optional(),
   cashReceived: z.number().finite().nonnegative().max(9_999_999).optional(),
+  /** Propina: se cobra encima del total y no cuenta como venta. */
+  tip: z.number().finite().nonnegative().max(99_999).optional(),
   discount: discountSchema.optional(),
   items: z
     .array(
@@ -63,6 +65,7 @@ interface CreateTicketData {
   subtotal: number
   discountTotal: number
   total: number
+  tip: number
   cashReceived: number | null
   changeDue: number | null
 }
@@ -75,7 +78,7 @@ export async function createTicket(
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, discount } = parsed.data
+  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount } = parsed.data
 
   const businessError = await checkExpectedBusiness(expectedBusinessId)
   if (businessError) {
@@ -90,6 +93,7 @@ export async function createTicket(
     p_notes: notes,
     p_cash_received: paymentMethod === "efectivo" ? cashReceived : undefined,
     p_discount: discount,
+    p_tip: tip,
   })
 
   if (error) {
@@ -102,6 +106,7 @@ export async function createTicket(
     subtotal: number
     discount_total: number
     total: number
+    tip_amount: number | null
     cash_received: number | null
     change_due: number | null
   }
@@ -115,6 +120,7 @@ export async function createTicket(
     subtotal: ticket.subtotal,
     discountTotal: ticket.discount_total ?? 0,
     total: ticket.total,
+    tip: ticket.tip_amount ?? 0,
     cashReceived: ticket.cash_received ?? null,
     changeDue: ticket.change_due ?? null,
   }

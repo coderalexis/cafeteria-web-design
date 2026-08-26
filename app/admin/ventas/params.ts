@@ -74,6 +74,8 @@ export interface SalesReport {
     revenue: number
     avg_ticket: number
     discount_total: number
+    /** Propinas del periodo: se cobran aparte, no son ingreso de venta. */
+    tips_total: number
     items_sold: number
     cancelled_count: number
     cancelled_amount: number
@@ -81,6 +83,6 @@ export interface SalesReport {
   by_method: Array<{ method: string; tickets: number; revenue: number }>
   by_day: Array<{ day: DateString; tickets: number; revenue: number }>
   by_hour: Array<{ hour: number; tickets: number; revenue: number }>
-  by_cashier: Array<{ cashier_id: string; name: string; tickets: number; revenue: number }>
+  by_cashier: Array<{ cashier_id: string; name: string; tickets: number; revenue: number; tips: number }>
   top_products: Array<{ product_name: string; variant_name: string; size_label: string | null; qty: number; revenue: number }>
 }

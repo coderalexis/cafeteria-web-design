@@ -32,6 +32,8 @@ export interface TicketRecord {
   discountTotal: number
   discountReason: string | null
   total: number
+  /** Propina cobrada aparte del total (no es venta). */
+  tip: number
   notes: string
   createdAt: string
   cashierId: string
@@ -47,7 +49,7 @@ export interface TicketRecord {
 
 /** Columnas que necesita `serializeTicket`; usar en los `.select()`. */
 export const TICKET_SELECT = `
-  id, folio, payment_method, subtotal, discount_total, discount_reason, total, notes, created_at, cashier_id,
+  id, folio, payment_method, subtotal, discount_total, discount_reason, total, tip_amount, notes, created_at, cashier_id,
   status, cancelled_at, cancelled_by, cancel_reason, cash_received, change_due,
   ticket_items(
     id, quantity, unit_price, line_total, notes, product_name, variant_name, size_label,
@@ -64,6 +66,7 @@ export interface TicketRow {
   discount_total: number
   discount_reason: string | null
   total: number
+  tip_amount: number
   notes: string | null
   created_at: string
   cashier_id: string
@@ -108,6 +111,7 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
     discountTotal: row.discount_total ?? 0,
     discountReason: row.discount_reason ?? null,
     total: row.total,
+    tip: row.tip_amount ?? 0,
     notes: row.notes || "",
     createdAt: row.created_at,
     cashierId: row.cashier_id,

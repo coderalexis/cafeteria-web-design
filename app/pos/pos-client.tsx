@@ -37,6 +37,7 @@ import {
   UserCircle,
   Star,
   Share2,
+  HandCoins,
 } from "lucide-react"
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
@@ -114,6 +115,8 @@ interface CompletedSale {
   discountTotal: number
   discountReason: string | null
   total: number
+  /** Propina cobrada encima del total (no cuenta como venta). */
+  tip: number
   paymentMethod: PaymentMethod
   date: Date
   notes?: string
@@ -138,6 +141,10 @@ interface POSClientProps {
 }
 
 const CASH_QUICK_AMOUNTS = [50, 100, 200, 500]
+
+/** Opciones de propina: porcentaje del total, "sin propina" o monto libre. */
+type TipChoice = number | "otro"
+const TIP_OPTIONS: TipChoice[] = [0, 5, 10, 15, "otro"]
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -166,6 +173,7 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
     discountTotal: sale.discountTotal,
     discountReason: sale.discountReason,
     total: sale.total,
+    tip: sale.tip,
     cashReceived: sale.cashReceived,
     changeDue: sale.changeDue,
   }
@@ -286,6 +294,20 @@ function ReceiptView({ sale, onClose }: { sale: CompletedSale; onClose: () => vo
           <span className="text-xl font-bold text-stone-800">{formatCurrency(sale.total)}</span>
         </div>
 
+        {/* Propina (se cobró aparte de la venta) */}
+        {sale.tip > 0 && (
+          <div className="flex justify-between items-center text-sm border-t border-stone-100 pt-2">
+            <span className="text-stone-500">Propina</span>
+            <span className="text-emerald-700 font-semibold">+{formatCurrency(sale.tip)}</span>
+          </div>
+        )}
+        {sale.tip > 0 && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-stone-500">Cobrado</span>
+            <span className="text-lg font-bold text-stone-800">{formatCurrency(sale.total + sale.tip)}</span>
+          </div>
+        )}
+
         {/* Cambio (solo efectivo con monto recibido) */}
         {sale.paymentMethod === "efectivo" && sale.cashReceived != null && (
           <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 flex items-center justify-between">
@@ -369,6 +391,10 @@ export default function POSClient({
   const [showTickets, setShowTickets] = useState(false)
   const [showCashDialog, setShowCashDialog] = useState(false)
   const [showDiscount, setShowDiscount] = useState(false)
+  // La propina se elige al cobrar y NO se guarda con el carrito: una propina
+  // vieja restaurada de otra venta cobraría de más sin que nadie lo note.
+  const [tipChoice, setTipChoice] = useState<TipChoice>(0)
+  const [tipCustomInput, setTipCustomInput] = useState("")
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
@@ -432,10 +458,25 @@ export default function POSClient({
   // Un descuento fijo mayor al subtotal (p.ej. tras quitar artículos) no se puede cobrar
   const discountInvalid = discount !== null && discount.type === "amount" && discount.value > subtotal && subtotal > 0
 
+  // Propina: porcentaje sobre el total ya con descuento, o monto libre.
+  const tipAmount =
+    lines.length === 0
+      ? 0
+      : tipChoice === "otro"
+      ? Math.max(0, parseCash(tipCustomInput) ?? 0)
+      : Math.round(total * tipChoice) / 100
+  // Lo que el cliente paga: la venta más la propina.
+  const due = Math.round((total + tipAmount) * 100) / 100
+
+  const clearTip = useCallback(() => {
+    setTipChoice(0)
+    setTipCustomInput("")
+  }, [])
+
   // Efectivo recibido / cambio (solo aplica al pago en efectivo)
   const cashReceived = paymentMethod === "efectivo" ? parseCash(cashReceivedInput) : null
-  const changeDue = cashReceived !== null ? cashReceived - total : null
-  const cashInsufficient = cashReceived !== null && cashReceived < total
+  const changeDue = cashReceived !== null ? cashReceived - due : null
+  const cashInsufficient = cashReceived !== null && cashReceived < due
 
   const canCharge =
     lines.length > 0 && !isProcessing && !!openSession && !cashInsufficient && !discountInvalid
@@ -453,6 +494,7 @@ export default function POSClient({
         paymentMethod,
         notes: ticketNotes.trim() || undefined,
         cashReceived: cashReceived ?? undefined,
+        tip: tipAmount > 0 ? tipAmount : undefined,
         discount: discount ?? undefined,
         items: lines.map((line) => ({
           variant_id: getLineVariantId(line) ?? "",
@@ -471,13 +513,16 @@ export default function POSClient({
           discountTotal: result.discountTotal,
           discountReason: discount?.reason ?? null,
           total: result.total,
+          tip: result.tip,
           paymentMethod,
           date: new Date(),
           notes: ticketNotes.trim() || undefined,
           cashReceived: result.cashReceived,
           changeDue: result.changeDue,
         })
+        // El total del día son ventas: la propina no suma aquí.
         setTotalSales((prev) => prev + result.total)
+        clearTip()
         resetAfterSale()
         setCartOpen(false)
       } else {
@@ -493,7 +538,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, discount, lines, resetAfterSale])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, tipAmount, discount, lines, clearTip, resetAfterSale])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -870,6 +915,50 @@ export default function POSClient({
           })}
         </div>
 
+        {/* Propina: se cobra encima del total y no cuenta como venta */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-medium text-stone-500 shrink-0 flex items-center gap-1">
+            <HandCoins className="h-3.5 w-3.5" />
+            Propina
+          </span>
+          {TIP_OPTIONS.map((option) => {
+            const active = tipChoice === option
+            return (
+              <button
+                key={String(option)}
+                type="button"
+                disabled={lines.length === 0}
+                onClick={() => {
+                  setTipChoice(option)
+                  if (option !== "otro") setTipCustomInput("")
+                }}
+                className={`px-2.5 py-1 rounded-md border text-xs font-semibold transition-colors disabled:opacity-40 ${
+                  active
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-stone-200 bg-white text-stone-500 hover:border-emerald-300 hover:text-emerald-700"
+                }`}
+              >
+                {option === "otro" ? "Otro" : option === 0 ? "Sin" : `${option}%`}
+              </button>
+            )
+          })}
+          {tipChoice === "otro" && (
+            <Input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.5"
+              placeholder="$"
+              value={tipCustomInput}
+              onChange={(e) => setTipCustomInput(e.target.value)}
+              className="h-8 w-24 text-sm font-semibold"
+            />
+          )}
+          {tipAmount > 0 && (
+            <span className="ml-auto text-sm font-bold text-emerald-700">+{formatCurrency(tipAmount)}</span>
+          )}
+        </div>
+
         {/* Efectivo recibido + cambio */}
         {paymentMethod === "efectivo" && (
           <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
@@ -896,7 +985,7 @@ export default function POSClient({
                 }`}
               >
                 {cashInsufficient
-                  ? `Faltan ${formatCurrency(total - (cashReceived ?? 0))}`
+                  ? `Faltan ${formatCurrency(due - (cashReceived ?? 0))}`
                   : changeDue !== null
                   ? `Cambio ${formatCurrency(changeDue)}`
                   : "Cambio —"}
@@ -922,7 +1011,7 @@ export default function POSClient({
             <div className="flex gap-1.5">
               <button
                 type="button"
-                onClick={() => setCashReceivedInput(total > 0 ? String(total) : "")}
+                onClick={() => setCashReceivedInput(due > 0 ? String(due) : "")}
                 className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
               >
                 Exacto
@@ -933,7 +1022,7 @@ export default function POSClient({
                   type="button"
                   onClick={() => setCashReceivedInput(String(amount))}
                   className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
-                  disabled={amount < total}
+                  disabled={amount < due}
                 >
                   ${amount}
                 </button>
@@ -972,9 +1061,29 @@ export default function POSClient({
             )}
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-base font-medium text-stone-500">Total</span>
-            <span className="text-2xl font-bold text-stone-800">{formatCurrency(total)}</span>
+            <span className={tipAmount > 0 ? "text-sm text-stone-500" : "text-base font-medium text-stone-500"}>
+              Total
+            </span>
+            <span
+              className={
+                tipAmount > 0 ? "text-base font-semibold text-stone-700" : "text-2xl font-bold text-stone-800"
+              }
+            >
+              {formatCurrency(total)}
+            </span>
           </div>
+          {tipAmount > 0 && (
+            <>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-stone-500">Propina</span>
+                <span className="text-emerald-700">+{formatCurrency(tipAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-base font-medium text-stone-500">A cobrar</span>
+                <span className="text-2xl font-bold text-stone-800">{formatCurrency(due)}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Cobrar button / gate de caja */}
@@ -991,7 +1100,7 @@ export default function POSClient({
             disabled={!canCharge}
             onClick={finalizeSale}
           >
-            {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(total)} · ${paymentLabel(paymentMethod)}`}
+            {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
             <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
           </Button>
         ) : (
@@ -1425,6 +1534,7 @@ export default function POSClient({
               className="bg-red-600 hover:bg-red-700"
               onClick={() => {
                 clearCart()
+                clearTip()
                 setConfirmClear(false)
               }}
             >

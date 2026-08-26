@@ -8,6 +8,8 @@ export interface InsightTotals {
   avg_ticket: number
   items_sold: number
   discount_total: number
+  /** Propinas del periodo (se cobran aparte; no son ingreso de venta). */
+  tips_total: number
   cancelled_count: number
   cancelled_amount: number
 }
@@ -39,6 +41,7 @@ export interface SalesInsights {
     items_per_ticket: number
     discount_count: number
     discount_total: number
+    tips: number
     cancelled_count: number
     cancelled_amount: number
   }>

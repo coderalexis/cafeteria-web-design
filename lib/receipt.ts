@@ -101,6 +101,8 @@ export interface ReceiptData {
   discountTotal?: number
   discountReason?: string | null
   total: number
+  /** Propina: se cobra encima del total, no forma parte de la venta. */
+  tip?: number
   cashReceived?: number | null
   changeDue?: number | null
   status?: "completado" | "cancelado"
@@ -126,6 +128,7 @@ export function receiptFromTicket(ticket: TicketRecord, reprint = false): Receip
     discountTotal: ticket.discountTotal,
     discountReason: ticket.discountReason,
     total: ticket.total,
+    tip: ticket.tip,
     cashReceived: ticket.cashReceived,
     changeDue: ticket.changeDue,
     status: ticket.status,
@@ -165,6 +168,11 @@ export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[]
     if (r.discountReason) lines.push(`  (${r.discountReason})`)
   }
   lines.push(row("  TOTAL:", formatCurrency(r.total)))
+  const tip = r.tip ?? 0
+  if (tip > 0) {
+    lines.push(row("  Propina:", formatCurrency(tip)))
+    lines.push(row("  A COBRAR:", formatCurrency(r.total + tip)))
+  }
   if (r.paymentMethod === "efectivo" && r.cashReceived != null) {
     lines.push(row("  Recibido:", formatCurrency(r.cashReceived)))
     lines.push(row("  Cambio:", formatCurrency(r.changeDue ?? 0)))
@@ -200,6 +208,10 @@ export function buildShareText(r: ReceiptData, biz: ReceiptBusiness): string {
     lines.push(`Descuento: -${formatCurrency(r.discountTotal ?? 0)}`)
   }
   lines.push(`Total: ${formatCurrency(r.total)}`)
+  if ((r.tip ?? 0) > 0) {
+    lines.push(`Propina: ${formatCurrency(r.tip ?? 0)}`)
+    lines.push(`Total a cobrar: ${formatCurrency(r.total + (r.tip ?? 0))}`)
+  }
   lines.push(`Pago: ${paymentLabel(r.paymentMethod)}`)
   if (biz.phone) lines.push("", `Tel. ${biz.phone}`)
   lines.push("", biz.receiptFooter?.trim() || DEFAULT_FOOTER)
@@ -254,6 +266,9 @@ export interface CashSessionSummary {
   cancelled_amount: number
   /** Suma de descuentos del turno (lo agrega cash_session_summary desde Fase 3; opcional por compatibilidad). */
   discount_total?: number
+  /** Propinas del turno (P2): no son venta, pero las de efectivo sí están en la caja. */
+  tips_total?: number
+  cash_tips?: number
   /** Entradas/salidas de efectivo a mitad de turno (Fase 4b). */
   movements_in?: number
   movements_out?: number
@@ -291,6 +306,9 @@ export function buildCorteLines(s: CashSessionSummary, biz: ReceiptBusiness): st
   if ((s.discount_total ?? 0) > 0) {
     lines.push(row("Descuentos aplicados", `-${formatCurrency(s.discount_total ?? 0)}`))
   }
+  if ((s.tips_total ?? 0) > 0) {
+    lines.push(row("Propinas (aparte)", formatCurrency(s.tips_total ?? 0)))
+  }
   if (s.cancelled_count > 0) {
     lines.push(row(`Canceladas (${s.cancelled_count})`, formatCurrency(s.cancelled_amount)))
   }
@@ -306,9 +324,11 @@ export function buildCorteLines(s: CashSessionSummary, biz: ReceiptBusiness): st
   lines.push("", THIN, "EFECTIVO EN CAJA")
   lines.push(row("Fondo inicial", formatCurrency(s.opening_float)))
   lines.push(row("Ventas efectivo", formatCurrency(s.cash_sales)))
+  const cashTips = s.cash_tips ?? 0
+  if (cashTips > 0) lines.push(row("Propinas efectivo", `+${formatCurrency(cashTips)}`))
   if (movIn > 0) lines.push(row("Entradas", `+${formatCurrency(movIn)}`))
   if (movOut > 0) lines.push(row("Salidas", `-${formatCurrency(movOut)}`))
-  lines.push(row("Esperado", formatCurrency(s.expected_cash ?? s.opening_float + s.cash_sales + movIn - movOut)))
+  lines.push(row("Esperado", formatCurrency(s.expected_cash ?? s.opening_float + s.cash_sales + cashTips + movIn - movOut)))
   if (s.counted_cash != null) {
     lines.push(row("Contado", formatCurrency(s.counted_cash)))
     const diff = s.difference ?? 0

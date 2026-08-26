@@ -31,9 +31,28 @@ export default async function CortesPage() {
     else t.out += m.amount
   }
 
+  // Propinas por turno. Solo los tickets que llevan propina (la mayoría no),
+  // así la consulta sigue siendo chica aunque el historial sea largo.
+  const { data: tipRows } = sessionIds.length
+    ? await supabase
+        .from("tickets")
+        .select("session_id, tip_amount, payment_method")
+        .in("session_id", sessionIds)
+        .eq("status", "completado")
+        .gt("tip_amount", 0)
+    : { data: [] }
+  const tipTotals: Record<string, { total: number; cash: number }> = {}
+  for (const t of tipRows ?? []) {
+    const acc = (tipTotals[t.session_id] ??= { total: 0, cash: 0 })
+    acc.total += t.tip_amount
+    if (t.payment_method === "efectivo") acc.cash += t.tip_amount
+  }
+
   const serialized: CashSessionRecord[] = (sessions ?? []).map((s) => ({
     movementsIn: movementTotals[s.id]?.in ?? 0,
     movementsOut: movementTotals[s.id]?.out ?? 0,
+    tipsTotal: tipTotals[s.id]?.total ?? 0,
+    tipsCash: tipTotals[s.id]?.cash ?? 0,
     id: s.id,
     status: s.status === "abierta" ? "abierta" : "cerrada",
     openedAt: s.opened_at,

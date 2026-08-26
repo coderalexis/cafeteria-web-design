@@ -11,6 +11,7 @@ import {
   DollarSign,
   ShoppingBag,
   Percent,
+  HandCoins,
   Ban,
   Users,
   CalendarDays,
@@ -261,7 +262,16 @@ export default function AnalisisClient({ insights, error, from, to, today, timez
                 bg="bg-violet-100"
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <KpiCard
+                label="Propinas"
+                value={formatCurrency(insights.current.tips_total ?? 0)}
+                current={insights.current.tips_total ?? 0}
+                previous={insights.previous.tips_total ?? 0}
+                icon={HandCoins}
+                color="text-emerald-700"
+                bg="bg-emerald-100"
+              />
               <KpiCard
                 label="Descuentos aplicados"
                 value={formatCurrency(insights.current.discount_total)}
@@ -406,6 +416,7 @@ export default function AnalisisClient({ insights, error, from, to, today, timez
                       <th className="text-right font-medium px-3 py-2">Ingresos</th>
                       <th className="text-right font-medium px-3 py-2">Ticket prom.</th>
                       <th className="text-right font-medium px-3 py-2">Art./ticket</th>
+                      <th className="text-right font-medium px-3 py-2">Propinas</th>
                       <th className="text-right font-medium px-3 py-2">Descuentos</th>
                       <th className="text-right font-medium px-4 py-2">Canceladas</th>
                     </tr>
@@ -418,6 +429,9 @@ export default function AnalisisClient({ insights, error, from, to, today, timez
                         <td className="px-3 py-2 text-right font-semibold text-stone-800">{formatCurrency(c.revenue)}</td>
                         <td className="px-3 py-2 text-right text-stone-700">{formatCurrency(c.avg_ticket)}</td>
                         <td className="px-3 py-2 text-right text-stone-700">{c.items_per_ticket}</td>
+                        <td className="px-3 py-2 text-right text-emerald-700">
+                          {(c.tips ?? 0) > 0 ? formatCurrency(c.tips) : <span className="text-stone-300">—</span>}
+                        </td>
                         <td className="px-3 py-2 text-right text-stone-700">
                           {c.discount_count > 0 ? `${c.discount_count} · ${formatCurrency(c.discount_total)}` : "—"}
                         </td>

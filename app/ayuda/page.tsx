@@ -93,7 +93,7 @@ export default function AyudaPage() {
             {[
               ["#entrar", "Entrar"],
               ["#cajero", "Cajero"],
-              ["#efectivo", "Efectivo y cambio"],
+              ["#efectivo", "Efectivo, propinas y descuentos"],
               ["#cancelar", "Cancelar / reimprimir"],
               ["#corte", "Corte de caja"],
               ["#atajos", "Atajos"],
@@ -151,7 +151,8 @@ export default function AyudaPage() {
                 los métodos de pago.
               </Step>
               <Step n={4} title="Elige método de pago y cobra">
-                Efectivo, Transferencia o Tarjeta. Pulsa <strong>Cobrar</strong>. Aparece el ticket registrado con su{" "}
+                Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, tócala antes de cobrar
+                (5 %, 10 %, 15 % u <em>Otro</em> monto). Pulsa <strong>Cobrar</strong>. Aparece el ticket registrado con su{" "}
                 <strong>folio</strong>; desde ahí imprimes el <strong>Ticket</strong> para el cliente y la <strong>Comanda</strong>{" "}
                 (sin precios) para quien prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp (o lo copia para
                 pegarlo donde quieras), útil cuando no hay impresora.
@@ -163,12 +164,18 @@ export default function AyudaPage() {
             </ol>
           </Section>
 
-          <Section id="efectivo" icon={Wallet} title="Efectivo, cambio y descuentos">
+          <Section id="efectivo" icon={Wallet} title="Efectivo, propinas y descuentos">
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
                 Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>: escribe lo que te dio el cliente con el
                 teclado numérico en pantalla (o usa los botones $50/$100/$200/$500) y el sistema muestra el <strong>cambio</strong>.
                 Si es menor que el total, no deja cobrar. <strong>C</strong> borra lo escrito.
+              </li>
+              <li>
+                <strong>Propina</strong>: se cobra <strong>encima</strong> del total (el botón dirá «Cobrar» con la suma). Los
+                porcentajes se calculan sobre el total ya con descuento, o escribe el monto con <em>Otro</em>. La propina{" "}
+                <strong>no cuenta como venta</strong>: no entra en los ingresos ni en el ticket promedio, se reporta aparte.
+                Se elige en cada venta y no se queda guardada para la siguiente.
               </li>
               <li>
                 <strong>Descuento</strong> (<Percent className="inline h-3.5 w-3.5 align-text-bottom" /> junto al total): puede
@@ -198,7 +205,8 @@ export default function AyudaPage() {
             <ol className="space-y-3">
               <Step n={1} title="Toca el botón verde «Caja abierta»">
                 Verás las ventas del turno por método de pago y el <strong>efectivo esperado</strong> = fondo inicial +
-                ventas en efectivo + entradas − salidas (las canceladas no cuentan).
+                ventas en efectivo + <strong>propinas cobradas en efectivo</strong> + entradas − salidas (las canceladas no
+                cuentan). Las propinas se listan aparte de las ventas.
               </Step>
               <Step n={2} title="Registra entradas y salidas de efectivo (si las hubo)">
                 En esa misma ventana, <strong>Entrada</strong> (metiste efectivo, ej. cambio en monedas) o{" "}
@@ -315,7 +323,7 @@ export default function AyudaPage() {
                 horas muertas.
               </li>
               <li>
-                <strong>Por cajero</strong>: ventas, ticket promedio, artículos por ticket, descuentos y cancelaciones de cada
+                <strong>Por cajero</strong>: ventas, ticket promedio, artículos por ticket, propinas, descuentos y cancelaciones de cada
                 quien. <strong>Descuentos y cancelaciones</strong> por motivo y por quién los aplicó.
               </li>
               <li>
@@ -380,7 +388,7 @@ export default function AyudaPage() {
               </li>
               <li>
                 <strong>CSV</strong> descarga el detalle del periodo (se abre en Excel) con folio, fecha, cajero, método,
-                importes, descuento y artículos.
+                importes, descuento, propina y artículos.
               </li>
             </ul>
           </Section>
@@ -389,7 +397,7 @@ export default function AyudaPage() {
             <ul className="space-y-2 text-sm text-stone-600">
               <li>
                 <strong>Cortes de caja</strong> muestra el estado actual de la caja y el historial de turnos: fondo, efectivo
-                vendido, esperado, contado y <strong>diferencia</strong> (verde cuadró, azul sobrante, rojo faltante). Cada corte se
+                vendido, propinas, esperado, contado y <strong>diferencia</strong> (verde cuadró, azul sobrante, rojo faltante). Cada corte se
                 puede reimprimir; con la caja abierta puedes imprimir un corte parcial.
               </li>
             </ul>

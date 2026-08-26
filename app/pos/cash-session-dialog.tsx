@@ -186,7 +186,10 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
 
   const movIn = summary?.movements_in ?? 0
   const movOut = summary?.movements_out ?? 0
-  const expected = summary ? summary.opening_float + summary.cash_sales + movIn - movOut : null
+  // Las propinas no son venta, pero las que se pagaron en efectivo sí están
+  // físicamente en la caja: cuentan para el esperado (igual que en el RPC).
+  const cashTips = summary?.cash_tips ?? 0
+  const expected = summary ? summary.opening_float + summary.cash_sales + cashTips + movIn - movOut : null
   const counted = parseMoney(countedValue)
   const difference = expected !== null && counted !== null ? counted - expected : null
 
@@ -287,6 +290,12 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
               <span className="text-stone-700">Total ventas ({summary.tickets_count})</span>
               <span className="text-stone-900">{formatCurrency(summary.revenue)}</span>
             </div>
+            {(summary.tips_total ?? 0) > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>Propinas (aparte de la venta)</span>
+                <span>{formatCurrency(summary.tips_total ?? 0)}</span>
+              </div>
+            )}
           </div>
 
           {/* Movimientos de efectivo del turno */}
@@ -399,6 +408,12 @@ function CloseSessionForm({ session, onDone }: { session: OpenSession; onDone: (
               <span>+ Ventas en efectivo</span>
               <span>{formatCurrency(summary.cash_sales)}</span>
             </div>
+            {cashTips > 0 && (
+              <div className="flex justify-between text-stone-600">
+                <span>+ Propinas en efectivo</span>
+                <span>{formatCurrency(cashTips)}</span>
+              </div>
+            )}
             {movIn > 0 && (
               <div className="flex justify-between text-emerald-700">
                 <span>+ Entradas</span>
