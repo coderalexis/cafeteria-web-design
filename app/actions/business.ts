@@ -73,6 +73,7 @@ const settingsSchema = z.object({
   publicMenu: z.enum(["on", "off"]).transform((v) => v === "on"),
   autoPrint: z.enum(["none", "ticket", "comanda", "both"]),
   parkedOrders: z.enum(["on", "off"]).transform((v) => v === "on"),
+  discountMaxCashier: z.number().int().min(0).max(100),
 })
 
 export async function updateBusinessSettings(formData: FormData): Promise<ActionResult> {
@@ -93,6 +94,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     publicMenu: formData.get("public_menu") ?? "off",
     autoPrint: formData.get("auto_print") ?? "none",
     parkedOrders: formData.get("parked_orders") ?? "on",
+    discountMaxCashier: Number(formData.get("discount_max_cashier") ?? 100),
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -116,6 +118,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       publicMenu: v.publicMenu,
       autoPrint: v.autoPrint,
       parkedOrders: v.parkedOrders,
+      discountMaxCashier: v.discountMaxCashier,
     }),
   }
 
@@ -155,6 +158,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.publicMenu !== v.publicMenu) cambios.push(v.publicMenu ? "menú público activado" : "menú público desactivado")
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")
   if (prevSettings.parkedOrders !== v.parkedOrders) cambios.push("módulo de pedidos en espera")
+  if (prevSettings.discountMaxCashier !== v.discountMaxCashier) cambios.push("límite de descuento en caja")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })
   }

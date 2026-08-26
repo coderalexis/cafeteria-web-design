@@ -250,7 +250,8 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               <strong>Descuento</strong> (<Percent className="inline h-3.5 w-3.5 align-text-bottom" /> junto al total):
               porcentaje o monto fijo, y <strong>siempre pide un motivo</strong>; queda registrado en el ticket y en los
-              reportes.
+              reportes. El dueño puede poner un <strong>tope para caja</strong> (por ejemplo, hasta 10 %): si necesitas
+              más, lo aplica un administrador.
             </li>
           </ul>
         </>
@@ -483,7 +484,8 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
-              <strong>Pedidos en espera</strong>. Lo que no usa tu cafetería no le estorba a quien cobra.
+              <strong>Pedidos en espera</strong>, y define el <strong>descuento máximo en caja</strong> (dueños y
+              administradores no tienen tope). Ese límite se aplica en el servidor, no solo en la pantalla.
             </li>
             <li>
               <strong>Impresión al cobrar</strong>: elige qué imprimir en automático al registrar cada venta (ticket,

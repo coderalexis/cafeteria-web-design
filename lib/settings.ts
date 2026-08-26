@@ -21,6 +21,12 @@ export interface BusinessSettings {
   autoPrint: "none" | "ticket" | "comanda" | "both"
   /** Módulo del POS: guardar pedidos a medias y retomarlos. */
   parkedOrders: boolean
+  /**
+   * Descuento máximo (%) que puede aplicar un cajero. 0 = solo administradores,
+   * 100 = sin límite. Dueños y administradores nunca tienen techo. Lo valida el
+   * RPC, no solo la pantalla.
+   */
+  discountMaxCashier: number
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -34,6 +40,8 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   // Encendido por defecto: no asume hardware ni expone datos, y le sirve a
   // cualquier cafetería con fila.
   parkedOrders: true,
+  // 100 = como se comportaba antes de existir el ajuste.
+  discountMaxCashier: 100,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -62,6 +70,10 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
       out.autoPrint = r.auto_print
     }
     out.parkedOrders = r.parked_orders !== false
+    const tope = Number(r.discount_max_cashier)
+    if (Number.isFinite(tope) && tope >= 0 && tope <= 100) {
+      out.discountMaxCashier = Math.round(tope)
+    }
   }
   return out
 }
@@ -79,5 +91,6 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     public_menu: s.publicMenu,
     auto_print: s.autoPrint,
     parked_orders: s.parkedOrders,
+    discount_max_cashier: s.discountMaxCashier,
   }
 }

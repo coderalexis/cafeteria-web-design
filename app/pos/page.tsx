@@ -143,6 +143,7 @@ export default async function POSPage() {
       lockMinutes={settings.lockMinutes}
       autoPrint={settings.autoPrint}
       parkedOrders={settings.parkedOrders}
+      discountMaxCashier={settings.discountMaxCashier}
       hasPin={pinSet === true}
       favoriteVariantIds={(topVariants ?? []).map((t) => t.variant_id).filter((id): id is string => !!id)}
       initialTotalSales={dbTotalSales}

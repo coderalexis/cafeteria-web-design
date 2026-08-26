@@ -25,6 +25,7 @@ import {
   type PlatformBusiness,
 } from "@/app/actions/super"
 import { MEXICO_TIMEZONES } from "@/lib/dates"
+import { PRESETS } from "@/lib/presets"
 import { WeeklySummaryCard } from "./weekly-card"
 import { DeleteBusinessDialog } from "./delete-dialog"
 import { formatCurrency, formatDateTime } from "@/lib/format"
@@ -351,6 +352,30 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
               <input type="checkbox" name="clone_template" defaultChecked={hasTemplate} disabled={!hasTemplate} className="h-4 w-4" />
               Copiar el menú de la plantilla {hasTemplate ? "" : "(no hay plantilla)"}
             </label>
+
+            {/* Modo de operación: preconfigura los módulos del POS */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-stone-700">¿Cómo opera?</p>
+              {PRESETS.map((preset, i) => (
+                <label
+                  key={preset.key}
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-stone-200 p-2.5 hover:border-amber-300"
+                >
+                  <input
+                    type="radio"
+                    name="preset"
+                    value={preset.key}
+                    defaultChecked={i === 0}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-stone-800">{preset.label}</span>
+                    <span className="block text-xs text-stone-500">{preset.hint}</span>
+                  </span>
+                </label>
+              ))}
+              <p className="text-xs text-stone-400">Todo esto se puede cambiar después en Negocio.</p>
+            </div>
 
             <div className="rounded-lg border border-stone-200 p-3 space-y-3">
               <p className="text-sm font-medium text-stone-700">Dueño</p>

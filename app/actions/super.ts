@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server"
 import { requireSuperAdmin } from "@/lib/context"
 import { generateTempPassword, isSyntheticEmail, normalizeSlug, SLUG_PATTERN } from "@/lib/accounts"
 import { isValidTimeZone } from "@/lib/dates"
+import { presetByKey } from "@/lib/presets"
+import { serializeBusinessSettings, DEFAULT_SETTINGS } from "@/lib/settings"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -69,6 +71,7 @@ const createSchema = z.object({
     .refine((s) => SLUG_PATTERN.test(s) && s.length >= 3, "Identificador inválido: 3+ caracteres, minúsculas, números y guiones."),
   timezone: z.string().trim().refine(isValidTimeZone, "Zona horaria no reconocida."),
   cloneTemplate: z.boolean(),
+  preset: z.string().trim(),
   ownerEmail: z.string().trim().toLowerCase().email("Correo del dueño inválido."),
   ownerName: z.string().trim().max(80),
 })
@@ -89,6 +92,7 @@ export async function createBusiness(
     slug: String(formData.get("slug") ?? "") || slugify(rawName),
     timezone: String(formData.get("timezone") ?? "America/Mexico_City"),
     cloneTemplate: String(formData.get("clone_template") ?? "") === "on",
+    preset: String(formData.get("preset") ?? ""),
     ownerEmail: String(formData.get("owner_email") ?? ""),
     ownerName: String(formData.get("owner_name") ?? ""),
   })
@@ -136,7 +140,18 @@ export async function createBusiness(
   // 2) Negocio
   const { data: biz, error: bizError } = await admin
     .from("businesses")
-    .insert({ name: v.name, slug: v.slug, timezone: v.timezone, created_by: ctx.userId })
+    .insert({
+      name: v.name,
+      slug: v.slug,
+      timezone: v.timezone,
+      created_by: ctx.userId,
+      // El modo de operación deja los módulos preconfigurados; el dueño los
+      // afina después en Negocio.
+      settings: serializeBusinessSettings({
+        ...DEFAULT_SETTINGS,
+        ...(presetByKey(v.preset)?.settings ?? {}),
+      }) as never,
+    })
     .select("id")
     .single()
   if (bizError || !biz) {

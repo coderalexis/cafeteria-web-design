@@ -149,6 +149,8 @@ interface POSClientProps {
   autoPrint: "none" | "ticket" | "comanda" | "both"
   /** Módulo de pedidos en espera activado para esta cafetería. */
   parkedOrders: boolean
+  /** Techo de descuento en % para cajeros (100 = sin límite). */
+  discountMaxCashier: number
   initialTotalSales: number
   openSession: OpenSession | null
 }
@@ -432,6 +434,7 @@ export default function POSClient({
   favoriteVariantIds,
   autoPrint,
   parkedOrders: parkedEnabled,
+  discountMaxCashier,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
@@ -1879,6 +1882,7 @@ export default function POSClient({
         onOpenChange={setShowDiscount}
         subtotal={subtotal}
         current={discount}
+        maxPercent={isAdmin ? 100 : discountMaxCashier}
         onApply={setDiscount}
       />
 

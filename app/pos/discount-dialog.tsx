@@ -20,6 +20,8 @@ interface Props {
   onOpenChange: (open: boolean) => void
   subtotal: number
   current: TicketDiscount | null
+  /** Techo en % de quien está cobrando (100 = sin límite). */
+  maxPercent: number
   onApply: (discount: TicketDiscount | null) => void
 }
 
@@ -30,7 +32,7 @@ function parseAmount(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : n
 }
 
-export function DiscountDialog({ open, onOpenChange, subtotal, current, onApply }: Props) {
+export function DiscountDialog({ open, onOpenChange, subtotal, current, maxPercent, onApply }: Props) {
   const [type, setType] = useState<"percent" | "amount">("percent")
   const [value, setValue] = useState("")
   const [reason, setReason] = useState("")
@@ -45,13 +47,24 @@ export function DiscountDialog({ open, onOpenChange, subtotal, current, onApply 
 
   const numeric = parseAmount(value)
   const tooBig = numeric !== null && (type === "percent" ? numeric > 100 : numeric > subtotal)
+  // El monto fijo se compara por su porcentaje equivalente: si no, bastaría
+  // cambiar de pestaña para saltarse el tope (el servidor hace lo mismo).
+  const pctPedido =
+    numeric === null || tooBig
+      ? 0
+      : type === "percent"
+      ? numeric
+      : subtotal > 0
+      ? (numeric * 100) / subtotal
+      : 0
+  const overCap = maxPercent < 100 && pctPedido > maxPercent + 0.001
   const preview =
     numeric !== null && !tooBig
       ? type === "percent"
         ? Math.round(subtotal * numeric) / 100
         : Math.round(numeric * 100) / 100
       : null
-  const canApply = numeric !== null && !tooBig && reason.trim().length >= 3
+  const canApply = numeric !== null && !tooBig && !overCap && reason.trim().length >= 3
 
   const apply = () => {
     if (!canApply || numeric === null) return
@@ -115,7 +128,7 @@ export function DiscountDialog({ open, onOpenChange, subtotal, current, onApply 
             </div>
             {type === "percent" && (
               <div className="flex gap-2">
-                {PERCENT_PRESETS.map((p) => (
+                {PERCENT_PRESETS.filter((p) => maxPercent >= 100 || p <= maxPercent).map((p) => (
                   <Button
                     key={p}
                     type="button"
@@ -132,6 +145,15 @@ export function DiscountDialog({ open, onOpenChange, subtotal, current, onApply 
             {tooBig && (
               <p className="text-xs text-red-600">
                 {type === "percent" ? "El porcentaje no puede pasar de 100." : "El monto no puede ser mayor que el subtotal."}
+              </p>
+            )}
+            {overCap && !tooBig && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  En caja puedes descontar hasta <strong>{maxPercent}%</strong>
+                  {type === "amount" && subtotal > 0
+                    ? " (" + formatCurrency(Math.round(subtotal * maxPercent) / 100) + " en esta venta)"
+                    : ""}
+                  . Para más, pídeselo a un administrador.
               </p>
             )}
             {preview !== null && (

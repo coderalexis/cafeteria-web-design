@@ -299,6 +299,31 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 Deja a medias el pedido de un cliente indeciso, cobra al siguiente y retómalo después. Los pedidos se
                 guardan en ese dispositivo, no se cobran solos y se pierden si se limpia el navegador.
               </p>
+
+              <div className="border-t border-stone-100 pt-3">
+                <label htmlFor="discount_max_cashier" className="text-sm font-medium text-stone-700">
+                  Descuento máximo en caja
+                </label>
+                <select
+                  id="discount_max_cashier"
+                  name="discount_max_cashier"
+                  defaultValue={String(currentSettings.discountMaxCashier)}
+                  className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                >
+                  <option value="0">Solo administradores</option>
+                  <option value="5">Hasta 5 %</option>
+                  <option value="10">Hasta 10 %</option>
+                  <option value="15">Hasta 15 %</option>
+                  <option value="20">Hasta 20 %</option>
+                  <option value="50">Hasta 50 %</option>
+                  <option value="100">Sin límite</option>
+                </select>
+                <p className="mt-1.5 text-xs text-stone-400">
+                  Cuánto puede descontar quien está en caja. Dueños y administradores no tienen límite. El tope se
+                  aplica en el servidor, así que vale también si alguien intenta rodearlo desde el navegador; los
+                  descuentos por monto fijo cuentan por su porcentaje equivalente.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
