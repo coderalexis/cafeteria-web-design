@@ -2,7 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ArrowLeft, Store, UserCircle } from "lucide-react"
 import { getContext } from "@/lib/context"
-import { homePathFor, ROLE_LABELS } from "@/lib/context-shape"
+import { landingPathFor, ROLE_LABELS } from "@/lib/context-shape"
 import { createClient } from "@/lib/supabase/server"
 import { isSyntheticEmail } from "@/lib/accounts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -41,7 +41,7 @@ export default async function CuentaPage() {
       <div className="mx-auto w-full max-w-2xl space-y-6">
         <div className="flex items-center gap-3">
           <Link
-            href={homePathFor(ctx)}
+            href={landingPathFor(ctx)}
             className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-800"
           >
             <ArrowLeft className="h-4 w-4" />

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { homePathFor, parseContext } from "@/lib/context-shape"
+import { landingPathFor, parseContext } from "@/lib/context-shape"
 import { isSyntheticEmail, normalizeSlug, normalizeUsername, SLUG_PATTERN, USERNAME_PATTERN, validatePassword } from "@/lib/accounts"
 import type { ActionResult } from "./types"
 
@@ -102,7 +102,7 @@ export async function login(formData: FormData): Promise<ActionResult> {
     ctx = parseContext(ctxJson)
   }
 
-  redirect(homePathFor(ctx))
+  redirect(landingPathFor(ctx))
 }
 
 /* ── Logout ───────────────────────────────────────────────────────── */

@@ -127,6 +127,19 @@ export function parseContext(json: unknown): AppContext | null {
 }
 
 /** A dónde debe caer un usuario según su contexto (login, "/", selector). */
+/**
+ * A dónde llega alguien al ENTRAR (login, "/" o volver desde Mi cuenta).
+ *
+ * El operador de la plataforma vive en /super aunque tenga cafeterías propias:
+ * su trabajo es administrar las de los demás, no vender café. Es distinto de
+ * homePathFor, que responde "el hogar del negocio ACTIVO" y por eso sigue
+ * usándose al cambiar de cafetería o al salir de /super.
+ */
+export function landingPathFor(ctx: AppContext | null): string {
+  if (ctx?.isPlatformAdmin) return "/super"
+  return homePathFor(ctx)
+}
+
 export function homePathFor(ctx: AppContext | null): string {
   if (!ctx) return "/login"
   if (!ctx.business) {
