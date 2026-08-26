@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Coffee, LogOut } from "lucide-react"
 import { getContext } from "@/lib/context"
+import { hasPendingRegistration } from "@/app/actions/signup"
 import { logout } from "@/app/actions/auth"
 import { BusinessPicker } from "@/components/business-picker"
 
@@ -10,6 +11,14 @@ export const dynamic = "force-dynamic"
 export default async function SeleccionarNegocioPage() {
   const ctx = await getContext()
   if (!ctx) redirect("/login")
+
+  // Red de seguridad del auto-registro: si el correo se confirmó pero la
+  // cafetería no llegó a crearse (el enlace del correo pudo dejar al usuario en
+  // cualquier parte del sitio), se termina aquí en lugar de dejarlo varado en
+  // una pantalla que le dice que pida ayuda a un administrador que no existe.
+  if (ctx.memberships.length === 0 && (await hasPendingRegistration())) {
+    redirect("/registro/listo")
+  }
 
   const memberships = ctx.memberships
   const activeId = ctx.business?.id ?? null

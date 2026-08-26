@@ -170,10 +170,13 @@ export type Database = {
           plan: string
           receipt_footer: string | null
           receipt_header: string | null
+          reviewed_at: string | null
           settings: Json
+          signup_source: string
           slug: string
           status: string
           timezone: string
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
@@ -189,10 +192,13 @@ export type Database = {
           plan?: string
           receipt_footer?: string | null
           receipt_header?: string | null
+          reviewed_at?: string | null
           settings?: Json
+          signup_source?: string
           slug: string
           status?: string
           timezone?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -208,10 +214,13 @@ export type Database = {
           plan?: string
           receipt_footer?: string | null
           receipt_header?: string | null
+          reviewed_at?: string | null
           settings?: Json
+          signup_source?: string
           slug?: string
           status?: string
           timezone?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -18,6 +18,7 @@ import {
   Check,
 } from "lucide-react"
 import { buildTicketLines } from "@/lib/receipt"
+import { TRIAL_DAYS } from "@/lib/signup"
 
 /**
  * Página pública de cafecitopos.com para quien todavía no tiene cuenta.
@@ -107,12 +108,17 @@ export function Landing() {
             </div>
             <span className="font-bold text-stone-800">Cafecito POS</span>
           </div>
-          <Link
-            href="/login"
-            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
-          >
-            Entrar
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/login" className="px-3 py-2 text-sm font-semibold text-stone-600 hover:text-amber-700">
+              Entrar
+            </Link>
+            <Link
+              href="/registro"
+              className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+            >
+              Crear mi cafetería
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -139,22 +145,22 @@ export function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/login"
+                href="/registro"
                 className="inline-flex items-center gap-2 rounded-xl bg-amber-700 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-amber-800"
               >
-                Entrar al sistema
+                Crear mi cafetería gratis
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <a
-                href={`mailto:${CONTACTO}?subject=Quiero%20probar%20Cafecito%20POS`}
+              <Link
+                href="/login"
                 className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-6 py-3 font-semibold text-stone-700 transition-colors hover:bg-stone-50"
               >
-                <Mail className="h-4 w-4" />
-                Quiero probarlo
-              </a>
+                Ya tengo cuenta
+              </Link>
             </div>
             <p className="mt-4 text-sm text-stone-500">
-              Ahorita estamos en pruebas con cafeterías reales, sin costo.
+              {TRIAL_DAYS} días de prueba, sin tarjeta. Se arma sola con un menú de ejemplo y empiezas a cobrar en lo
+              que tarda un café. ¿Dudas? <a href={`mailto:${CONTACTO}`} className="text-amber-700 underline underline-offset-2">{CONTACTO}</a>
             </p>
           </div>
 

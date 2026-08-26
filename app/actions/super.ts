@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { runWeeklySummaries, type WeeklySendResult } from "@/lib/weekly-summary"
 import { createClient } from "@/lib/supabase/server"
 import { requireSuperAdmin } from "@/lib/context"
-import { generateTempPassword, isSyntheticEmail, normalizeSlug, SLUG_PATTERN } from "@/lib/accounts"
+import { generateTempPassword, isSyntheticEmail, normalizeSlug, slugify, SLUG_PATTERN } from "@/lib/accounts"
 import { isValidTimeZone } from "@/lib/dates"
 import { presetByKey } from "@/lib/presets"
 import { serializeBusinessSettings, DEFAULT_SETTINGS } from "@/lib/settings"
@@ -33,6 +33,11 @@ export interface PlatformBusiness {
   is_template: boolean
   timezone: string
   created_at: string
+  /** 'self' = la creó su propio dueño desde /registro; 'operator' = la dio de alta el operador. */
+  signup_source: string
+  trial_ends_at: string | null
+  /** null = alta por cuenta propia que el operador todavía no mira. */
+  reviewed_at: string | null
   active_members: number
   owners: string[]
   has_menu: boolean
@@ -49,17 +54,6 @@ export async function getPlatformOverview(): Promise<ActionResult<{ businesses: 
   const { data, error } = await admin.rpc("platform_overview")
   if (error) return { error: error.message }
   return { success: true, businesses: (data as unknown as PlatformBusiness[]) ?? [] }
-}
-
-/** Slug sugerido a partir del nombre (sin acentos, minúsculas, guiones). */
-function slugify(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40)
 }
 
 const createSchema = z.object({
@@ -333,4 +327,51 @@ export async function deleteBusiness(input: {
 
   revalidateSuper()
   return { success: true, summary: result.summary, deletedUsers, keptUsers }
+}
+
+/**
+ * Marca una cafetería de auto-registro como ya revisada por el operador.
+ * No cambia nada de su operación: la cafetería entró de inmediato al
+ * registrarse (nadie espera una aprobación para vender). Esto solo apaga el
+ * aviso de "nueva" en el panel, para que la lista sirva de bandeja de entrada.
+ */
+export async function markBusinessReviewed(businessId: string): Promise<ActionResult> {
+  const { error: authError } = await requireSuperAdmin()
+  if (authError) return { error: authError }
+  if (!uuid.safeParse(businessId).success) return { error: "Cafetería inválida." }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("businesses")
+    .update({ reviewed_at: new Date().toISOString() })
+    .eq("id", businessId)
+  if (error) return { error: error.message }
+
+  revalidateSuper()
+  return { success: true }
+}
+
+/**
+ * Mueve el fin de la prueba: alargarla unos días, o quitarla del todo cuando
+ * la cafetería deja de ser un piloto y se queda. Es de las cosas que SOLO el
+ * operador puede hacer — `trial_ends_at` quedó fuera del grant por columna de
+ * `businesses`, así que un dueño no puede regalarse tiempo desde su panel.
+ */
+export async function setBusinessTrial(businessId: string, days: number | null): Promise<ActionResult> {
+  const { error: authError } = await requireSuperAdmin()
+  if (authError) return { error: authError }
+  if (!uuid.safeParse(businessId).success) return { error: "Cafetería inválida." }
+  if (days !== null && (!Number.isInteger(days) || days < 1 || days > 365)) {
+    return { error: "Los días de prueba deben ir de 1 a 365." }
+  }
+
+  const nuevoFin =
+    days === null ? null : new Date(Date.now() + days * 86_400_000).toISOString()
+
+  const admin = createAdminClient()
+  const { error } = await admin.from("businesses").update({ trial_ends_at: nuevoFin }).eq("id", businessId)
+  if (error) return { error: error.message }
+
+  revalidateSuper()
+  return { success: true }
 }

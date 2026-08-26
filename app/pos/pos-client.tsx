@@ -46,6 +46,7 @@ import {
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
 import { OfflineBanner, PosLockScreen, POS_LOCK_EVENT } from "./lock-screen"
+import { TrialBanner } from "@/components/trial-banner"
 import { DEFAULT_CHIP, DEFAULT_CHIP_ACTIVE, colorClasses } from "@/lib/category-colors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1479,7 +1480,10 @@ export default function POSClient({
   )
 
   return (
-    <div className="relative flex h-[100dvh] bg-stone-50 overflow-hidden">
+    <div className="flex h-[100dvh] flex-col bg-stone-50 overflow-hidden">
+      {/* Aviso de fin de prueba: arriba de todo, para que nadie lo descubra con la caja abierta. */}
+      <TrialBanner trialEndsAt={appCtx.business?.trialEndsAt ?? null} />
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
       <OfflineBanner />
       <PosLockScreen
         lockMinutes={lockMinutes}
@@ -1928,6 +1932,7 @@ export default function POSClient({
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

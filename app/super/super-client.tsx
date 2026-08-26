@@ -16,16 +16,22 @@ import {
   LogIn,
   LayoutTemplate,
   AlertTriangle,
+  Sparkles,
+  CalendarClock,
+  Check,
 } from "lucide-react"
 import {
   cloneTemplateInto,
   createBusiness,
   enterBusiness,
+  markBusinessReviewed,
   setBusinessStatus,
+  setBusinessTrial,
   type PlatformBusiness,
 } from "@/app/actions/super"
 import { MEXICO_TIMEZONES } from "@/lib/dates"
 import { PRESETS } from "@/lib/presets"
+import { trialState } from "@/lib/signup"
 import { WeeklySummaryCard } from "./weekly-card"
 import { DeleteBusinessDialog } from "./delete-dialog"
 import { formatCurrency, formatDateTime } from "@/lib/format"
@@ -41,6 +47,11 @@ interface Props {
   loadError: string | null
   /** ids de negocios de los que el operador ya es miembro */
   memberOf: string[]
+}
+
+/** Alta por cuenta propia que el operador todavía no ha mirado. */
+function esNueva(b: PlatformBusiness): boolean {
+  return b.signup_source === "self" && !b.reviewed_at
 }
 
 function slugify(name: string): string {
@@ -64,8 +75,14 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
   const memberSet = useMemo(() => new Set(memberOf), [memberOf])
 
   const hasTemplate = businesses.some((b) => b.is_template)
-  const real = businesses.filter((b) => !b.is_template)
   const templates = businesses.filter((b) => b.is_template)
+  // Las que se registraron solas y nadie ha mirado van arriba: la lista hace de
+  // bandeja de entrada, y lo que hay que atender no debería haber que buscarlo.
+  const real = businesses
+    .filter((b) => !b.is_template)
+    .slice()
+    .sort((a, b) => Number(esNueva(b)) - Number(esNueva(a)))
+  const nuevas = real.filter(esNueva).length
 
   function run(fn: () => Promise<{ error?: string; success?: boolean }>, ok: string) {
     startTransition(async () => {
@@ -112,8 +129,19 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
 
   function BusinessCard({ b }: { b: PlatformBusiness }) {
     const suspended = b.status === "suspended"
+    const seRegistroSola = b.signup_source === "self"
+    const sinRevisar = seRegistroSola && !b.reviewed_at
+    const prueba = trialState(b.trial_ends_at)
     return (
-      <Card className={suspended ? "border-red-200 bg-red-50/30" : ""}>
+      <Card
+        className={
+          sinRevisar
+            ? "border-amber-300 bg-amber-50/40 ring-1 ring-amber-200"
+            : suspended
+              ? "border-red-200 bg-red-50/30"
+              : ""
+        }
+      >
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -126,6 +154,24 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
                 <span className="text-xs">{b.timezone}</span>
                 {b.is_template && <Badge variant="secondary">plantilla</Badge>}
                 {suspended && <Badge variant="destructive">suspendida</Badge>}
+                {sinRevisar && (
+                  <Badge className="bg-amber-600 hover:bg-amber-600 gap-1">
+                    <Sparkles className="h-3 w-3" /> nueva, sin revisar
+                  </Badge>
+                )}
+                {seRegistroSola && !sinRevisar && <Badge variant="outline">se registró sola</Badge>}
+                {prueba.state === "expired" && <Badge variant="destructive">prueba vencida</Badge>}
+                {(prueba.state === "last-day" || prueba.state === "ending-soon") && (
+                  <Badge className="bg-red-600 hover:bg-red-600 gap-1">
+                    <CalendarClock className="h-3 w-3" />
+                    {prueba.state === "last-day" ? "último día" : `${prueba.daysLeft} días`}
+                  </Badge>
+                )}
+                {prueba.state === "running" && (
+                  <Badge variant="outline" className="border-stone-300 gap-1">
+                    <CalendarClock className="h-3 w-3" /> prueba: {prueba.daysLeft} días
+                  </Badge>
+                )}
                 {!b.has_menu && !b.is_template && (
                   <Badge variant="outline" className="border-amber-300 text-amber-800">
                     sin menú
@@ -212,6 +258,50 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
                 {suspended ? "Reactivar" : "Suspender"}
               </Button>
             )}
+            {sinRevisar && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                className="gap-1.5 border-amber-300 text-amber-800"
+                onClick={() => run(() => markBusinessReviewed(b.id), "Marcada como revisada")}
+              >
+                <Check className="h-4 w-4" />
+                Marcar revisada
+              </Button>
+            )}
+            {!b.is_template && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                className="gap-1.5"
+                onClick={() => {
+                  const respuesta = window.prompt(
+                    `Días de prueba para «${b.name}», contados desde hoy.
+Deja el campo vacío para quitarle la prueba (se queda para siempre).`,
+                    prueba.state === "none" ? "30" : String(prueba.daysLeft || 7),
+                  )
+                  if (respuesta === null) return
+                  const limpio = respuesta.trim()
+                  if (limpio === "") {
+                    run(() => setBusinessTrial(b.id, null), "Se le quitó la prueba: la cafetería se queda")
+                    return
+                  }
+                  const dias = Number(limpio)
+                  if (!Number.isInteger(dias) || dias < 1 || dias > 365) {
+                    toast.error("Escribe un número entero de días, de 1 a 365.")
+                    return
+                  }
+                  run(() => setBusinessTrial(b.id, dias), `Prueba ajustada a ${dias} días`)
+                }}
+              >
+                <CalendarClock className="h-4 w-4" />
+                Prueba
+              </Button>
+            )}
             <DeleteBusinessDialog
               business={{
                 id: b.id,
@@ -239,6 +329,12 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
           <p className="text-sm text-stone-500 mt-1">
             {real.length} {real.length === 1 ? "cafetería" : "cafeterías"} · {real.filter((b) => b.status === "active").length}{" "}
             activas
+            {nuevas > 0 && (
+              <span className="font-medium text-amber-700">
+                {" · "}
+                {nuevas} {nuevas === 1 ? "nueva sin revisar" : "nuevas sin revisar"}
+              </span>
+            )}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">

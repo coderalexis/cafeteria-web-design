@@ -3,6 +3,10 @@
     {
       "path": "/api/resumen-semanal",
       "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/pruebas",
+      "schedule": "0 15 * * *"
     }
   ]
 }

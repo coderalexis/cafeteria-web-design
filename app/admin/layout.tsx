@@ -7,6 +7,7 @@ import { getContext } from "@/lib/context"
 import { homePathFor, isManager, ROLE_LABELS } from "@/lib/context-shape"
 import { BusinessProvider } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
+import { TrialBanner } from "@/components/trial-banner"
 import { AdminNav } from "./admin-nav"
 import { AdminMobileNav } from "./mobile-nav"
 
@@ -120,6 +121,7 @@ export default async function AdminLayout({
             isPlatformAdmin={ctx.isPlatformAdmin}
             logoutAction={logout}
           />
+          <TrialBanner trialEndsAt={business.trialEndsAt} />
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>

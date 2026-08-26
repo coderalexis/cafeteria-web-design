@@ -22,6 +22,8 @@ export interface BusinessInfo {
   receiptFooter: string | null
   /** `businesses.settings` crudo; parsear con `parseBusinessSettings`. */
   settings: unknown
+  /** Fin de la prueba gratis (ISO) o null si la cafetería no está a prueba. */
+  trialEndsAt: string | null
 }
 
 export interface Membership {
@@ -88,6 +90,7 @@ function parseBusiness(v: unknown): BusinessInfo | null {
     receiptHeader: strOrNull(b.receipt_header),
     receiptFooter: strOrNull(b.receipt_footer),
     settings: b.settings ?? {},
+    trialEndsAt: strOrNull(b.trial_ends_at),
   }
 }
 

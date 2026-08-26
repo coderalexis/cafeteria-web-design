@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   Ban,
   BookOpen,
+  CalendarClock,
   ChefHat,
   Coffee,
   Keyboard,
@@ -26,6 +27,7 @@ import {
   X,
 } from "lucide-react"
 import { POS_SHORTCUTS } from "@/app/pos/shortcuts"
+import { TRIAL_DAYS } from "@/lib/signup"
 import { DemoDiferencia, DemoEfectivo, DemoPOS, DemoPropina, DemoQR, TicketImpreso } from "./demos"
 
 /**
@@ -507,6 +509,37 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
           </ul>
         </>
+      ),
+    },
+    {
+      id: "admin-prueba",
+      grupo: "admin",
+      icon: CalendarClock,
+      titulo: "Tu prueba gratis",
+      palabras: "prueba gratis dias trial vencimiento suspension banner rojo pagar continuar",
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            Si creaste tu cafetería desde la página principal, tienes <strong>{TRIAL_DAYS} días</strong> para probarla
+            con todo incluido. No pedimos tarjeta y no se cobra nada solo.
+          </li>
+          <li>
+            Te avisamos por correo <strong>dos días antes</strong> y otra vez <strong>el último día</strong>. Ese último
+            día verás además una <strong>franja roja</strong> arriba del sistema; puedes cerrarla y vuelve al día
+            siguiente.
+          </li>
+          <li>
+            Cuando termina, la cafetería queda <strong>en pausa</strong>: no se puede vender, pero{" "}
+            <strong>no se borra nada</strong> — tus ventas, tu menú y tu equipo siguen ahí.
+          </li>
+          <li>
+            <strong>Con la caja abierta no te pausamos.</strong> Si te vence a media jornada, esperamos a que hagas tu
+            corte para que el arqueo te cuadre y no se te quede un turno sin cerrar.
+          </li>
+          <li>
+            ¿Quieres seguir? Escríbenos a <strong>soporte@cafecitopos.com</strong> y lo reactivamos.
+          </li>
+        </ul>
       ),
     },
     {
