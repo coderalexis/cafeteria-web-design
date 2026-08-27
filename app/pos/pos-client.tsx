@@ -31,6 +31,7 @@ import {
   ChefHat,
   Keyboard,
   AArrowUp,
+  Info,
   Calculator,
   MoreVertical,
   LogOut,
@@ -94,6 +95,7 @@ import { autoName, type ParkedOrder } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
+import { ProductInfoDialog } from "./product-info-dialog"
 import { TextSizeControl } from "./text-size-control"
 import { usePosTextSize } from "./use-text-size"
 import { usePosCart } from "./use-pos-cart"
@@ -486,6 +488,7 @@ export default function POSClient({
   const [tipCustomInput, setTipCustomInput] = useState("")
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showTender, setShowTender] = useState(false)
+  const [infoProduct, setInfoProduct] = useState<Product | null>(null)
   // Aquí y no en el control: el control vive dentro del menú, que casi siempre
   // está cerrado, y el tamaño guardado debe aplicarse al abrir el POS.
   const textSize = usePosTextSize()
@@ -1741,7 +1744,21 @@ export default function POSClient({
                   {items.map((product) => {
                     const accent = colorClasses(categoryColor[product.category])?.accent
                     return (
-                      <div key={product.id}>
+                      <div key={product.id} className="relative">
+                        {/* La "i" va FUERA del botón del producto —un botón
+                            dentro de otro no es HTML válido— y encima de él con
+                            z-10, así que tocarla no agrega el producto. */}
+                        {product.description && (
+                          <button
+                            type="button"
+                            onClick={() => setInfoProduct(product)}
+                            aria-label={`Qué lleva ${product.name}`}
+                            title={`Qué lleva ${product.name}`}
+                            className="absolute right-0 top-0 z-10 rounded-full p-2 text-stone-300 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        )}
                         <motion.button
                           whileTap={{ scale: 0.95 }}
                           onClick={() => handleProductClick(product)}
@@ -1755,7 +1772,11 @@ export default function POSClient({
                             {accent && (
                               <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
                             )}
-                            <p className="font-semibold text-stone-800 text-sm leading-tight line-clamp-2">
+                            <p
+                              className={`text-sm font-semibold leading-tight text-stone-800 line-clamp-2 ${
+                                product.description ? "pr-5" : ""
+                              }`}
+                            >
                               {product.name}
                             </p>
                             {product.description && product.description !== subcategory && (
@@ -1858,6 +1879,7 @@ export default function POSClient({
         parkedCount={parkedEnabled ? parked.orders.length : 0}
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
+      <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />
       <ShortcutsDialog
         open={showShortcuts}
         onOpenChange={setShowShortcuts}
