@@ -49,6 +49,27 @@ export default async function POSPage() {
   ]
 
   /* ── Transform products ─────────────────────────────────────────── */
+  /**
+   * La descripción hace dos trabajos distintos en la misma columna.
+   *
+   * Cuando VARIOS productos la comparten funciona como subtítulo de sección
+   * («Frappé a base de leche» vs «a base de agua»), y agrupar por ella ayuda a
+   * encontrar las cosas. Cuando es de UN solo producto es su descripción —los
+   * ingredientes de un sándwich— y convertirla en encabezado partía la rejilla
+   * en secciones de un elemento con un titular en mayúsculas de veinte
+   * palabras. En Gym Coffee eso daba 22 encabezados para 10 categorías.
+   *
+   * La regla: un encabezado tiene que agrupar al menos dos productos. Si no,
+   * es descripción y va como subtítulo de la tarjeta.
+   */
+  const productosPorDescripcion = new Map<string, number>()
+  for (const p of dbProducts ?? []) {
+    const desc = p.description?.trim()
+    if (!desc) continue
+    const clave = `${p.menu_categories?.slug ?? ""}|${desc}`
+    productosPorDescripcion.set(clave, (productosPorDescripcion.get(clave) ?? 0) + 1)
+  }
+
   const products = (dbProducts ?? []).map((p) => {
     const cat = p.menu_categories
     const variants = [...(p.menu_variants ?? [])]
@@ -59,8 +80,11 @@ export default async function POSPage() {
     const categorySlug = cat?.slug || ""
     const categoryName = cat?.name || ""
 
-    // Use description as subcategory grouping label
-    const subcategory = p.description || categoryName
+    // Encabezado de sección: la descripción solo si la comparten 2 o más.
+    const desc = p.description?.trim()
+    const esEtiquetaCompartida =
+      !!desc && (productosPorDescripcion.get(`${categorySlug}|${desc}`) ?? 0) >= 2
+    const subcategory = esEtiquetaCompartida ? desc! : categoryName
 
     // Show description on card only if it differs from category name
     const cardDescription =
