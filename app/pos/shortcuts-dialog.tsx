@@ -12,8 +12,19 @@ import {
 } from "@/components/ui/dialog"
 import { POS_SHORTCUTS } from "./shortcuts"
 import { TextSizeControl } from "./text-size-control"
+import type { TextSizeKey } from "./text-size"
 
-export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function ShortcutsDialog({
+  open,
+  onOpenChange,
+  textSize,
+  setTextSize,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  textSize: TextSizeKey
+  setTextSize: (next: TextSizeKey) => void
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -34,7 +45,7 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
             <p className="text-sm font-medium text-stone-700">Tamaño de letra</p>
             <p className="text-xs text-stone-400">Solo en esta pantalla; se recuerda en este dispositivo.</p>
           </div>
-          <TextSizeControl compact />
+          <TextSizeControl size={textSize} setSize={setTextSize} compact />
         </div>
 
         <div className="divide-y divide-stone-100 text-sm">

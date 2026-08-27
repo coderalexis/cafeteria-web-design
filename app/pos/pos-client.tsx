@@ -95,6 +95,7 @@ import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
 import { TextSizeControl } from "./text-size-control"
+import { usePosTextSize } from "./use-text-size"
 import { usePosCart } from "./use-pos-cart"
 import {
   cartItemCount,
@@ -485,6 +486,9 @@ export default function POSClient({
   const [tipCustomInput, setTipCustomInput] = useState("")
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showTender, setShowTender] = useState(false)
+  // Aquí y no en el control: el control vive dentro del menú, que casi siempre
+  // está cerrado, y el tamaño guardado debe aplicarse al abrir el POS.
+  const textSize = usePosTextSize()
   const [confirmClear, setConfirmClear] = useState(false)
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
   // Producto/tamaño esperando modificadores: alta nueva, o edición de una
@@ -1479,81 +1483,16 @@ export default function POSClient({
         businessName={businessName}
         userName={appCtx.fullName || "quien está en caja"}
       />
-      {/* ── Top-right actions (escritorio) ──
-           Las etiquetas se van por debajo de 1280 px de ancho. Con la letra en
-           Muy grande esta barra medía 1153 px y empezaba en x=-149: en una
-           tablet acostada, el chip de caja y Tickets quedaban FUERA de la
-           pantalla, justo para quien más necesita la letra grande. */}
-      {!isMobile && (
-        <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
-          <span className="xl:hidden">{cashChip(true)}</span>
-          <span className="hidden xl:inline-flex">{cashChip(false)}</span>
-          <Button
-            variant="outline"
-            onClick={() => setShowTickets(true)}
-            className="bg-white/80 backdrop-blur gap-1.5"
-            title="Tickets del día (T)"
-            aria-label="Tickets del día"
-          >
-            <Receipt className="h-4 w-4" />
-            <span className="hidden xl:inline">Tickets</span>
-            <Kbd>T</Kbd>
-          </Button>
-          {isAdmin && (
-            <Link href="/admin">
-              <Button
-                variant="outline"
-                className="bg-white/80 backdrop-blur gap-1.5"
-                title="Administrar"
-                aria-label="Administrar"
-              >
-                <Settings className="h-4 w-4" />
-                <span className="hidden xl:inline">Administrar</span>
-              </Button>
-            </Link>
-          )}
-          <TextSizeControl />
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowShortcuts(true)}
-            className="bg-white/80 backdrop-blur"
-            title="Atajos y ayuda (?)"
-            aria-label="Atajos y ayuda"
-          >
-            <Keyboard className="h-4 w-4" />
-          </Button>
-          {lockMinutes > 0 && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => window.dispatchEvent(new Event(POS_LOCK_EVENT))}
-              className="bg-white/80 backdrop-blur"
-              title="Bloquear pantalla"
-              aria-label="Bloquear pantalla"
-            >
-              <Lock className="h-4 w-4" />
-            </Button>
-          )}
-          <Link href="/cuenta" title="Mi cuenta" aria-label="Mi cuenta">
-            <Button variant="outline" size="icon" className="bg-white/80 backdrop-blur">
-              <UserCircle className="h-4 w-4" />
-            </Button>
-          </Link>
-          <form action={logout}>
-            <Button type="submit" variant="outline" className="bg-white/80 backdrop-blur">
-              Cerrar sesión
-            </Button>
-          </form>
-        </div>
-      )}
-
       {/* ───── LEFT PANEL (Products) ───── */}
       <div className={`flex flex-col h-full ${isMobile ? "w-full" : "flex-1 min-w-0 border-r border-stone-200"}`}>
         {/* Header */}
         <header className="shrink-0 px-4 md:px-5 pt-3 md:pt-4 pb-3 bg-white border-b border-stone-200 shadow-sm">
-          <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+          {/* Se envuelve a propósito: con la letra en Muy grande no caben en un
+              renglón, y sin wrap el nombre del negocio se aplastaba a 0 px y las
+              acciones se salían. Preferible un encabezado más alto —que es lo
+              que pidió quien subió la letra— a contenido invisible. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
+            <div className="flex min-w-[7rem] max-w-[14rem] items-center gap-2">
               <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
               <h1 className="text-xl md:text-2xl font-bold text-stone-800 tracking-tight truncate">{businessName}</h1>
               {!isMobile && (
@@ -1569,7 +1508,7 @@ export default function POSClient({
                 acostada sobra ancho y falta alto, y su renglón se llevaba 48 px
                 que valen una fila entera de productos. */}
             {!isMobile && (
-              <div className="relative mx-2 min-w-0 max-w-xs flex-1">
+              <div className="relative min-w-[7rem] max-w-xs flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
                 <Input
                   ref={searchInputRef}
@@ -1599,14 +1538,26 @@ export default function POSClient({
                 </div>
               </div>
             )}
-            {isMobile ? (
-              <div className="flex items-center gap-1.5 shrink-0">
-                {cashChip(true)}
+            {/* Un solo grupo de acciones, DENTRO del encabezado. Antes flotaba
+                encima con position:absolute y tapaba el nombre del negocio y el
+                total del día. Solo queda a la vista lo que se consulta de un
+                vistazo (el estado de la caja); el resto vive en el menú. */}
+            <div className="flex shrink-0 items-center gap-1.5">
+              {!isMobile && (
+                <div className="hidden items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 xl:flex">
+                  <span className="text-sm font-medium text-amber-800">Hoy</span>
+                  <span className="text-lg font-bold text-amber-800">{formatCurrency(totalSales)}</span>
+                </div>
+              )}
+              <span className="lg:hidden">{cashChip(true)}</span>
+              <span className="hidden lg:inline-flex">{cashChip(false)}</span>
+              {isMobile && (
                 <BusinessSwitcher
                   memberships={appCtx.memberships}
                   activeId={appCtx.business?.id ?? null}
                   variant="compact"
                 />
+              )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Menú">
@@ -1623,8 +1574,18 @@ export default function POSClient({
                     <DropdownMenuItem onSelect={() => setShowTickets(true)}>
                       <Receipt className="h-4 w-4 mr-2" /> Tickets del día
                     </DropdownMenuItem>
+                    {/* No es un DropdownMenuItem a propósito: ajustar la letra
+                        suele ser probar un tamaño y luego otro, y un Item
+                        cerraría el menú en cada toque. */}
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="flex items-center gap-2 text-sm text-stone-600">
+                        <AArrowUp className="h-4 w-4" /> Letra
+                      </span>
+                      <TextSizeControl size={textSize.size} setSize={textSize.setSize} compact />
+                    </div>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>
-                      <AArrowUp className="h-4 w-4 mr-2" /> Tamaño de letra
+                      <Keyboard className="h-4 w-4 mr-2" /> Atajos de teclado
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setShowCashDialog(true)}>
                       {openSession ? <Unlock className="h-4 w-4 mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
@@ -1658,13 +1619,7 @@ export default function POSClient({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
-            ) : (
-              <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl flex items-center gap-2">
-                <span className="text-sm text-amber-800 font-medium">Total vendido hoy:</span>
-                <span className="text-xl font-bold text-amber-800">{formatCurrency(totalSales)}</span>
-              </div>
-            )}
+            </div>
           </div>
           {isMobile && (
             <p className="text-xs text-amber-800 mt-1">
@@ -1903,7 +1858,12 @@ export default function POSClient({
         parkedCount={parkedEnabled ? parked.orders.length : 0}
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
-      <ShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
+      <ShortcutsDialog
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
+        textSize={textSize.size}
+        setTextSize={textSize.setSize}
+      />
       <CashTenderDialog
         open={showTender}
         onOpenChange={setShowTender}

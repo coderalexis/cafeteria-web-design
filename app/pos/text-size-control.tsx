@@ -1,49 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { AArrowDown, AArrowUp } from "lucide-react"
-import {
-  DEFAULT_TEXT_SIZE,
-  readTextSize,
-  stepTextSize,
-  storeTextSize,
-  TEXT_SIZES,
-  textSizePx,
-  type TextSizeKey,
-} from "./text-size"
+import { stepTextSize, TEXT_SIZES, type TextSizeKey } from "./text-size"
 import { Button } from "@/components/ui/button"
 
 /**
- * A− / A+ para el tamaño de letra del POS. Se aplica al documento entero
- * mientras el POS está montado y se restaura al salir, para no dejar el panel
- * de administración con el tamaño de la tablet del mostrador.
+ * A− / A+ del tamaño de letra. Sin estado propio: lo lleva `usePosTextSize` en
+ * el POS, que sigue montado aunque este control esté dentro de un menú cerrado.
  */
-export function TextSizeControl({ compact = false }: { compact?: boolean }) {
-  const [size, setSize] = useState<TextSizeKey>(DEFAULT_TEXT_SIZE)
-
-  // Se lee después de montar: en el servidor no hay localStorage, y leerlo
-  // durante el render daría un HTML distinto al del cliente.
-  useEffect(() => {
-    setSize(readTextSize())
-  }, [])
-
-  useEffect(() => {
-    const raiz = document.documentElement
-    const previo = raiz.style.fontSize
-    raiz.style.fontSize = `${textSizePx(size)}px`
-    return () => {
-      raiz.style.fontSize = previo
-    }
-  }, [size])
-
-  function cambiar(direction: 1 | -1) {
-    setSize((actual) => {
-      const nuevo = stepTextSize(actual, direction)
-      storeTextSize(nuevo)
-      return nuevo
-    })
-  }
-
+export function TextSizeControl({
+  size,
+  setSize,
+  compact = false,
+}: {
+  size: TextSizeKey
+  setSize: (next: TextSizeKey) => void
+  compact?: boolean
+}) {
   const actual = TEXT_SIZES.find((s) => s.key === size)
   const enMinimo = size === TEXT_SIZES[0].key
   const enMaximo = size === TEXT_SIZES[TEXT_SIZES.length - 1].key
@@ -53,30 +26,23 @@ export function TextSizeControl({ compact = false }: { compact?: boolean }) {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => cambiar(-1)}
+        onClick={() => setSize(stepTextSize(size, -1))}
         disabled={enMinimo}
-        className={compact ? "h-9 w-9" : "bg-white/80 backdrop-blur"}
+        className="h-9 w-9"
         title="Letra más chica"
         aria-label="Letra más chica"
       >
         <AArrowDown className="h-4 w-4" />
       </Button>
-      {/* En pantallas angostas la etiqueta se oculta a la vista pero sigue en el
-          árbol de accesibilidad: es lo que anuncia el cambio a un lector. */}
-      <span
-        className={`select-none text-center text-xs font-medium text-stone-500 ${
-          compact ? "w-16" : "sr-only xl:not-sr-only xl:w-20"
-        }`}
-        aria-live="polite"
-      >
+      <span className="w-16 select-none text-center text-xs font-medium text-stone-500" aria-live="polite">
         {actual?.label ?? "Normal"}
       </span>
       <Button
         variant="outline"
         size="icon"
-        onClick={() => cambiar(1)}
+        onClick={() => setSize(stepTextSize(size, 1))}
         disabled={enMaximo}
-        className={compact ? "h-9 w-9" : "bg-white/80 backdrop-blur"}
+        className="h-9 w-9"
         title="Letra más grande"
         aria-label="Letra más grande"
       >
