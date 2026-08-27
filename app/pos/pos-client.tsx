@@ -1502,24 +1502,36 @@ export default function POSClient({
         businessName={businessName}
         userName={appCtx.fullName || "quien está en caja"}
       />
-      {/* ── Top-right actions (escritorio) ── */}
+      {/* ── Top-right actions (escritorio) ──
+           Las etiquetas se van por debajo de 1280 px de ancho. Con la letra en
+           Muy grande esta barra medía 1153 px y empezaba en x=-149: en una
+           tablet acostada, el chip de caja y Tickets quedaban FUERA de la
+           pantalla, justo para quien más necesita la letra grande. */}
       {!isMobile && (
         <div className="absolute right-4 top-4 z-50 flex items-center gap-2">
-          {cashChip(false)}
+          <span className="xl:hidden">{cashChip(true)}</span>
+          <span className="hidden xl:inline-flex">{cashChip(false)}</span>
           <Button
             variant="outline"
             onClick={() => setShowTickets(true)}
             className="bg-white/80 backdrop-blur gap-1.5"
+            title="Tickets del día (T)"
+            aria-label="Tickets del día"
           >
             <Receipt className="h-4 w-4" />
-            Tickets
+            <span className="hidden xl:inline">Tickets</span>
             <Kbd>T</Kbd>
           </Button>
           {isAdmin && (
             <Link href="/admin">
-              <Button variant="outline" className="bg-white/80 backdrop-blur gap-1.5">
+              <Button
+                variant="outline"
+                className="bg-white/80 backdrop-blur gap-1.5"
+                title="Administrar"
+                aria-label="Administrar"
+              >
                 <Settings className="h-4 w-4" />
-                Administrar
+                <span className="hidden xl:inline">Administrar</span>
               </Button>
             </Link>
           )}

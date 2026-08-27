@@ -61,8 +61,12 @@ export function TextSizeControl({ compact = false }: { compact?: boolean }) {
       >
         <AArrowDown className="h-4 w-4" />
       </Button>
+      {/* En pantallas angostas la etiqueta se oculta a la vista pero sigue en el
+          árbol de accesibilidad: es lo que anuncia el cambio a un lector. */}
       <span
-        className={`select-none text-center text-xs font-medium text-stone-500 ${compact ? "w-16" : "w-20"}`}
+        className={`select-none text-center text-xs font-medium text-stone-500 ${
+          compact ? "w-16" : "sr-only xl:not-sr-only xl:w-20"
+        }`}
         aria-live="polite"
       >
         {actual?.label ?? "Normal"}
