@@ -159,8 +159,9 @@ export function Landing() {
               </Link>
             </div>
             <p className="mt-4 text-sm text-stone-500">
-              {TRIAL_DAYS} días de prueba, sin tarjeta. Se arma sola con un menú de ejemplo y empiezas a cobrar en lo
-              que tarda un café. ¿Dudas? <a href={`mailto:${CONTACTO}`} className="text-amber-700 underline underline-offset-2">{CONTACTO}</a>
+              {TRIAL_DAYS} días de prueba, sin tarjeta. Eliges qué vendes de una lista lista para usar —café, frappés,
+              panadería— y empiezas a cobrar en lo que tarda un café. ¿Dudas?{" "}
+              <a href={`mailto:${CONTACTO}`} className="text-amber-700 underline underline-offset-2">{CONTACTO}</a>
             </p>
           </div>
 

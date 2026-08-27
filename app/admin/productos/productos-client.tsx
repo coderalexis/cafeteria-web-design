@@ -15,6 +15,7 @@ import { setProductModifierGroups } from "@/app/actions/modifiers"
 import { formatCurrency } from "@/lib/format"
 import { ActionForm } from "@/components/action-form"
 import { BulkPricesButton, ReorderButton } from "./tools"
+import { MenuPackDialog } from "@/components/menu-pack-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -207,6 +208,7 @@ export default function ProductosClient({
             </p>
           </div>
           <div className="flex gap-2">
+            <MenuPackDialog />
             <BulkPricesButton
               categories={categories.map((c) => ({ id: c.id, name: c.name }))}
               variants={priceVariants}

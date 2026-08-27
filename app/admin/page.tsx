@@ -30,6 +30,7 @@ import {
   Minus,
 } from "lucide-react"
 import Link from "next/link"
+import { MenuPackPicker } from "@/components/menu-pack-picker"
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -224,6 +225,23 @@ export default async function AdminDashboard() {
     { ...PAYMENT_METHODS.transferencia, color: "text-violet-600", barColor: "bg-violet-500" },
     { ...PAYMENT_METHODS.tarjeta_clip, color: "text-blue-600", barColor: "bg-blue-500" },
   ]
+
+  // Carta vacía: no tiene caso enseñar un tablero de ceros. Lo único que
+  // importa ahora es que elija qué vende — el POS no sirve sin productos.
+  if ((productCount ?? 0) === 0) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6 p-6">
+        <div>
+          <h1 className="text-2xl font-bold text-stone-800">Arma tu carta</h1>
+          <p className="mt-1 text-stone-600">
+            Elige lo que vendes y lo dejamos listo con precios de referencia. Puedes cambiarlos, quitar lo que no uses
+            y agregar más paquetes cuando quieras.
+          </p>
+        </div>
+        <MenuPackPicker menuEmpty />
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8">

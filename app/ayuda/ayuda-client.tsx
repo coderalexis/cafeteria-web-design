@@ -13,6 +13,7 @@ import {
   Keyboard,
   Lock,
   PauseCircle,
+  PackagePlus,
   Percent,
   Printer,
   Receipt,
@@ -407,6 +408,41 @@ export function AyudaClient({ ticket, corte }: Props) {
             historial); desactívalo.
           </li>
         </ul>
+      ),
+    },
+    {
+      id: "admin-paquetes",
+      grupo: "admin",
+      icon: PackagePlus,
+      titulo: "Armar tu carta con paquetes",
+      palabras: "paquete plantilla menu inicial arrancar productos ejemplo cafe frappes panaderia crear carta",
+      nodo: (
+        <>
+          <ul className="space-y-2 text-sm text-stone-600">
+            <li>
+              La primera vez que entras, el panel te pide <strong>elegir qué vendes</strong>: café espresso, bebidas con
+              leche, frappés, tés, bebidas frías, panadería, comida, crepas y personalizaciones. Marca los que te sirvan
+              y se agregan con precios de referencia.
+            </li>
+            <li>
+              Después puedes agregar más desde <strong>Productos → Agregar paquete</strong>. Sirve cuando el negocio
+              crece: metes «Frappés» cuando llega el calor sin tocar lo que ya tenías.
+            </li>
+            <li>
+              <strong>No duplica.</strong> Si un producto con ese nombre ya está en la categoría, se lo salta; si la
+              categoría ya existe, mete los productos ahí en vez de crear otra.
+            </li>
+            <li>
+              Los precios son un punto de partida, no una recomendación. Cámbialos en <strong>Productos</strong> (o
+              varios de un jalón con <strong>Precios en lote</strong>) y borra lo que no vendas.
+            </li>
+            <li>
+              ¿Quieres una carta completa de golpe? En la pantalla de arranque está{" "}
+              <strong>«Copiar el menú de ejemplo completo»</strong>, que solo funciona con la carta vacía para no
+              duplicarte todo.
+            </li>
+          </ul>
+        </>
       ),
     },
     {

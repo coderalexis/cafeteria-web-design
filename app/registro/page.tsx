@@ -39,11 +39,11 @@ export default async function RegistroPage() {
             Prueba el sistema en tu cafetería
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-stone-600">
-            {TRIAL_DAYS} días gratis, sin tarjeta. Tu cafetería queda lista con un menú de ejemplo para que empieces a
-            vender en cuanto confirmes tu correo.
+            {TRIAL_DAYS} días gratis, sin tarjeta. Confirmas tu correo, eliges qué vendes de una lista de paquetes
+            —café, frappés, panadería— y ya estás cobrando.
           </p>
           <ul className="mx-auto mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-stone-600">
-            {["Sin instalar nada", "Con tu menú y tus precios", "Cancela cuando quieras"].map((t) => (
+            {["Sin instalar nada", "Tu carta, no una ajena", "Cancela cuando quieras"].map((t) => (
               <li key={t} className="inline-flex items-center gap-1.5">
                 <Check className="h-4 w-4 text-emerald-600" />
                 {t}

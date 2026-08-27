@@ -181,16 +181,10 @@ export async function finishRegistration(): Promise<ActionResult<{ redirectTo: s
     return { error: memberError.message }
   }
 
-  // Menú de arranque: una cafetería vacía no se puede probar.
-  const { data: plantilla } = await admin
-    .from("businesses")
-    .select("id")
-    .eq("is_template", true)
-    .limit(1)
-    .maybeSingle()
-  if (plantilla) {
-    await admin.rpc("clone_menu", { p_source: plantilla.id, p_target: biz.id })
-  }
+  // La cafetería nace SIN menú, a propósito. Antes se clonaba entero el de la
+  // plantilla: 88 productos que nadie eligió, y borrarlos a mano para dejar los
+  // seis que sí se venden es peor que empezar de cero. Al entrar, /admin le
+  // pide que arme su carta con paquetes (o que copie el ejemplo, si lo quiere).
 
   const supabase = await createClient()
   await supabase.rpc("set_active_business", { p_business_id: biz.id })

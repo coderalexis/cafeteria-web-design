@@ -932,6 +932,10 @@ export type Database = {
         Args: { p_source: string; p_target: string }
         Returns: Json
       }
+      install_menu_pack: {
+        Args: { p_pack: Json }
+        Returns: Json
+      }
       close_cash_session: {
         Args: { p_counted_cash: number; p_notes?: string }
         Returns: Json
