@@ -20,6 +20,7 @@ import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, MENU_NOTE_MAX } from "@/lib/settings"
 import { trialState } from "@/lib/signup"
+import { GRACIA_HORAS, HORAS_SIN_HORARIO } from "@/lib/cash-session"
 import { MEXICO_TIMEZONES, dateStringInTz } from "@/lib/dates"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { buildTicketLines } from "@/lib/receipt"
@@ -394,6 +395,48 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 <option value="comanda">Comanda para preparación</option>
                 <option value="both">Ticket y comanda</option>
               </select>
+            </CardContent>
+          </Card>
+
+          <Card className={currentSettings.closingTime ? "" : "border-amber-200"}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-700" />
+                Hora de cierre y caja olvidada
+              </CardTitle>
+              <CardDescription>
+                Una caja que se queda abierta de un día para otro vuelve el arqueo imposible de cuadrar —el efectivo
+                del cajón contra las ventas de varios días— y no deja abrir la del día siguiente ni registrar su fondo.
+                Por eso, si se olvida, el sistema la cierra solo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="space-y-1.5">
+                <label htmlFor="closing_time" className="text-sm font-medium text-stone-700">
+                  ¿A qué hora cierras?
+                </label>
+                <Input
+                  id="closing_time"
+                  name="closing_time"
+                  type="time"
+                  defaultValue={currentSettings.closingTime}
+                  className="w-40"
+                />
+              </div>
+              {currentSettings.closingTime ? (
+                <p className="text-xs text-stone-400">
+                  Si a las <strong>{currentSettings.closingTime}</strong> + {GRACIA_HORAS} h de gracia la caja sigue
+                  abierta, se cierra sola <strong>sin arqueo</strong> (nadie contó el efectivo) y así queda anotado en
+                  el corte. Lo mejor sigue siendo cerrarla tú y contar.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700">
+                  <strong>Sin configurar.</strong> Mientras tanto la caja se cierra sola a las{" "}
+                  {HORAS_SIN_HORARIO} h de abierta. Pon tu hora de cierre para que el corte automático caiga cuando de
+                  verdad cierras, y sobre todo <strong>no olvides cerrar tu caja</strong>: un cierre automático va sin
+                  arqueo.
+                </p>
+              )}
             </CardContent>
           </Card>
 

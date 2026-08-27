@@ -10,7 +10,7 @@ export default async function CortesPage() {
     supabase
       .from("cash_sessions")
       .select(
-        "id, status, opened_by, opened_at, opening_float, opening_notes, closed_by, closed_at, expected_cash, counted_cash, difference, closing_notes",
+        "id, status, opened_by, opened_at, opening_float, opening_notes, closed_by, closed_at, expected_cash, counted_cash, difference, closing_notes, auto_closed",
       )
       .order("opened_at", { ascending: false })
       .limit(200),
@@ -65,6 +65,7 @@ export default async function CortesPage() {
     countedCash: s.counted_cash,
     difference: s.difference,
     closingNotes: s.closing_notes,
+    autoClosed: s.auto_closed === true,
   }))
 
   return <CortesClient sessions={serialized} />

@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit"
 import { homePathFor, parseContext } from "@/lib/context-shape"
 import { isValidTimeZone } from "@/lib/dates"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings, MENU_NOTE_MAX } from "@/lib/settings"
+import { normalizeClosingTime } from "@/lib/cash-session"
 import type { ActionResult } from "./types"
 
 /**
@@ -75,6 +76,7 @@ const settingsSchema = z.object({
   parkedOrders: z.enum(["on", "off"]).transform((v) => v === "on"),
   discountMaxCashier: z.number().int().min(0).max(100),
   menuNote: z.string().trim().max(MENU_NOTE_MAX, "La nota del menú es demasiado larga."),
+  closingTime: z.string().trim().max(5),
   loyalty: z.enum(["on", "off"]).transform((v) => v === "on"),
   loyaltyTarget: z.number().int().min(2).max(30),
   loyaltyReward: z.string().trim().max(60, "El nombre del premio es demasiado largo."),
@@ -100,6 +102,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     parkedOrders: formData.get("parked_orders") ?? "on",
     discountMaxCashier: Number(formData.get("discount_max_cashier") ?? 100),
     menuNote: formData.get("menu_note") ?? "",
+    closingTime: formData.get("closing_time") ?? "",
     loyalty: formData.get("loyalty") ?? "off",
     loyaltyTarget: Number(formData.get("loyalty_target") ?? 10),
     loyaltyReward: formData.get("loyalty_reward") ?? "",
@@ -128,6 +131,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       parkedOrders: v.parkedOrders,
       discountMaxCashier: v.discountMaxCashier,
       menuNote: v.menuNote,
+      closingTime: normalizeClosingTime(v.closingTime),
       loyalty: v.loyalty,
       loyaltyTarget: v.loyaltyTarget,
       loyaltyReward: v.loyaltyReward || "Bebida gratis",
@@ -169,6 +173,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.weeklyEmail !== v.weeklyEmail) cambios.push("resumen semanal")
   if (prevSettings.publicMenu !== v.publicMenu) cambios.push(v.publicMenu ? "menú público activado" : "menú público desactivado")
   if (prevSettings.menuNote !== v.menuNote) cambios.push("nota del menú")
+  if (prevSettings.closingTime !== normalizeClosingTime(v.closingTime)) cambios.push("hora de cierre")
   if (prevSettings.loyalty !== v.loyalty) cambios.push(v.loyalty ? "lealtad activada" : "lealtad desactivada")
   if (prevSettings.loyaltyTarget !== v.loyaltyTarget) cambios.push(`meta de sellos: ${v.loyaltyTarget}`)
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")

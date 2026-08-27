@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { isSyntheticEmail } from "@/lib/accounts"
 import { formatDateString, dateStringInTz, type DateString } from "@/lib/dates"
 import { trialState } from "@/lib/signup"
+import { closeStaleSessions } from "@/lib/stale-cash"
 
 /**
  * Vigilancia diaria de las pruebas gratuitas (/api/pruebas, cron de Vercel).
@@ -11,11 +12,12 @@ import { trialState } from "@/lib/signup"
  * Dos cosas, en este orden de importancia:
  *   1. **Avisar.** A dos días del final y otra vez el último día. El aviso en
  *      pantalla (banner) ya está; esto es para quien no abrió el sistema.
- *   2. **Suspender la vencida** — pero NUNCA con la caja abierta. Suspender a
- *      media jornada dejaría un turno sin cortar y un arqueo imposible de
- *      cuadrar: el dinero del cajón ya no coincidiría con nada. Si hay caja
- *      abierta se deja pasar el día y se reintenta mañana; el corte cierra la
- *      jornada y entonces sí se suspende.
+ *   2. **Suspender la vencida** — pero no a media jornada: suspender con la
+ *      caja abierta dejaría un turno sin cortar y un arqueo imposible de
+ *      cuadrar. La espera NO es indefinida: antes de evaluar nada se barren
+ *      las cajas olvidadas (`closeStaleSessions`), así que solo queda abierta
+ *      la de un turno de verdad en curso. Sin ese barrido, una cafetería que
+ *      nunca cerrara su caja nunca perdería la prueba.
  *
  * Suspender no borra nada: los datos siguen ahí y basta reactivar desde /super.
  */
@@ -106,6 +108,10 @@ export async function runTrialCheck(options: {
   const apiKey = process.env.RESEND_API_KEY
   const now = options.now ?? new Date()
   const admin = createAdminClient()
+
+  // Primero las cajas olvidadas: si no, «tiene la caja abierta» sería excusa
+  // permanente para no vencer nunca.
+  if (!options.dryRun) await closeStaleSessions()
 
   let query = admin
     .from("businesses")

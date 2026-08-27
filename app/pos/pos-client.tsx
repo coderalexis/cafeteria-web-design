@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS } from "@/lib/format"
+import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS, formatDate } from "@/lib/format"
 import {
   buildKitchenLines,
   buildShareText,
@@ -505,6 +505,10 @@ export default function POSClient({
   const [showTender, setShowTender] = useState(false)
   // Lealtad: el cliente se adjunta POR VENTA y no se guarda con el carrito —
   // una tarjeta pegada de una venta anterior sellaría al cliente equivocado.
+  // Una caja de otro día no se distingue de una recién abierta si el chip solo
+  // dice la hora: hay que decirlo con todas sus letras.
+  const cajaDeOtroDia =
+    openSession != null && formatDate(openSession.openedAt) !== formatDate(new Date())
   const loyaltyEnabled = loyalty
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<LoyaltyCustomer | null>(null)
   const [loyaltyRedeem, setLoyaltyRedeem] = useState(false)
@@ -1574,7 +1578,9 @@ export default function POSClient({
       onClick={() => setShowCashDialog(true)}
       className={`backdrop-blur gap-1.5 font-semibold ${
         openSession
-          ? "bg-green-50/90 border-green-300 text-green-700 hover:bg-green-100"
+          ? cajaDeOtroDia
+            ? "bg-amber-50/90 border-amber-400 text-amber-800 hover:bg-amber-100"
+            : "bg-green-50/90 border-green-300 text-green-700 hover:bg-green-100"
           : "bg-red-50/90 border-red-300 text-red-700 hover:bg-red-100"
       }`}
       title={openSession ? "Cerrar caja (corte) · movimientos de efectivo" : "Abrir caja"}
@@ -1582,10 +1588,14 @@ export default function POSClient({
       {openSession ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
       {compact
         ? openSession
-          ? "Caja"
+          ? cajaDeOtroDia
+            ? "Caja de otro día"
+            : "Caja"
           : "Cerrada"
         : openSession
-        ? `Caja abierta · ${formatTime(openSession.openedAt)}`
+        ? cajaDeOtroDia
+          ? `Caja abierta desde ${formatDate(openSession.openedAt)}`
+          : `Caja abierta · ${formatTime(openSession.openedAt)}`
         : "Caja cerrada"}
       {!compact && <Kbd>K</Kbd>}
     </Button>

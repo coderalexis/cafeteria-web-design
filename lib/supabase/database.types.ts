@@ -290,6 +290,7 @@ export type Database = {
       }
       cash_sessions: {
         Row: {
+          auto_closed: boolean
           business_id: string
           closed_at: string | null
           closed_by: string | null
@@ -305,6 +306,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          auto_closed?: boolean
           business_id?: string
           closed_at?: string | null
           closed_by?: string | null
@@ -320,6 +322,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          auto_closed?: boolean
           business_id?: string
           closed_at?: string | null
           closed_by?: string | null
@@ -991,6 +994,10 @@ export type Database = {
       }
       loyalty_find_or_create: {
         Args: { p_name?: string; p_phone: string }
+        Returns: Json
+      }
+      force_close_cash_session: {
+        Args: { p_deadline: string; p_reason: string; p_session_id: string }
         Returns: Json
       }
       install_menu_pack: {

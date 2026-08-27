@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { POS_SHORTCUTS } from "@/app/pos/shortcuts"
 import { TRIAL_DAYS } from "@/lib/signup"
+import { GRACIA_HORAS, HORAS_SIN_HORARIO } from "@/lib/cash-session"
 import { DemoDiferencia, DemoEfectivo, DemoPOS, DemoPropina, DemoQR, TicketImpreso } from "./demos"
 
 /**
@@ -343,7 +344,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: Lock,
       titulo: "Cerrar el turno (corte de caja)",
-      palabras: "corte cierre esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas",
+      palabras:
+        "corte cierre esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre",
       href: "/pos",
       nodo: (
         <>
@@ -367,6 +369,24 @@ export function AyudaClient({ ticket, corte }: Props) {
             </Step>
           </ol>
           <DemoDiferencia />
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-semibold">¿Y si un día se me olvida cerrarla?</p>
+            <p className="mt-1">
+              El sistema la cierra solo. No es un premio: se cierra <strong>sin arqueo</strong> —nadie contó el
+              efectivo—, el corte queda marcado como «cierre automático» y esa diferencia ya no se puede recuperar.
+              Sirve para que al día siguiente puedas abrir tu caja con su fondo y que el arqueo no arrastre las ventas
+              de dos días.
+            </p>
+            <p className="mt-1">
+              Cuándo se cierra: <strong>{GRACIA_HORAS} horas después de tu hora de cierre</strong>, la que hayas puesto
+              en Negocio. Si no la has puesto, a las <strong>{HORAS_SIN_HORARIO} horas</strong> de abierta. Configúrala:
+              así el corte automático cae cuando de verdad cierras y no a media tarde.
+            </p>
+            <p className="mt-1">
+              Mientras siga abierta de un día anterior, el botón de la caja se pone <strong>ámbar</strong> y te dice
+              desde cuándo, en vez de verde.
+            </p>
+          </div>
           <TicketImpreso lineas={corte} titulo="Un corte de este sistema, tal cual se imprime" />
         </>
       ),
@@ -659,7 +679,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Store,
       titulo: "Datos del negocio, metas y menú con QR",
-      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera",
+      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada",
       href: "/admin/negocio",
       nodo: (
         <>
@@ -704,6 +724,12 @@ export function AyudaClient({ ticket, corte }: Props) {
               corto del café (para el login de cajeros) se muestra ahí y no se puede cambiar.
             </li>
             <li>
+              <strong>Hora de cierre</strong>: a qué hora cierras tu café. Con eso, una caja que se quedó abierta se
+              cierra sola {GRACIA_HORAS} horas después de esa hora —sin arqueo, y marcada como automática— en lugar de
+              esperar al tope de {HORAS_SIN_HORARIO} horas que aplica cuando no la has configurado. Ponla: es la
+              diferencia entre un cierre a tu hora y uno a media tarde.
+            </li>
+            <li>
               <strong>Seguridad de caja</strong>: activa el bloqueo por inactividad y el POS se bloquea solo; se
               desbloquea con el PIN de quien está en caja.
             </li>
@@ -716,7 +742,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: CalendarClock,
       titulo: "Tu prueba gratis",
-      palabras: "prueba gratis dias trial vencimiento suspension banner rojo pagar continuar",
+      palabras: "prueba gratis dias trial vencimiento suspension banner rojo pagar continuar caja abierta cierre automatico",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -742,7 +768,8 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             <strong>Con la caja abierta no te pausamos.</strong> Si te vence a media jornada, esperamos a que hagas tu
-            corte para que el arqueo te cuadre y no se te quede un turno sin cerrar.
+            corte para que el arqueo te cuadre y no se te quede un turno sin cerrar. Esa espera termina cuando la caja
+            se cierra —tú o, si se te olvida, el cierre automático—: dejarla abierta no alarga la prueba.
           </li>
           <li>
             ¿Quieres seguir? Escríbenos a <strong>soporte@cafecitopos.com</strong> y lo reactivamos.
@@ -819,7 +846,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Unlock,
       titulo: "Cortes de caja",
-      palabras: "historial turnos esperado contado diferencia cuadre reimprimir parcial propinas",
+      palabras: "historial turnos esperado contado diferencia cuadre reimprimir parcial propinas cierre automatico sin arqueo nadie conto",
       href: "/admin/cortes",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
@@ -827,6 +854,12 @@ export function AyudaClient({ ticket, corte }: Props) {
             Muestra el estado actual de la caja y el historial de turnos: fondo, efectivo vendido, propinas, esperado,
             contado y <strong>diferencia</strong> (verde cuadró, azul sobrante, rojo faltante — como en la demo del
             corte). Cada corte se puede reimprimir; con la caja abierta puedes imprimir un corte parcial.
+          </li>
+          <li>
+            Un turno marcado <strong>«cierre automático · sin arqueo»</strong> es una caja que se quedó abierta y cerró
+            sola: dice el efectivo esperado, pero en Contado dice <strong>«nadie contó»</strong> y no cuenta para la
+            diferencia acumulada —no se puede inventar un número que nadie verificó—. Si ves varios, pon tu{" "}
+            <strong>hora de cierre</strong> en Negocio y recuérdale al equipo cerrar la caja.
           </li>
         </ul>
       ),

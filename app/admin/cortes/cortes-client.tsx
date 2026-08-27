@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { Wallet, Printer, Unlock, Lock, StickyNote } from "lucide-react"
+import { Wallet, Printer, Unlock, Lock, StickyNote, Clock } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,8 @@ export interface CashSessionRecord {
   expectedCash: number | null
   countedCash: number | null
   difference: number | null
+  /** Cerrada por el sistema tras quedar olvidada: nadie contó el efectivo. */
+  autoClosed?: boolean
   closingNotes: string | null
   movementsIn: number
   movementsOut: number
@@ -202,11 +204,23 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                           {s.expectedCash != null ? formatCurrency(s.expectedCash) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-stone-800">
-                          {s.countedCash != null ? formatCurrency(s.countedCash) : "—"}
+                          {s.countedCash != null ? formatCurrency(s.countedCash) : s.autoClosed ? (
+                            <span className="text-xs font-normal text-stone-400">nadie contó</span>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <DifferenceBadge value={s.difference} />
+                            {/* Un cierre automático no tiene diferencia porque no hubo
+                                conteo: decirlo es más útil que un cero de mentira. */}
+                            {s.autoClosed ? (
+                              <Badge className="gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100">
+                                <Clock className="h-3 w-3" /> cierre automático · sin arqueo
+                              </Badge>
+                            ) : (
+                              <DifferenceBadge value={s.difference} />
+                            )}
                             {(s.openingNotes || s.closingNotes) && (
                               <span
                                 className="inline-flex"

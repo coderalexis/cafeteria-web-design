@@ -1,3 +1,5 @@
+import { normalizeClosingTime } from "./cash-session"
+
 /**
  * Ajustes por cafetería guardados en `businesses.settings` (jsonb).
  * Un solo lugar para leerlos con defaults seguros: valores raros o de
@@ -27,6 +29,12 @@ export interface BusinessSettings {
    * RPC, no solo la pantalla.
    */
   discountMaxCashier: number
+  /**
+   * Hora a la que cierra la cafetería ("HH:MM"), o "" si no la configuró.
+   * Con ella, la caja olvidada se cierra sola a esa hora + gracia; sin ella,
+   * a las 12 h de abierta. Ver `lib/cash-session.ts`.
+   */
+  closingTime: string
   /** Lealtad con sellos: tarjeta digital por teléfono. Apagado por defecto —
    *  guardar teléfonos de clientes es una decisión del dueño. */
   loyalty: boolean
@@ -56,6 +64,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   // 100 = como se comportaba antes de existir el ajuste.
   discountMaxCashier: 100,
   menuNote: "",
+  closingTime: "",
   loyalty: false,
   loyaltyTarget: 10,
   loyaltyReward: "Bebida gratis",
@@ -96,6 +105,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
       out.discountMaxCashier = Math.round(tope)
     }
     if (typeof r.menu_note === "string") out.menuNote = r.menu_note.slice(0, MENU_NOTE_MAX)
+    if (typeof r.closing_time === "string") out.closingTime = normalizeClosingTime(r.closing_time)
     out.loyalty = r.loyalty === true
     const meta = Number(r.loyalty_target)
     if (Number.isFinite(meta) && meta >= 2 && meta <= 30) out.loyaltyTarget = Math.round(meta)
@@ -121,6 +131,7 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     parked_orders: s.parkedOrders,
     discount_max_cashier: s.discountMaxCashier,
     menu_note: s.menuNote,
+    closing_time: s.closingTime,
     loyalty: s.loyalty,
     loyalty_target: s.loyaltyTarget,
     loyalty_reward: s.loyaltyReward,

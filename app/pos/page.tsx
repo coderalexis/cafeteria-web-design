@@ -4,6 +4,7 @@ import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
 import { parseBusinessSettings } from "@/lib/settings"
 import { businessDayRange } from "@/lib/dates"
+import { closeStaleSessionFor } from "@/lib/stale-cash"
 import POSClient from "./pos-client"
 
 /* ------------------------------------------------------------------ */
@@ -19,6 +20,12 @@ export default async function POSPage() {
   }
   const isAdmin = isManager(ctx.role)
   const businessId = ctx.business.id
+
+  // Antes de leer la caja: si la del turno pasado quedó abierta y ya venció,
+  // se cierra sola. Aquí y no solo en el cron porque este es el momento en que
+  // importa — quien llega a abrir su turno la encuentra limpia y puede
+  // registrar su fondo inicial.
+  await closeStaleSessionFor(businessId)
 
   /* ── Fetch menu data ────────────────────────────────────────────── */
   const [{ data: dbCategories }, { data: dbProducts }] = await Promise.all([
