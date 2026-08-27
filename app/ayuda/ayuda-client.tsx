@@ -112,6 +112,10 @@ export function AyudaClient({ ticket, corte }: Props) {
             campo Café se oculta solo.
           </li>
           <li>
+            El <strong>ojito</strong> del campo de contraseña la muestra para revisar que la escribiste bien antes de
+            entrar. Empieza oculta y se vuelve a ocultar cada vez que se carga la pantalla.
+          </li>
+          <li>
             Si perteneces a varias cafeterías, arriba verás un <strong>selector</strong> para cambiar de una a otra. Tu
             contraseña se cambia en <strong>Mi cuenta</strong>.
           </li>
@@ -149,8 +153,9 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ol className="mt-4 space-y-3">
             <Step n={3} title="Ajusta cantidades y notas">
               Con <strong>+ / −</strong> cambias la cantidad. El icono de nota en cada línea permite instrucciones de
-              ese artículo («sin azúcar»). La <strong>nota del ticket</strong> (mesa, nombre, para llevar) va abajo,
-              sobre los métodos de pago.
+              ese artículo («sin azúcar»). Abajo, los controles van en el orden en que se usan: método de pago,
+              efectivo recibido, propina, y hasta el final los chips de <strong>Para llevar / Aquí</strong> y la{" "}
+              <strong>nota del ticket</strong> (mesa, nombre).
             </Step>
             <Step n={4} title="Elige método de pago y cobra">
               Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, tócala antes de cobrar.
@@ -234,10 +239,12 @@ export function AyudaClient({ ticket, corte }: Props) {
         <>
           <ul className="space-y-2 text-sm text-stone-600">
             <li>
-              Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>: escribe lo que te dio el cliente
-              con el teclado en pantalla o usa los botones de billetes, que se{" "}
-              <strong>calculan según el total</strong> (para una cuenta de $87 ofrece $90, $100 y $200). El sistema
-              calcula el <strong>cambio</strong>; si no alcanza, no deja cobrar. <strong>C</strong> borra lo escrito.
+              Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>. Toca{" "}
+              <strong>«Teclado y montos rápidos»</strong> y se abre en grande, con teclas de dedo: los billetes se{" "}
+              <strong>calculan según el total</strong> (para una cuenta de $87 ofrece $90, $100 y $200) y{" "}
+              <strong>Exacto</strong> pone el importe justo. El sistema calcula el <strong>cambio</strong> mientras
+              tecleas; si no alcanza, no deja cobrar. Con teclado físico puedes escribir directo en el campo (atajo{" "}
+              <strong>F4</strong>).
             </li>
           </ul>
           <DemoEfectivo />
@@ -271,7 +278,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            Botón <strong>Tickets</strong> (arriba a la derecha): lista las ventas del día. Cada una tiene{" "}
+            Menú <strong>⋮</strong> (arriba a la derecha) → <strong>Tickets del día</strong>: lista las ventas del
+            turno. Cada una tiene{" "}
             <Printer className="inline h-3.5 w-3.5 align-text-bottom" /> reimprimir ticket,{" "}
             <ChefHat className="inline h-3.5 w-3.5 align-text-bottom" /> comanda y{" "}
             <Ban className="inline h-3.5 w-3.5 align-text-bottom" /> cancelar.
@@ -327,8 +335,12 @@ export function AyudaClient({ ticket, corte }: Props) {
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
             En pantallas chicas el carrito vive en la <strong>barra inferior</strong>: muestra artículos y total; tócala
-            para abrirlo y cobrar. Las acciones (Tickets, Caja, Guía, Cerrar sesión) están en el menú <strong>⋮</strong>{" "}
-            arriba a la derecha.
+            para abrirlo y cobrar. En pantallas grandes va como columna a la derecha.
+          </li>
+          <li>
+            En cualquier tamaño, a la vista arriba queda solo el <strong>estado de la caja</strong>; lo demás (Tickets,
+            Administrar, tamaño de letra, atajos, Mi cuenta, cerrar sesión) está en el menú <strong>⋮</strong> de la
+            derecha. Así el encabezado no le tapa el nombre ni el total del día.
           </li>
           <li>
             <strong>Instalar como app</strong>: en Chrome/Android o Safari/iPad abre el sitio y elige{" "}
@@ -347,8 +359,9 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            En el punto de venta, arriba a la derecha están <strong>A−</strong> y <strong>A+</strong>. Van entre cuatro
-            tamaños: Compacto, Normal, Grande y Muy grande. En celular está en el menú <strong>⋮ → Tamaño de letra</strong>.
+            En el punto de venta, menú <strong>⋮</strong> arriba a la derecha → <strong>Tamaño de letra</strong>, con{" "}
+            <strong>A−</strong> y <strong>A+</strong>. Van entre cuatro tamaños: Compacto, Normal, Grande y Muy grande.
+            El menú <strong>no se cierra</strong> mientras ajustas, para que puedas probar uno y otro.
           </li>
           <li>
             Los productos con una <strong>«i»</strong> en la esquina traen descripción: tócala y se abre lo que lleva,
@@ -427,6 +440,14 @@ export function AyudaClient({ ticket, corte }: Props) {
             <strong>Productos</strong>: cada uno tiene una o más <strong>variantes</strong> (tamaños con precio). Un
             producto con una sola variante llamada <code>Único</code> se vende con un toque. Desde el editor puedes
             ocultar del POS un producto o una variante (<em>Desactivar</em>).
+          </li>
+          <li>
+            <strong>Descripción</strong>: hace dos cosas según cuántos productos la compartan. Si es de{" "}
+            <strong>un solo producto</strong> (sus ingredientes), sale como subtítulo en su tarjeta y detrás de la{" "}
+            <strong>«i»</strong> del POS. Si <strong>varios de la misma categoría</strong> tienen exactamente la misma,
+            el POS la usa como <strong>subtítulo de sección</strong> para agruparlos («Frappé a base de leche» contra
+            «a base de agua»). Si ves un encabezado raro en el POS, casi siempre es una descripción repetida que
+            conviene borrar o corregir.
           </li>
           <li>
             <strong>Orden</strong>: en Categorías, las flechas ↑↓ acomodan las pestañas del POS; en Productos, el botón{" "}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Delete } from "lucide-react"
 import QRCode from "react-qr-code"
 import { COLOR_CLASSES, DEFAULT_CHIP_ACTIVE } from "@/lib/category-colors"
 import { formatCurrency } from "@/lib/format"
@@ -84,42 +85,37 @@ export function DemoEfectivo() {
   const n = recibido === "" ? null : Number(recibido)
   const cambio = n === null || Number.isNaN(n) ? null : Math.round((n - TOTAL) * 100) / 100
 
-  const teclear = (k: string) =>
-    setRecibido((prev) => (k === "C" ? "" : (prev + k).replace(/^0+(?=\d)/, "").slice(0, 6)))
+  // Mismo actualizador funcional que el POS: dos toques seguidos se encadenan.
+  const teclear = (k: string) => setRecibido((prev) => (prev + k).replace(/^0+(?=\d)/, "").slice(0, 6))
 
   return (
     <MarcoDemo titulo="Pruébalo — un cliente te paga una cuenta de $97.00">
-      <div className="max-w-sm space-y-2 rounded-lg border border-green-200 bg-green-50/60 p-2.5">
-        <div className="flex items-center gap-2">
-          <span className="shrink-0 text-xs font-medium text-green-800">Recibido</span>
-          <div className="h-9 flex-1 rounded-md border border-green-200 bg-white px-2.5 text-sm font-semibold leading-9 text-stone-800">
-            {recibido || <span className="font-normal text-stone-300">Toca el teclado</span>}
-          </div>
-          <span
-            className={`min-w-[7rem] shrink-0 text-right text-sm font-bold ${
+      <div className="max-w-xs space-y-2 rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
+        <p className="text-xs font-semibold text-stone-500">Efectivo recibido</p>
+
+        <div className="rounded-lg border border-green-200 bg-green-50/60 p-3 text-center">
+          <p className="text-[11px] font-medium text-green-800">A cobrar {formatCurrency(TOTAL)}</p>
+          <p className="mt-0.5 text-2xl font-bold tabular-nums text-green-900">
+            {recibido === "" ? "—" : formatCurrency(Number(recibido))}
+          </p>
+          <p
+            className={`mt-0.5 text-xs font-semibold ${
               cambio === null ? "text-stone-400" : cambio < 0 ? "text-red-600" : "text-green-700"
             }`}
           >
-            {cambio === null ? "Cambio —" : cambio < 0 ? `Faltan ${formatCurrency(-cambio)}` : `Cambio ${formatCurrency(cambio)}`}
-          </span>
+            {cambio === null
+              ? "Cambio —"
+              : cambio < 0
+                ? `Faltan ${formatCurrency(-cambio)}`
+                : `Cambio ${formatCurrency(cambio)}`}
+          </p>
         </div>
-        <div className="grid grid-cols-6 gap-1">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "00", "C"].map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => teclear(k)}
-              className="rounded-md border border-green-200 bg-white py-1.5 text-sm font-semibold text-green-900 hover:bg-green-100 active:bg-green-200"
-            >
-              {k}
-            </button>
-          ))}
-        </div>
+
         <div className="flex gap-1">
           <button
             type="button"
             onClick={() => setRecibido(String(TOTAL))}
-            className="flex-1 rounded-md border border-green-200 bg-white py-1 text-xs font-semibold text-green-800 hover:bg-green-100"
+            className="flex-1 rounded-lg border border-green-300 bg-white py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50"
           >
             Exacto
           </button>
@@ -129,12 +125,34 @@ export function DemoEfectivo() {
               type="button"
               disabled={m < TOTAL}
               onClick={() => setRecibido(String(m))}
-              className="flex-1 rounded-md border border-green-200 bg-white py-1 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
+              className="flex-1 rounded-lg border border-green-300 bg-white py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50 disabled:opacity-40"
             >
               ${m}
             </button>
           ))}
         </div>
+
+        <div className="grid grid-cols-3 gap-1.5">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0"].map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => teclear(k)}
+              className="rounded-lg border border-stone-200 bg-white py-2.5 text-base font-semibold text-stone-800 hover:bg-stone-50 active:bg-stone-100"
+            >
+              {k}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setRecibido((prev) => prev.slice(0, -1))}
+            aria-label="Borrar el último dígito"
+            className="flex items-center justify-center rounded-lg border border-stone-200 bg-white py-2.5 text-stone-600 hover:bg-stone-50 active:bg-stone-100"
+          >
+            <Delete className="h-4 w-4" />
+          </button>
+        </div>
+
         <p className="text-[11px] text-stone-500">
           El $50 aparece apagado porque no alcanza para $97 — el POS hace lo mismo.
         </p>
