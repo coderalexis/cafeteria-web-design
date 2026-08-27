@@ -1188,268 +1188,277 @@ export default function POSClient({
       </ScrollArea>
 
       {/* Checkout */}
-      <div className="shrink-0 p-4 border-t border-stone-200 bg-stone-50/80 space-y-3">
-        {/* Nota del ticket: chips de un toque + texto libre */}
-        <div className="flex gap-1.5">
-          {QUICK_NOTES.map((qn) => {
-            const activa = ticketNotes === qn || ticketNotes.startsWith(qn + " · ")
-            return (
-              <button
-                key={qn}
-                type="button"
-                onClick={() => {
-                  const resto = QUICK_NOTES.reduce(
-                    (t, otro) => (t === otro ? "" : t.startsWith(otro + " · ") ? t.slice(otro.length + 3) : t),
-                    ticketNotes,
-                  )
-                  setTicketNotes(activa ? resto : resto ? `${qn} · ${resto}` : qn)
-                }}
-                className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  activa
-                    ? "border-amber-600 bg-amber-600 text-white"
-                    : "border-stone-200 bg-white text-stone-500 hover:border-amber-300"
-                }`}
-              >
-                {qn}
-              </button>
-            )
-          })}
-        </div>
-        <Input
-          placeholder="Nota del ticket: mesa, nombre, para llevar..."
-          value={ticketNotes}
-          onChange={(e) => setTicketNotes(e.target.value)}
-          maxLength={500}
-          className="bg-white border-stone-200 h-9 text-sm"
-        />
+      {/* Bloque de cobro. En una tablet horizontal (768 px de alto) esto medía
+          555 px y, siendo shrink-0, aplastaba la lista de artículos a 125 px: el
+          cajero no alcanzaba a ver lo que estaba cobrando. Ahora se topa en 55%
+          del panel; los controles ceden y se desplazan, y el total con el botón
+          de cobro nunca se mueven — son lo único que no se puede perder de vista. */}
+      <div className="flex max-h-[55%] shrink-0 flex-col border-t border-stone-200 bg-stone-50/80">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-0">
+          {/* Nota del ticket: chips de un toque + texto libre */}
+          <div className="flex gap-1.5">
+            {QUICK_NOTES.map((qn) => {
+              const activa = ticketNotes === qn || ticketNotes.startsWith(qn + " · ")
+              return (
+                <button
+                  key={qn}
+                  type="button"
+                  onClick={() => {
+                    const resto = QUICK_NOTES.reduce(
+                      (t, otro) => (t === otro ? "" : t.startsWith(otro + " · ") ? t.slice(otro.length + 3) : t),
+                      ticketNotes,
+                    )
+                    setTicketNotes(activa ? resto : resto ? `${qn} · ${resto}` : qn)
+                  }}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    activa
+                      ? "border-amber-600 bg-amber-600 text-white"
+                      : "border-stone-200 bg-white text-stone-500 hover:border-amber-300"
+                  }`}
+                >
+                  {qn}
+                </button>
+              )
+            })}
+          </div>
+          <Input
+            placeholder="Nota del ticket: mesa, nombre, para llevar..."
+            value={ticketNotes}
+            onChange={(e) => setTicketNotes(e.target.value)}
+            maxLength={500}
+            className="bg-white border-stone-200 h-9 text-sm"
+          />
 
-        {/* Payment method selector */}
-        <div className="flex gap-2">
-          {PAYMENT_METHOD_KEYS.map((key, index) => {
-            const info = PAYMENT_METHODS[key]
-            const Icon = info.icon
-            const active = paymentMethod === key
-            const activeClass =
-              key === "efectivo"
-                ? "border-green-500 bg-green-50 text-green-700"
-                : key === "transferencia"
-                ? "border-violet-500 bg-violet-50 text-violet-700"
-                : "border-blue-500 bg-blue-50 text-blue-700"
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setPaymentMethod(key)}
-                className={`relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
-                  active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {info.shortLabel}
-                <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Propina: se cobra encima del total y no cuenta como venta */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-medium text-stone-500 shrink-0 flex items-center gap-1">
-            <HandCoins className="h-3.5 w-3.5" />
-            Propina
-          </span>
-          {TIP_OPTIONS.map((option) => {
-            const active = tipChoice === option
-            return (
-              <button
-                key={String(option)}
-                type="button"
-                disabled={lines.length === 0}
-                onClick={() => {
-                  setTipChoice(option)
-                  if (option !== "otro") setTipCustomInput("")
-                }}
-                className={`px-2.5 py-1 rounded-md border text-xs font-semibold transition-colors disabled:opacity-40 ${
-                  active
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-stone-200 bg-white text-stone-500 hover:border-emerald-300 hover:text-emerald-700"
-                }`}
-              >
-                {option === "otro" ? "Otro" : option === 0 ? "Sin" : `${option}%`}
-              </button>
-            )
-          })}
-          {tipChoice === "otro" && (
-            <Input
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.5"
-              placeholder="$"
-              value={tipCustomInput}
-              onChange={(e) => setTipCustomInput(e.target.value)}
-              className="h-8 w-24 text-sm font-semibold"
-            />
-          )}
-          {tipAmount > 0 && (
-            <span className="ml-auto text-sm font-bold text-emerald-700">+{formatCurrency(tipAmount)}</span>
-          )}
-        </div>
-
-        {/* Efectivo recibido + cambio */}
-        {paymentMethod === "efectivo" && (
-          <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
-                Recibido <Kbd>F4</Kbd>
-              </span>
-              <Input
-                ref={cashInputRef}
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="Opcional"
-                value={cashReceivedInput}
-                onChange={(e) => setCashReceivedInput(e.target.value)}
-                className={`h-9 text-sm font-semibold bg-white ${
-                  cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
-                }`}
-              />
-              <span
-                className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
-                  cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
-                }`}
-              >
-                {cashInsufficient
-                  ? `Faltan ${formatCurrency(due - (cashReceived ?? 0))}`
-                  : changeDue !== null
-                  ? `Cambio ${formatCurrency(changeDue)}`
-                  : "Cambio —"}
-              </span>
-            </div>
-            {/* Teclado numérico: en tablet es más rápido que el teclado del sistema */}
-            <div className="grid grid-cols-6 gap-1.5">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "00", "C"].map((key) => (
+          {/* Payment method selector */}
+          <div className="flex gap-2">
+            {PAYMENT_METHOD_KEYS.map((key, index) => {
+              const info = PAYMENT_METHODS[key]
+              const Icon = info.icon
+              const active = paymentMethod === key
+              const activeClass =
+                key === "efectivo"
+                  ? "border-green-500 bg-green-50 text-green-700"
+                  : key === "transferencia"
+                  ? "border-violet-500 bg-violet-50 text-violet-700"
+                  : "border-blue-500 bg-blue-50 text-blue-700"
+              return (
                 <button
                   key={key}
                   type="button"
-                  onClick={() =>
-                    setCashReceivedInput((prev) =>
-                      key === "C" ? "" : (prev + key).replace(/^0+(?=\d)/, "").slice(0, 7),
-                    )
-                  }
-                  className="py-2 rounded-md bg-white border border-green-200 text-sm font-semibold text-green-900 hover:bg-green-100 active:bg-green-200"
+                  onClick={() => setPaymentMethod(key)}
+                  className={`relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                    active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
+                  }`}
                 >
-                  {key}
+                  <Icon className="h-4 w-4" />
+                  {info.shortLabel}
+                  <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
                 </button>
-              ))}
-            </div>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => setCashReceivedInput(due > 0 ? String(due) : "")}
-                className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
-              >
-                Exacto
-              </button>
-              {cashSuggestions(due).map((amount) => (
-                <button
-                  key={amount}
-                  type="button"
-                  onClick={() => setCashReceivedInput(String(amount))}
-                  className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
-                  disabled={amount < due}
-                >
-                  ${amount}
-                </button>
-              ))}
-            </div>
+              )
+            })}
           </div>
-        )}
 
-        {/* Subtotal / descuento / total */}
-        <div className="space-y-1">
-          {(discount || subtotal > 0) && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">Subtotal</span>
-              <span className="text-stone-600">{formatCurrency(subtotal)}</span>
-            </div>
-          )}
-          <div className="flex justify-between items-center text-sm">
-            <button
-              type="button"
-              onClick={() => setShowDiscount(true)}
-              disabled={lines.length === 0}
-              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 -ml-1.5 transition-colors disabled:opacity-40 ${
-                discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
-              }`}
-            >
-              <Percent className="h-3.5 w-3.5" />
-              {discount
-                ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
-                : "Agregar descuento"}
-              <Kbd>D</Kbd>
-            </button>
-            {discount && (
-              <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
-                {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
-              </span>
+          {/* Propina: se cobra encima del total y no cuenta como venta */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-medium text-stone-500 shrink-0 flex items-center gap-1">
+              <HandCoins className="h-3.5 w-3.5" />
+              Propina
+            </span>
+            {TIP_OPTIONS.map((option) => {
+              const active = tipChoice === option
+              return (
+                <button
+                  key={String(option)}
+                  type="button"
+                  disabled={lines.length === 0}
+                  onClick={() => {
+                    setTipChoice(option)
+                    if (option !== "otro") setTipCustomInput("")
+                  }}
+                  className={`px-2.5 py-1 rounded-md border text-xs font-semibold transition-colors disabled:opacity-40 ${
+                    active
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-stone-200 bg-white text-stone-500 hover:border-emerald-300 hover:text-emerald-700"
+                  }`}
+                >
+                  {option === "otro" ? "Otro" : option === 0 ? "Sin" : `${option}%`}
+                </button>
+              )
+            })}
+            {tipChoice === "otro" && (
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.5"
+                placeholder="$"
+                value={tipCustomInput}
+                onChange={(e) => setTipCustomInput(e.target.value)}
+                className="h-8 w-24 text-sm font-semibold"
+              />
+            )}
+            {tipAmount > 0 && (
+              <span className="ml-auto text-sm font-bold text-emerald-700">+{formatCurrency(tipAmount)}</span>
             )}
           </div>
-          <div className="flex justify-between items-center">
-            <span className={tipAmount > 0 ? "text-sm text-stone-500" : "text-base font-medium text-stone-500"}>
-              Total
-            </span>
-            <span
-              className={
-                tipAmount > 0 ? "text-base font-semibold text-stone-700" : "text-2xl font-bold text-stone-800"
-              }
-            >
-              {formatCurrency(total)}
-            </span>
-          </div>
-          {tipAmount > 0 && (
-            <>
+
+          {/* Efectivo recibido + cambio */}
+          {paymentMethod === "efectivo" && (
+            <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
+                  Recibido <Kbd>F4</Kbd>
+                </span>
+                <Input
+                  ref={cashInputRef}
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="Opcional"
+                  value={cashReceivedInput}
+                  onChange={(e) => setCashReceivedInput(e.target.value)}
+                  className={`h-9 text-sm font-semibold bg-white ${
+                    cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
+                  }`}
+                />
+                <span
+                  className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
+                    cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
+                  }`}
+                >
+                  {cashInsufficient
+                    ? `Faltan ${formatCurrency(due - (cashReceived ?? 0))}`
+                    : changeDue !== null
+                    ? `Cambio ${formatCurrency(changeDue)}`
+                    : "Cambio —"}
+                </span>
+              </div>
+              {/* Teclado numérico: en tablet es más rápido que el teclado del sistema */}
+              <div className="grid grid-cols-6 gap-1.5">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "00", "C"].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() =>
+                      setCashReceivedInput((prev) =>
+                        key === "C" ? "" : (prev + key).replace(/^0+(?=\d)/, "").slice(0, 7),
+                      )
+                    }
+                    className="py-2 rounded-md bg-white border border-green-200 text-sm font-semibold text-green-900 hover:bg-green-100 active:bg-green-200"
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCashReceivedInput(due > 0 ? String(due) : "")}
+                  className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
+                >
+                  Exacto
+                </button>
+                {cashSuggestions(due).map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setCashReceivedInput(String(amount))}
+                    className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
+                    disabled={amount < due}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+        <div className="shrink-0 space-y-3 p-4 pt-3">
+          {/* Subtotal / descuento / total */}
+          <div className="space-y-1">
+            {(discount || subtotal > 0) && (
               <div className="flex justify-between items-center text-sm">
-                <span className="text-stone-500">Propina</span>
-                <span className="text-emerald-700">+{formatCurrency(tipAmount)}</span>
+                <span className="text-stone-500">Subtotal</span>
+                <span className="text-stone-600">{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-medium text-stone-500">A cobrar</span>
-                <span className="text-2xl font-bold text-stone-800">{formatCurrency(due)}</span>
-              </div>
-            </>
+            )}
+            <div className="flex justify-between items-center text-sm">
+              <button
+                type="button"
+                onClick={() => setShowDiscount(true)}
+                disabled={lines.length === 0}
+                className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 -ml-1.5 transition-colors disabled:opacity-40 ${
+                  discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
+                }`}
+              >
+                <Percent className="h-3.5 w-3.5" />
+                {discount
+                  ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
+                  : "Agregar descuento"}
+                <Kbd>D</Kbd>
+              </button>
+              {discount && (
+                <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
+                  {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
+                </span>
+              )}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className={tipAmount > 0 ? "text-sm text-stone-500" : "text-base font-medium text-stone-500"}>
+                Total
+              </span>
+              <span
+                className={
+                  tipAmount > 0 ? "text-base font-semibold text-stone-700" : "text-2xl font-bold text-stone-800"
+                }
+              >
+                {formatCurrency(total)}
+              </span>
+            </div>
+            {tipAmount > 0 && (
+              <>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-stone-500">Propina</span>
+                  <span className="text-emerald-700">+{formatCurrency(tipAmount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-medium text-stone-500">A cobrar</span>
+                  <span className="text-2xl font-bold text-stone-800">{formatCurrency(due)}</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Cobrar button / gate de caja */}
+          {openSession ? (
+            <Button
+              className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
+                paymentMethod === "efectivo"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : paymentMethod === "transferencia"
+                  ? "bg-violet-600 hover:bg-violet-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+              size="lg"
+              disabled={!canCharge}
+              onClick={finalizeSale}
+            >
+              {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
+              <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
+            </Button>
+          ) : (
+            <Button
+              className="w-full py-6 text-lg font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2"
+              size="lg"
+              onClick={() => setShowCashDialog(true)}
+            >
+              <Lock className="h-5 w-5" />
+              Caja cerrada · Abrir caja para cobrar
+            </Button>
           )}
         </div>
-
-        {/* Cobrar button / gate de caja */}
-        {openSession ? (
-          <Button
-            className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
-              paymentMethod === "efectivo"
-                ? "bg-green-600 hover:bg-green-700"
-                : paymentMethod === "transferencia"
-                ? "bg-violet-600 hover:bg-violet-700"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-            size="lg"
-            disabled={!canCharge}
-            onClick={finalizeSale}
-          >
-            {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
-            <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
-          </Button>
-        ) : (
-          <Button
-            className="w-full py-6 text-lg font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white gap-2"
-            size="lg"
-            onClick={() => setShowCashDialog(true)}
-          >
-            <Lock className="h-5 w-5" />
-            Caja cerrada · Abrir caja para cobrar
-          </Button>
-        )}
       </div>
     </div>
   )
