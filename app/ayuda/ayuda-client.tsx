@@ -21,6 +21,7 @@ import {
   Search,
   Settings,
   SlidersHorizontal,
+  Stamp,
   Smartphone,
   Store,
   Unlock,
@@ -290,6 +291,51 @@ export function AyudaClient({ ticket, corte }: Props) {
             <strong>mientras la caja siga abierta</strong>; después lo hace un administrador desde el panel.
           </li>
         </ul>
+      ),
+    },
+    {
+      id: "sellos",
+      grupo: "cajero",
+      icon: Stamp,
+      titulo: "Tarjeta de sellos (lealtad)",
+      palabras: "lealtad sellos tarjeta cliente telefono premio canjear gratis fidelidad puntos",
+      href: "/pos",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            La tarjetita de «junta 10 y el siguiente va gratis», sin cartón: el cliente da su{" "}
+            <strong>teléfono</strong> y sus sellos se guardan solos. Aparece únicamente si el dueño activó el módulo.
+          </p>
+          <ol className="mt-3 space-y-3">
+            <Step n={1} title="Pide el número">
+              En el carrito toca <strong>Tarjeta de sellos</strong>, escribe el teléfono (10 dígitos) y{" "}
+              <strong>Buscar</strong>. Si es nuevo, se registra ahí mismo — el nombre es opcional. Queda un gafete en
+              la venta: «Lupita · 7/10».
+            </Step>
+            <Step n={2} title="Cobra normal">
+              El sello se registra solo al cobrar, uno por visita. El ticket impreso lleva su avance («Sellos: 8 de
+              10») y el sistema te avisa cuando alguien completa.
+            </Step>
+            <Step n={3} title="Canjea el premio">
+              Cuando el gafete diga que hay premio, toca <strong>Canjear premio</strong> y elige{" "}
+              <strong>qué artículo sale gratis</strong> (una unidad). Se aplica como descuento con motivo «Premio de
+              lealtad» y los sellos vuelven a empezar. La visita del canje no gana sello.
+            </Step>
+          </ol>
+          <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              El canje <strong>no pasa por tu tope de descuento</strong>: lo autorizan los sellos. Pero el sistema no
+              deja que el premio valga más que el artículo más caro del ticket.
+            </li>
+            <li>
+              Si cancelas una venta con sello, el sello se devuelve; si cancelas un canje, los sellos regresan.
+            </li>
+            <li>
+              ¿Sello olvidado o error? Un administrador lo corrige en <strong>Lealtad</strong> (panel), con motivo y
+              registro en Actividad.
+            </li>
+          </ul>
+        </>
       ),
     },
     {

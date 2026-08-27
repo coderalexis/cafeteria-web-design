@@ -358,6 +358,50 @@ export type Database = {
           },
         ]
       }
+      loyalty_customers: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          last_visit_at: string | null
+          name: string
+          phone: string
+          rewards_redeemed: number
+          stamps: number
+          visits: number
+        }
+        Insert: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          last_visit_at?: string | null
+          name?: string
+          phone: string
+          rewards_redeemed?: number
+          stamps?: number
+          visits?: number
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          last_visit_at?: string | null
+          name?: string
+          phone?: string
+          rewards_redeemed?: number
+          stamps?: number
+          visits?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_customers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_categories: {
         Row: {
           business_id: string
@@ -830,6 +874,8 @@ export type Database = {
           discount_total: number
           folio: number
           id: string
+          loyalty_customer_id: string | null
+          loyalty_delta: number
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           session_id: string
@@ -853,6 +899,8 @@ export type Database = {
           discount_total?: number
           folio: number
           id?: string
+          loyalty_customer_id?: string | null
+          loyalty_delta?: number
           notes?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           session_id: string
@@ -876,6 +924,8 @@ export type Database = {
           discount_total?: number
           folio?: number
           id?: string
+          loyalty_customer_id?: string | null
+          loyalty_delta?: number
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           session_id?: string
@@ -935,6 +985,14 @@ export type Database = {
         Args: { p_source: string; p_target: string }
         Returns: Json
       }
+      loyalty_adjust: {
+        Args: { p_customer: string; p_delta: number; p_reason: string }
+        Returns: Json
+      }
+      loyalty_find_or_create: {
+        Args: { p_name?: string; p_phone: string }
+        Returns: Json
+      }
       install_menu_pack: {
         Args: { p_pack: Json }
         Returns: Json
@@ -949,6 +1007,8 @@ export type Database = {
           p_client_ref: string
           p_discount?: Json
           p_items: Json
+          p_loyalty_customer?: string
+          p_loyalty_redeem?: boolean
           p_notes?: string
           p_payment_method: Database["public"]["Enums"]["payment_method"]
           p_tip?: number

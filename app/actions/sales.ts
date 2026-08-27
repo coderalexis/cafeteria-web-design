@@ -44,6 +44,10 @@ const createTicketSchema = z.object({
   /** Propina: se cobra encima del total y no cuenta como venta. */
   tip: z.number().finite().nonnegative().max(99_999).optional(),
   discount: discountSchema.optional(),
+  /** Cliente de la tarjeta de sellos adjunto a esta venta (opcional). */
+  loyaltyCustomerId: z.string().uuid().optional(),
+  /** Canjear el premio en esta venta (el RPC valida saldo, monto y motivo). */
+  loyaltyRedeem: z.boolean().optional(),
   items: z
     .array(
       z.object({
@@ -68,6 +72,8 @@ interface CreateTicketData {
   tip: number
   cashReceived: number | null
   changeDue: number | null
+  /** Estado de la tarjeta tras la venta (solo si se adjuntó cliente). */
+  loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
 }
 
 export async function createTicket(
@@ -78,7 +84,7 @@ export async function createTicket(
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount } = parsed.data
+  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, loyaltyCustomerId, loyaltyRedeem } = parsed.data
 
   const businessError = await checkExpectedBusiness(expectedBusinessId)
   if (businessError) {
@@ -94,6 +100,8 @@ export async function createTicket(
     p_cash_received: paymentMethod === "efectivo" ? cashReceived : undefined,
     p_discount: discount,
     p_tip: tip,
+    p_loyalty_customer: loyaltyCustomerId,
+    p_loyalty_redeem: loyaltyRedeem,
   })
 
   if (error) {
@@ -109,6 +117,7 @@ export async function createTicket(
     tip_amount: number | null
     cash_received: number | null
     change_due: number | null
+    loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
   }
 
   revalidateSales()
@@ -123,6 +132,7 @@ export async function createTicket(
     tip: ticket.tip_amount ?? 0,
     cashReceived: ticket.cash_received ?? null,
     changeDue: ticket.change_due ?? null,
+    loyalty: ticket.loyalty ?? null,
   }
 }
 

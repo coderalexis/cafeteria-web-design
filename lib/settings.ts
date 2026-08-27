@@ -27,6 +27,13 @@ export interface BusinessSettings {
    * RPC, no solo la pantalla.
    */
   discountMaxCashier: number
+  /** Lealtad con sellos: tarjeta digital por teléfono. Apagado por defecto —
+   *  guardar teléfonos de clientes es una decisión del dueño. */
+  loyalty: boolean
+  /** Sellos necesarios para el premio (2–30). */
+  loyaltyTarget: number
+  /** Qué es el premio, en palabras del negocio («Bebida gratis»). */
+  loyaltyReward: string
   /**
    * Nota al pie del menú público: lo que en la carta impresa va en letra chica
    * ("nuestros jarabes son libres de azúcar", "precios con IVA"). No sale en el
@@ -49,6 +56,9 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   // 100 = como se comportaba antes de existir el ajuste.
   discountMaxCashier: 100,
   menuNote: "",
+  loyalty: false,
+  loyaltyTarget: 10,
+  loyaltyReward: "Bebida gratis",
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -86,6 +96,12 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
       out.discountMaxCashier = Math.round(tope)
     }
     if (typeof r.menu_note === "string") out.menuNote = r.menu_note.slice(0, MENU_NOTE_MAX)
+    out.loyalty = r.loyalty === true
+    const meta = Number(r.loyalty_target)
+    if (Number.isFinite(meta) && meta >= 2 && meta <= 30) out.loyaltyTarget = Math.round(meta)
+    if (typeof r.loyalty_reward === "string" && r.loyalty_reward.trim()) {
+      out.loyaltyReward = r.loyalty_reward.trim().slice(0, 60)
+    }
   }
   return out
 }
@@ -105,5 +121,8 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     parked_orders: s.parkedOrders,
     discount_max_cashier: s.discountMaxCashier,
     menu_note: s.menuNote,
+    loyalty: s.loyalty,
+    loyalty_target: s.loyaltyTarget,
+    loyalty_reward: s.loyaltyReward,
   }
 }

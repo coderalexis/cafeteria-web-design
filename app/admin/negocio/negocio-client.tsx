@@ -14,6 +14,7 @@ import {
   QrCode,
   PauseCircle,
   CalendarClock,
+  Stamp,
 } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
@@ -393,6 +394,62 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 <option value="comanda">Comanda para preparación</option>
                 <option value="both">Ticket y comanda</option>
               </select>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Stamp className="h-4 w-4 text-amber-700" />
+                Lealtad con sellos
+              </CardTitle>
+              <CardDescription>
+                La tarjetita de «junta {currentSettings.loyaltyTarget} y el siguiente va gratis», sin cartón: el
+                cliente da su teléfono en caja y sus sellos viven aquí. El canje sale como descuento del artículo
+                elegido, validado por el sistema.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <select
+                name="loyalty"
+                aria-label="Lealtad con sellos"
+                defaultValue={currentSettings.loyalty ? "on" : "off"}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="off">Desactivada</option>
+                <option value="on">Activada</option>
+              </select>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label htmlFor="loyalty_target" className="text-xs font-medium text-stone-500">
+                    Sellos para el premio
+                  </label>
+                  <Input
+                    id="loyalty_target"
+                    name="loyalty_target"
+                    type="number"
+                    min={2}
+                    max={30}
+                    defaultValue={currentSettings.loyaltyTarget}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="loyalty_reward" className="text-xs font-medium text-stone-500">
+                    ¿Cuál es el premio?
+                  </label>
+                  <Input
+                    id="loyalty_reward"
+                    name="loyalty_reward"
+                    maxLength={60}
+                    defaultValue={currentSettings.loyaltyReward}
+                    placeholder="Bebida gratis"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-stone-400">
+                Los clientes y sus sellos se ven en <strong>Lealtad</strong>, en el menú del panel. Cambiar la meta
+                aplica también a los sellos ya juntados.
+              </p>
             </CardContent>
           </Card>
 

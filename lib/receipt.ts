@@ -108,6 +108,8 @@ export interface ReceiptData {
   status?: "completado" | "cancelado"
   cancelReason?: string | null
   reprint?: boolean
+  /** Estado de la tarjeta de sellos tras esta venta (si hubo cliente). */
+  loyalty?: { stamps: number; target: number; redeemed: boolean } | null
 }
 
 export function receiptFromTicket(ticket: TicketRecord, reprint = false): ReceiptData {
@@ -178,6 +180,21 @@ export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[]
     lines.push(row("  Cambio:", formatCurrency(r.changeDue ?? 0)))
   }
   lines.push("")
+
+  // Tarjeta de sellos: el cliente se lleva su avance impreso, como en el cartón.
+  if (r.loyalty) {
+    lines.push(
+      center(
+        r.loyalty.redeemed
+          ? "* PREMIO CANJEADO *"
+          : `Sellos: ${r.loyalty.stamps} de ${r.loyalty.target}`,
+      ),
+    )
+    if (!r.loyalty.redeemed && r.loyalty.stamps >= r.loyalty.target) {
+      lines.push(center("¡Tienes un premio por canjear!"))
+    }
+    lines.push("")
+  }
 
   if (r.status === "cancelado") {
     lines.push(RULE, center("*** CANCELADO ***"))

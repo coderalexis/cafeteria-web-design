@@ -31,6 +31,8 @@ import {
   ChefHat,
   Keyboard,
   AArrowUp,
+  Gift,
+  Stamp,
   Info,
   Calculator,
   MoreVertical,
@@ -95,6 +97,8 @@ import { autoName, type ParkedOrder } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
+import { formatPhone, LoyaltyDialog, RedeemDialog } from "./loyalty-dialog"
+import type { LoyaltyCustomer } from "@/app/actions/loyalty"
 import { ProductInfoDialog } from "./product-info-dialog"
 import { TextSizeControl } from "./text-size-control"
 import { usePosTextSize } from "./use-text-size"
@@ -139,6 +143,7 @@ interface CompletedSale {
   notes?: string
   cashReceived: number | null
   changeDue: number | null
+  loyalty: { stamps: number; target: number; redeemed: boolean } | null
 }
 
 interface POSClientProps {
@@ -157,6 +162,12 @@ interface POSClientProps {
   autoPrint: "none" | "ticket" | "comanda" | "both"
   /** Módulo de pedidos en espera activado para esta cafetería. */
   parkedOrders: boolean
+  /** Lealtad con sellos activada para esta cafetería. */
+  loyalty: boolean
+  /** Sellos necesarios para el premio. */
+  loyaltyTarget: number
+  /** Qué es el premio, en palabras del negocio. */
+  loyaltyReward: string
   /** Techo de descuento en % para cajeros (100 = sin límite). */
   discountMaxCashier: number
   initialTotalSales: number
@@ -226,6 +237,7 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
     tip: sale.tip,
     cashReceived: sale.cashReceived,
     changeDue: sale.changeDue,
+    loyalty: sale.loyalty,
   }
 }
 
@@ -442,6 +454,9 @@ export default function POSClient({
   favoriteVariantIds,
   autoPrint,
   parkedOrders: parkedEnabled,
+  loyalty,
+  loyaltyTarget,
+  loyaltyReward,
   discountMaxCashier,
   initialTotalSales,
   openSession,
@@ -488,6 +503,13 @@ export default function POSClient({
   const [tipCustomInput, setTipCustomInput] = useState("")
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showTender, setShowTender] = useState(false)
+  // Lealtad: el cliente se adjunta POR VENTA y no se guarda con el carrito —
+  // una tarjeta pegada de una venta anterior sellaría al cliente equivocado.
+  const loyaltyEnabled = loyalty
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState<LoyaltyCustomer | null>(null)
+  const [loyaltyRedeem, setLoyaltyRedeem] = useState(false)
+  const [showLoyalty, setShowLoyalty] = useState(false)
+  const [showRedeem, setShowRedeem] = useState(false)
   const [infoProduct, setInfoProduct] = useState<Product | null>(null)
   // Aquí y no en el control: el control vive dentro del menú, que casi siempre
   // está cerrado, y el tamaño guardado debe aplicarse al abrir el POS.
@@ -699,6 +721,8 @@ export default function POSClient({
         cashReceived: cashReceived ?? undefined,
         tip: tipAmount > 0 ? tipAmount : undefined,
         discount: discount ?? undefined,
+        loyaltyCustomerId: loyaltyCustomer?.id,
+        loyaltyRedeem: loyaltyRedeem || undefined,
         items: lines.map((line) => ({
           variant_id: getLineVariantId(line) ?? "",
           quantity: line.quantity,
@@ -722,7 +746,20 @@ export default function POSClient({
           notes: ticketNotes.trim() || undefined,
           cashReceived: result.cashReceived,
           changeDue: result.changeDue,
+          loyalty: result.loyalty
+            ? { stamps: result.loyalty.stamps, target: result.loyalty.target, redeemed: result.loyalty.redeemed }
+            : null,
         })
+        if (result.loyalty) {
+          const quien = result.loyalty.name || formatPhone(result.loyalty.phone)
+          if (result.loyalty.redeemed) {
+            toast.success(`Premio canjeado 🎁 ${quien} vuelve a empezar (0 de ${result.loyalty.target}).`)
+          } else if (result.loyalty.stamps >= result.loyalty.target) {
+            toast.success(`Sello ${result.loyalty.stamps}/${result.loyalty.target} para ${quien} — ¡ya tiene premio!`)
+          } else {
+            toast.success(`Sello ${result.loyalty.stamps} de ${result.loyalty.target} para ${quien}.`)
+          }
+        }
         // El total del día son ventas: la propina no suma aquí.
         setTotalSales((prev) => prev + result.total)
         // Guardar las líneas para «Repetir última venta» (validadas contra el
@@ -739,6 +776,8 @@ export default function POSClient({
         }
         vibra(30)
         clearTip()
+        setLoyaltyCustomer(null)
+        setLoyaltyRedeem(false)
         resetAfterSale()
         setCartOpen(false)
       } else {
@@ -754,7 +793,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, tipAmount, discount, lines, lastSaleKey, clearTip, resetAfterSale])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, tipAmount, discount, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -791,6 +830,9 @@ export default function POSClient({
     showCashDialog ||
     showDiscount ||
     showShortcuts ||
+    showTender ||
+    showLoyalty ||
+    showRedeem ||
     confirmClear ||
     pendingModifiers !== null
 
@@ -893,7 +935,10 @@ export default function POSClient({
           break
         case "d":
         case "D":
-          if (lines.length > 0) setShowDiscount(true)
+          if (lines.length > 0) {
+            if (loyaltyRedeem) toast.info("Quita el canje del premio para cambiar el descuento.")
+            else setShowDiscount(true)
+          }
           break
         default:
           return
@@ -906,6 +951,7 @@ export default function POSClient({
   }, [
     anyDialogOpen,
     canCharge,
+    loyaltyRedeem,
     finalizeSale,
     openSession,
     focusCash,
@@ -975,6 +1021,74 @@ export default function POSClient({
             )}
           </div>
         </div>
+        {/* Tarjeta de sellos de esta venta (solo con el módulo encendido) */}
+        {loyaltyEnabled && (
+          <div className="mt-2">
+            {loyaltyCustomer === null ? (
+              <button
+                type="button"
+                onClick={() => setShowLoyalty(true)}
+                disabled={isProcessing}
+                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-stone-300 px-3 py-1 text-xs font-medium text-stone-500 hover:border-amber-400 hover:text-amber-700"
+              >
+                <Stamp className="h-3.5 w-3.5" />
+                Tarjeta de sellos
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                    loyaltyRedeem
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                      : "border-amber-300 bg-amber-50 text-amber-800"
+                  }`}
+                >
+                  <Stamp className="h-3.5 w-3.5" />
+                  {loyaltyCustomer.name || formatPhone(loyaltyCustomer.phone)} ·{" "}
+                  {loyaltyRedeem
+                    ? "canjeando premio"
+                    : `${loyaltyCustomer.stamps}/${loyaltyTarget}`}
+                  <button
+                    type="button"
+                    aria-label="Quitar la tarjeta de esta venta"
+                    onClick={() => {
+                      setLoyaltyCustomer(null)
+                      if (loyaltyRedeem) {
+                        setLoyaltyRedeem(false)
+                        setDiscount(null)
+                      }
+                    }}
+                    className="-mr-1 rounded-full p-0.5 hover:bg-black/10"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+                {!loyaltyRedeem && loyaltyCustomer.stamps >= loyaltyTarget && lines.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRedeem(true)}
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                  >
+                    <Gift className="h-3.5 w-3.5" />
+                    Canjear premio
+                  </button>
+                )}
+                {loyaltyRedeem && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoyaltyRedeem(false)
+                      setDiscount(null)
+                    }}
+                    className="text-xs font-medium text-stone-400 underline underline-offset-2 hover:text-stone-600"
+                  >
+                    quitar canje
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Cart items */}
@@ -1373,7 +1487,10 @@ export default function POSClient({
             <div className="flex justify-between items-center text-sm">
               <button
                 type="button"
-                onClick={() => setShowDiscount(true)}
+                onClick={() => {
+                  if (loyaltyRedeem) toast.info("Quita el canje del premio para cambiar el descuento.")
+                  else setShowDiscount(true)
+                }}
                 disabled={lines.length === 0}
                 className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 -ml-1.5 transition-colors disabled:opacity-40 ${
                   discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
@@ -1880,6 +1997,24 @@ export default function POSClient({
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />
+      <LoyaltyDialog
+        open={showLoyalty}
+        onOpenChange={setShowLoyalty}
+        target={loyaltyTarget}
+        onAttach={(customer) => setLoyaltyCustomer(customer)}
+      />
+      <RedeemDialog
+        open={showRedeem}
+        onOpenChange={setShowRedeem}
+        lines={lines}
+        reward={loyaltyReward}
+        onPick={(unitPrice) => {
+          // El canje ocupa el lugar del descuento: monto fijo por UNA unidad,
+          // con el motivo exacto que el servidor exige y revalida.
+          setDiscount({ type: "amount", value: unitPrice, reason: "Premio de lealtad" })
+          setLoyaltyRedeem(true)
+        }}
+      />
       <ShortcutsDialog
         open={showShortcuts}
         onOpenChange={setShowShortcuts}
