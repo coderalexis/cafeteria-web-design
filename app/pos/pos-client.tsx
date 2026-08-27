@@ -31,6 +31,7 @@ import {
   ChefHat,
   Keyboard,
   AArrowUp,
+  Calculator,
   MoreVertical,
   LogOut,
   BookOpen,
@@ -92,6 +93,7 @@ import { useParkedOrders } from "./use-parked-orders"
 import { autoName, type ParkedOrder } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
+import { CashTenderDialog } from "./cash-tender-dialog"
 import { TextSizeControl } from "./text-size-control"
 import { usePosCart } from "./use-pos-cart"
 import {
@@ -482,6 +484,7 @@ export default function POSClient({
   const [tipChoice, setTipChoice] = useState<TipChoice>(0)
   const [tipCustomInput, setTipCustomInput] = useState("")
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showTender, setShowTender] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
   // Producto/tamaño esperando modificadores: alta nueva, o edición de una
@@ -1195,42 +1198,12 @@ export default function POSClient({
           cajero no alcanzaba a ver lo que estaba cobrando. Ahora se topa en 55%
           del panel; los controles ceden y se desplazan, y el total con el botón
           de cobro nunca se mueven — son lo único que no se puede perder de vista. */}
-      <div className="flex max-h-[55%] shrink-0 flex-col border-t border-stone-200 bg-stone-50/80">
+      <div className="flex max-h-[46%] shrink-0 flex-col border-t border-stone-200 bg-stone-50/80">
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-0">
-          {/* Nota del ticket: chips de un toque + texto libre */}
-          <div className="flex gap-1.5">
-            {QUICK_NOTES.map((qn) => {
-              const activa = ticketNotes === qn || ticketNotes.startsWith(qn + " · ")
-              return (
-                <button
-                  key={qn}
-                  type="button"
-                  onClick={() => {
-                    const resto = QUICK_NOTES.reduce(
-                      (t, otro) => (t === otro ? "" : t.startsWith(otro + " · ") ? t.slice(otro.length + 3) : t),
-                      ticketNotes,
-                    )
-                    setTicketNotes(activa ? resto : resto ? `${qn} · ${resto}` : qn)
-                  }}
-                  className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
-                    activa
-                      ? "border-amber-600 bg-amber-600 text-white"
-                      : "border-stone-200 bg-white text-stone-500 hover:border-amber-300"
-                  }`}
-                >
-                  {qn}
-                </button>
-              )
-            })}
-          </div>
-          <Input
-            placeholder="Nota del ticket: mesa, nombre, para llevar..."
-            value={ticketNotes}
-            onChange={(e) => setTicketNotes(e.target.value)}
-            maxLength={500}
-            className="bg-white border-stone-200 h-9 text-sm"
-          />
-
+          {/* Orden por frecuencia de uso, no por lógica de formulario: el
+              espacio visible sin desplazar es corto en una tablet acostada,
+              así que arriba va lo de cada venta (método y efectivo) y abajo
+              lo ocasional (propina, para llevar, nota). */}
           {/* Payment method selector */}
           <div className="flex gap-2">
             {PAYMENT_METHOD_KEYS.map((key, index) => {
@@ -1259,12 +1232,56 @@ export default function POSClient({
               )
             })}
           </div>
-
+          {/* Efectivo recibido + cambio */}
+          {paymentMethod === "efectivo" && (
+            <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
+                  Recibido <Kbd>F4</Kbd>
+                </span>
+                <Input
+                  ref={cashInputRef}
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="Opcional"
+                  value={cashReceivedInput}
+                  onChange={(e) => setCashReceivedInput(e.target.value)}
+                  className={`h-9 text-sm font-semibold bg-white ${
+                    cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
+                  }`}
+                />
+                <span
+                  className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
+                    cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
+                  }`}
+                >
+                  {cashInsufficient
+                    ? `Faltan ${formatCurrency(due - (cashReceived ?? 0))}`
+                    : changeDue !== null
+                    ? `Cambio ${formatCurrency(changeDue)}`
+                    : "Cambio —"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTender(true)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-green-200 bg-white py-1.5 text-xs font-semibold text-green-800 hover:bg-green-100"
+              >
+                <Calculator className="h-3.5 w-3.5" />
+                Teclado y montos rápidos
+              </button>
+            </div>
+          )}
           {/* Propina: se cobra encima del total y no cuenta como venta */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-medium text-stone-500 shrink-0 flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Solo el icono cuando el carrito es angosto: con la palabra
+                completa la fila se partía en dos y costaba 32 px de alto. */}
+            <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-stone-500">
               <HandCoins className="h-3.5 w-3.5" />
-              Propina
+              <span className="hidden xl:inline">Propina</span>
+              <span className="sr-only xl:hidden">Propina</span>
             </span>
             {TIP_OPTIONS.map((option) => {
               const active = tipChoice === option
@@ -1303,79 +1320,39 @@ export default function POSClient({
               <span className="ml-auto text-sm font-bold text-emerald-700">+{formatCurrency(tipAmount)}</span>
             )}
           </div>
-
-          {/* Efectivo recibido + cambio */}
-          {paymentMethod === "efectivo" && (
-            <div className="rounded-lg border border-green-200 bg-green-50/60 p-2.5 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-green-800 shrink-0 flex items-center gap-1">
-                  Recibido <Kbd>F4</Kbd>
-                </span>
-                <Input
-                  ref={cashInputRef}
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  placeholder="Opcional"
-                  value={cashReceivedInput}
-                  onChange={(e) => setCashReceivedInput(e.target.value)}
-                  className={`h-9 text-sm font-semibold bg-white ${
-                    cashInsufficient ? "border-red-400 focus-visible:ring-red-400" : "border-green-200"
-                  }`}
-                />
-                <span
-                  className={`text-sm font-bold shrink-0 min-w-[7.5rem] text-right ${
-                    cashInsufficient ? "text-red-600" : changeDue !== null ? "text-green-700" : "text-stone-400"
-                  }`}
-                >
-                  {cashInsufficient
-                    ? `Faltan ${formatCurrency(due - (cashReceived ?? 0))}`
-                    : changeDue !== null
-                    ? `Cambio ${formatCurrency(changeDue)}`
-                    : "Cambio —"}
-                </span>
-              </div>
-              {/* Teclado numérico: en tablet es más rápido que el teclado del sistema */}
-              <div className="grid grid-cols-6 gap-1.5">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "00", "C"].map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() =>
-                      setCashReceivedInput((prev) =>
-                        key === "C" ? "" : (prev + key).replace(/^0+(?=\d)/, "").slice(0, 7),
-                      )
-                    }
-                    className="py-2 rounded-md bg-white border border-green-200 text-sm font-semibold text-green-900 hover:bg-green-100 active:bg-green-200"
-                  >
-                    {key}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-1.5">
+          {/* Nota del ticket: chips de un toque + texto libre */}
+          <div className="flex gap-1.5">
+            {QUICK_NOTES.map((qn) => {
+              const activa = ticketNotes === qn || ticketNotes.startsWith(qn + " · ")
+              return (
                 <button
+                  key={qn}
                   type="button"
-                  onClick={() => setCashReceivedInput(due > 0 ? String(due) : "")}
-                  className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100"
+                  onClick={() => {
+                    const resto = QUICK_NOTES.reduce(
+                      (t, otro) => (t === otro ? "" : t.startsWith(otro + " · ") ? t.slice(otro.length + 3) : t),
+                      ticketNotes,
+                    )
+                    setTicketNotes(activa ? resto : resto ? `${qn} · ${resto}` : qn)
+                  }}
+                  className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    activa
+                      ? "border-amber-600 bg-amber-600 text-white"
+                      : "border-stone-200 bg-white text-stone-500 hover:border-amber-300"
+                  }`}
                 >
-                  Exacto
+                  {qn}
                 </button>
-                {cashSuggestions(due).map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => setCashReceivedInput(String(amount))}
-                    className="flex-1 py-1.5 rounded-md bg-white border border-green-200 text-xs font-semibold text-green-800 hover:bg-green-100 disabled:opacity-40"
-                    disabled={amount < due}
-                  >
-                    ${amount}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
+              )
+            })}
+          </div>
+          <Input
+            placeholder="Nota del ticket: mesa, nombre, para llevar..."
+            value={ticketNotes}
+            onChange={(e) => setTicketNotes(e.target.value)}
+            maxLength={500}
+            className="bg-white border-stone-200 h-9 text-sm"
+          />
         </div>
         <div className="shrink-0 space-y-3 p-4 pt-3">
           {/* Subtotal / descuento / total */}
@@ -1572,7 +1549,7 @@ export default function POSClient({
       )}
 
       {/* ───── LEFT PANEL (Products) ───── */}
-      <div className={`flex flex-col h-full ${isMobile ? "w-full" : "w-3/5 border-r border-stone-200"}`}>
+      <div className={`flex flex-col h-full ${isMobile ? "w-full" : "flex-1 min-w-0 border-r border-stone-200"}`}>
         {/* Header */}
         <header className="shrink-0 px-4 md:px-5 pt-3 md:pt-4 pb-3 bg-white border-b border-stone-200 shadow-sm">
           <div className="flex justify-between items-center gap-2">
@@ -1588,6 +1565,40 @@ export default function POSClient({
                 />
               )}
             </div>
+            {/* El buscador vive en este renglón y no en uno propio: en una tablet
+                acostada sobra ancho y falta alto, y su renglón se llevaba 48 px
+                que valen una fila entera de productos. */}
+            {!isMobile && (
+              <div className="relative mx-2 min-w-0 max-w-xs flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+                <Input
+                  ref={searchInputRef}
+                  placeholder="Buscar producto…"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setSizePickerFor(null)
+                  }}
+                  className="h-9 border-stone-200 bg-stone-50 pl-9 pr-10 text-sm"
+                />
+                <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center">
+                  {searchQuery ? (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("")
+                        searchInputRef.current?.focus()
+                      }}
+                      className="p-1 text-stone-400 hover:text-stone-600"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <Kbd className="text-stone-400">/</Kbd>
+                  )}
+                </div>
+              </div>
+            )}
             {isMobile ? (
               <div className="flex items-center gap-1.5 shrink-0">
                 {cashChip(true)}
@@ -1660,13 +1671,13 @@ export default function POSClient({
               Vendido hoy: <span className="font-bold">{formatCurrency(totalSales)}</span>
             </p>
           )}
-
-          {/* Search bar */}
-          <div className="relative mt-3">
+          {/* Buscador (móvil): en su propio renglón */}
+          {isMobile && (
+            <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
             <Input
               ref={searchInputRef}
-              placeholder={isMobile ? "Buscar producto…" : "Buscar producto…  (Enter agrega el primero)"}
+              placeholder="Buscar producto…"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -1691,6 +1702,7 @@ export default function POSClient({
               )}
             </div>
           </div>
+          )}
 
           {/* Categories scroll */}
           <div className="flex gap-2 mt-2 overflow-x-auto pb-1 scrollbar-hide">
@@ -1764,7 +1776,13 @@ export default function POSClient({
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1">
                   {subcategory}
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {/* Columnas por el ancho REAL del panel, no por el de la ventana.
+                    El mínimo es 9rem tras medirlo: a 7rem entraban 5 columnas en
+                    la tablet pero NO se veía ni un producto más (los títulos de
+                    categoría mandan) y se cortaban 9 nombres en vez de 2. En
+                    pantallas grandes sí caben 6 columnas, donde antes el
+                    grid-cols-4 fijo desperdiciaba el ancho. */}
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(9rem,1fr))]">
                   {items.map((product) => {
                     const accent = colorClasses(categoryColor[product.category])?.accent
                     return (
@@ -1840,7 +1858,13 @@ export default function POSClient({
       </div>
 
       {/* ───── RIGHT PANEL (Cart) — escritorio ───── */}
-      {!isMobile && <div className="w-2/5 h-full">{cartPanel}</div>}
+      {/* Ancho fijo, no un porcentaje: los renglones del carrito («Latte ·
+          Grande · $58») no crecen con la pantalla, así que el 40% le sobraba
+          espacio al carrito y se lo quitaba a los productos. A 1024 px esto le
+          devuelve 58 px a la rejilla. Escalonado porque el corte de «móvil» está
+          en 768: una tablet EN VERTICAL usa este mismo diseño y ahí 352 px de
+          carrito le dejarían 416 a los productos. */}
+      {!isMobile && <div className="h-full w-[19rem] shrink-0 lg:w-[22rem] xl:w-[25rem]">{cartPanel}</div>}
 
       {/* ───── Barra inferior + hoja del carrito — móvil ───── */}
       {isMobile && (
@@ -1880,6 +1904,14 @@ export default function POSClient({
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
       <ShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
+      <CashTenderDialog
+        open={showTender}
+        onOpenChange={setShowTender}
+        due={due}
+        value={cashReceivedInput}
+        onChange={setCashReceivedInput}
+        suggestions={cashSuggestions(due)}
+      />
       <ParkDialog
         open={showPark}
         onOpenChange={setShowPark}

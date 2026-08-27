@@ -351,6 +351,11 @@ export function AyudaClient({ ticket, corte }: Props) {
             tamaños: Compacto, Normal, Grande y Muy grande. En celular está en el menú <strong>⋮ → Tamaño de letra</strong>.
           </li>
           <li>
+            El teclado para el efectivo recibido está en <strong>«Teclado y montos rápidos»</strong>, dentro del
+            recuadro verde: se abre en grande, con Exacto y los billetes más comunes. Si escribes con teclado, el
+            campo Recibido sigue ahí (atajo <strong>F4</strong>).
+          </li>
+          <li>
             <strong>Compacto</strong> encoge todo —letra, botones y espacios— para que quepan más productos y más
             renglones del carrito. Útil en tablets acostadas, que son anchas pero bajitas.
           </li>
