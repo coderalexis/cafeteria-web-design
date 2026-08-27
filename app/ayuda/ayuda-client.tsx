@@ -488,13 +488,22 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: SlidersHorizontal,
       titulo: "Modificadores (opciones al vender)",
-      palabras: "leche extras opciones grupos minimo maximo precio adicional",
+      palabras: "leche extras opciones grupos minimo maximo precio adicional obligatorio elegir cuantas",
       href: "/admin/modificadores",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            Creas grupos (ej. «Tipo de leche») con sus opciones y precio extra (ej. «Leche de avena +$12»).
-            Mínimo/máximo controlan cuántas se pueden elegir; máximo 1 = elige solo una.
+            Creas grupos (ej. «Tipo de leche») con sus opciones y su precio extra (ej. «Leche de avena +$12»).
+            Cada grupo es una <strong>pregunta</strong> que el POS le hace al cajero.
+          </li>
+          <li>
+            En <strong>«¿Cuántas puede elegir el cajero?»</strong> eliges entre: una obligatoria, una o ninguna, las
+            que quiera, hasta cierto número, un número exacto, o al menos cierto número. Abajo aparece{" "}
+            <strong>la vista previa</strong> con el texto tal cual lo verá quien cobra.
+          </li>
+          <li>
+            Si pides más opciones de las que tiene el grupo (p. ej. «elige 2» con una sola opción), te avisa en rojo:
+            así nadie podría cerrar la venta.
           </li>
           <li>
             Luego, en el editor de cada <strong>producto</strong>, marcas qué grupos aplican. En el POS aparecen al

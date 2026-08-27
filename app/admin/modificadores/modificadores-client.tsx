@@ -18,6 +18,7 @@ import {
   updateModifierGroup,
 } from "@/app/actions/modifiers"
 import { formatCurrency } from "@/lib/format"
+import { ChoiceRuleField } from "./choice-rule-field"
 
 export interface ModifierGroupRecord {
   id: string
@@ -43,8 +44,8 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
             Modificadores
           </h1>
           <p className="text-sm text-stone-500 mt-1">
-            Opciones que el cajero elige al vender un producto (tipo de leche, extras…). Cada grupo se asigna a
-            productos desde el editor de <strong>Productos</strong>.
+            Preguntas que el POS le hace al cajero al vender un producto: «¿tipo de leche?», «¿con pollo o huevo?».
+            Cada grupo se asigna a sus productos desde el editor de <strong>Productos</strong>.
           </p>
         </div>
         <Button onClick={() => setShowNew((v) => !v)} className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shrink-0">
@@ -60,30 +61,23 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
             <CardTitle className="text-base">Nuevo grupo de opciones</CardTitle>
           </CardHeader>
           <CardContent>
-            <ActionForm action={createModifierGroup} className="grid gap-3 sm:grid-cols-12 items-end">
-              <div className="sm:col-span-5 space-y-1">
-                <label className="text-xs font-medium text-stone-500">Nombre</label>
-                <Input name="name" placeholder="ej. Tipo de leche" required />
+            <ActionForm action={createModifierGroup} className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="nuevo-grupo" className="text-xs font-medium text-stone-500">
+                  ¿Qué se le pregunta al cajero?
+                </label>
+                <Input id="nuevo-grupo" name="name" placeholder="ej. Tipo de leche" required />
+                <p className="text-xs text-stone-400">
+                  Es el título que aparece al cobrar. Escríbelo como pregunta o como etiqueta corta.
+                </p>
               </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-medium text-stone-500">Mínimo</label>
-                <Input name="min_select" type="number" min="0" max="20" defaultValue={0} required />
+              <ChoiceRuleField min={0} max={1} />
+              <div className="sm:col-span-2">
+                <Button type="submit" className="bg-amber-600 text-white hover:bg-amber-700">
+                  Crear grupo
+                </Button>
               </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-medium text-stone-500">Máximo</label>
-                <Input name="max_select" type="number" min="1" max="20" placeholder="∞" />
-              </div>
-              <label className="sm:col-span-2 flex items-center gap-2 text-sm text-stone-600 h-10">
-                <input type="checkbox" name="is_required" value="true" className="h-4 w-4 accent-amber-600" />
-                Obligatorio
-              </label>
-              <Button type="submit" className="sm:col-span-1 bg-amber-600 hover:bg-amber-700 text-white">
-                Crear
-              </Button>
             </ActionForm>
-            <p className="text-xs text-stone-400 mt-2">
-              Máximo 1 = el cajero elige una sola opción (tipo radio). Sin máximo = varias. Obligatorio = no se puede vender sin elegir.
-            </p>
           </CardContent>
         </Card>
       )}
@@ -99,27 +93,23 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
       {groups.map((g) => (
         <Card key={g.id} className={g.isActive ? "" : "border-amber-200 bg-amber-50/30"}>
           <CardHeader className="pb-3">
-            <ActionForm action={updateModifierGroup} className="grid gap-3 sm:grid-cols-12 items-end">
+            <ActionForm action={updateModifierGroup} className="grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="id" value={g.id} />
-              <div className="sm:col-span-5 space-y-1">
-                <label className="text-xs font-medium text-stone-500">Grupo</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-stone-500">¿Qué se le pregunta al cajero?</label>
                 <Input name="name" defaultValue={g.name} required className="font-semibold" />
               </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-medium text-stone-500">Mínimo</label>
-                <Input name="min_select" type="number" min="0" max="20" defaultValue={g.minSelect} required />
+              <ChoiceRuleField
+                min={Math.max(g.minSelect, g.isRequired ? 1 : 0)}
+                max={g.maxSelect}
+                optionCount={g.options.filter((o) => o.isActive).length}
+                compact
+              />
+              <div className="sm:col-span-2">
+                <Button type="submit" variant="secondary" size="sm">
+                  Guardar cambios
+                </Button>
               </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-medium text-stone-500">Máximo</label>
-                <Input name="max_select" type="number" min="1" max="20" defaultValue={g.maxSelect ?? ""} placeholder="∞" />
-              </div>
-              <label className="sm:col-span-2 flex items-center gap-2 text-sm text-stone-600 h-10">
-                <input type="checkbox" name="is_required" value="true" defaultChecked={g.isRequired} className="h-4 w-4 accent-amber-600" />
-                Obligatorio
-              </label>
-              <Button type="submit" variant="secondary" size="sm" className="sm:col-span-1">
-                Guardar
-              </Button>
             </ActionForm>
 
             <div className="flex items-center justify-between pt-3">
