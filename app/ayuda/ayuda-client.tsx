@@ -491,25 +491,68 @@ export function AyudaClient({ ticket, corte }: Props) {
       palabras: "leche extras opciones grupos minimo maximo precio adicional obligatorio elegir cuantas",
       href: "/admin/modificadores",
       nodo: (
-        <ul className="space-y-2 text-sm text-stone-600">
-          <li>
-            Creas grupos (ej. «Tipo de leche») con sus opciones y su precio extra (ej. «Leche de avena +$12»).
-            Cada grupo es una <strong>pregunta</strong> que el POS le hace al cajero.
-          </li>
-          <li>
-            En <strong>«¿Cuántas puede elegir el cajero?»</strong> eliges entre: una obligatoria, una o ninguna, las
-            que quiera, hasta cierto número, un número exacto, o al menos cierto número. Abajo aparece{" "}
-            <strong>la vista previa</strong> con el texto tal cual lo verá quien cobra.
-          </li>
-          <li>
-            Si pides más opciones de las que tiene el grupo (p. ej. «elige 2» con una sola opción), te avisa en rojo:
-            así nadie podría cerrar la venta.
-          </li>
-          <li>
-            Luego, en el editor de cada <strong>producto</strong>, marcas qué grupos aplican. En el POS aparecen al
-            vender ese producto y el precio se calcula solo.
-          </li>
-        </ul>
+        <>
+          <ul className="space-y-2 text-sm text-stone-600">
+            <li>
+              Un <strong>grupo</strong> es una pregunta que el POS le hace al cajero al vender un producto: «¿tipo de
+              leche?», «¿con pollo o con huevo?». Cada respuesta es una <strong>opción</strong>, y puede costar extra
+              («Leche de avena +$12») o no costar nada («Estrellado»).
+            </li>
+            <li>
+              Se arma en tres pasos: <strong>1)</strong> creas el grupo y dices cuántas puede elegir el cajero,{" "}
+              <strong>2)</strong> le agregas sus opciones con su precio, <strong>3)</strong> en el editor de cada{" "}
+              <strong>producto</strong> marcas qué grupos le aplican. Hasta el paso 3 no aparece en el POS —es el
+              olvido más común.
+            </li>
+          </ul>
+
+          <p className="mt-4 text-sm font-medium text-stone-700">Cuál elegir, según lo que quieras</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[34rem] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-400">
+                  <th className="py-2 pr-3 font-medium">Lo que quieres</th>
+                  <th className="py-2 pr-3 font-medium">Eliges</th>
+                  <th className="py-2 font-medium">El cajero ve</th>
+                </tr>
+              </thead>
+              <tbody className="text-stone-600">
+                {[
+                  ["«¿Con pollo o con huevo?» — hay que decidir sí o sí", "Una, y es obligatoria", "Elige una"],
+                  ["«¿Tipo de leche?» — puede saltárselo", "Una, o ninguna", "Elige una (opcional)"],
+                  ["Extras que se pueden acumular sin tope", "Las que quiera, o ninguna", "Opcional"],
+                  ["Máximo 3 extras por bebida", "Hasta cierto número → 3", "Hasta 3 (opcional)"],
+                  ["«2 ingredientes a elegir» del omelette", "Un número exacto → 2", "Elige 2"],
+                ].map(([quieres, eliges, ve]) => (
+                  <tr key={quieres} className="border-b border-stone-100 align-top">
+                    <td className="py-2 pr-3">{quieres}</td>
+                    <td className="py-2 pr-3 font-medium text-stone-700">{eliges}</td>
+                    <td className="py-2 text-stone-500">{ve}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              No tienes que adivinar: debajo de la pregunta está la <strong>vista previa</strong> con el texto tal cual
+              lo verá quien cobra. Si dice lo que esperabas, está bien puesto.
+            </li>
+            <li>
+              Si pides más opciones de las que tiene el grupo —«elige 2» cuando solo hay una— te avisa en rojo. Es
+              importante: así <strong>nadie podría cerrar la venta</strong> de ese producto.
+            </li>
+            <li>
+              Poner un <strong>tope</strong> más alto que las opciones que tienes no es problema (un «hasta 3» con dos
+              opciones simplemente nunca llega a tres). Lo que traba es el <strong>mínimo</strong>.
+            </li>
+            <li>
+              Una opción usada en ventas no se puede borrar, para no romper tickets viejos:{" "}
+              <strong>desactívala</strong> y deja de aparecer en el POS.
+            </li>
+          </ul>
+        </>
       ),
     },
     {
