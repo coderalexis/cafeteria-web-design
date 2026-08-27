@@ -30,6 +30,7 @@ import {
   StickyNote,
   ChefHat,
   Keyboard,
+  AArrowUp,
   MoreVertical,
   LogOut,
   BookOpen,
@@ -91,6 +92,7 @@ import { useParkedOrders } from "./use-parked-orders"
 import { autoName, type ParkedOrder } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
+import { TextSizeControl } from "./text-size-control"
 import { usePosCart } from "./use-pos-cart"
 import {
   cartItemCount,
@@ -1521,6 +1523,7 @@ export default function POSClient({
               </Button>
             </Link>
           )}
+          <TextSizeControl />
           <Button
             variant="outline"
             size="icon"
@@ -1596,6 +1599,9 @@ export default function POSClient({
                     )}
                     <DropdownMenuItem onSelect={() => setShowTickets(true)}>
                       <Receipt className="h-4 w-4 mr-2" /> Tickets del día
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>
+                      <AArrowUp className="h-4 w-4 mr-2" /> Tamaño de letra
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setShowCashDialog(true)}>
                       {openSession ? <Unlock className="h-4 w-4 mr-2" /> : <Lock className="h-4 w-4 mr-2" />}

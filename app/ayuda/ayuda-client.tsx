@@ -5,6 +5,7 @@ import Link from "next/link"
 import {
   ArrowLeft,
   ArrowUpRight,
+  AArrowUp,
   Ban,
   BookOpen,
   CalendarClock,
@@ -333,6 +334,33 @@ export function AyudaClient({ ticket, corte }: Props) {
             <strong>Instalar como app</strong>: en Chrome/Android o Safari/iPad abre el sitio y elige{" "}
             <em>Agregar a pantalla de inicio</em>. Se abre a pantalla completa con su propio ícono. Sigue necesitando
             internet.
+          </li>
+        </ul>
+      ),
+    },
+    {
+      id: "letra",
+      grupo: "cajero",
+      icon: AArrowUp,
+      titulo: "Tamaño de letra",
+      palabras: "letra tamano texto grande chico compacto vista ver mejor tablet zoom acercar accesibilidad",
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            En el punto de venta, arriba a la derecha están <strong>A−</strong> y <strong>A+</strong>. Van entre cuatro
+            tamaños: Compacto, Normal, Grande y Muy grande. En celular está en el menú <strong>⋮ → Tamaño de letra</strong>.
+          </li>
+          <li>
+            <strong>Compacto</strong> encoge todo —letra, botones y espacios— para que quepan más productos y más
+            renglones del carrito. Útil en tablets acostadas, que son anchas pero bajitas.
+          </li>
+          <li>
+            <strong>Grande</strong> y <strong>Muy grande</strong> son para quien no alcanza a leer bien de lejos o con
+            poca luz.
+          </li>
+          <li>
+            Se recuerda <strong>en ese dispositivo</strong>, no en tu cuenta: la tablet del mostrador puede estar en
+            Compacto y la computadora del dueño en Normal. Solo aplica al punto de venta.
           </li>
         </ul>
       ),

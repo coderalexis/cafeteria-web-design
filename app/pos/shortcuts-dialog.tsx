@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { POS_SHORTCUTS } from "./shortcuts"
+import { TextSizeControl } from "./text-size-control"
 
 export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   return (
@@ -19,10 +20,23 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5 text-amber-700" />
-            Atajos de teclado
+            Pantalla y atajos
           </DialogTitle>
-          <DialogDescription>Los atajos con letras funcionan cuando no estás escribiendo en un campo.</DialogDescription>
+          <DialogDescription>
+            Ajusta cómo se ve el punto de venta. Los atajos con letras funcionan cuando no estás escribiendo en un
+            campo.
+          </DialogDescription>
         </DialogHeader>
+        {/* El tamaño de letra vive aquí además del encabezado: es donde alguien
+            busca cuando no alcanza a leer, y en el encabezado no siempre cabe. */}
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-stone-700">Tamaño de letra</p>
+            <p className="text-xs text-stone-400">Solo en esta pantalla; se recuerda en este dispositivo.</p>
+          </div>
+          <TextSizeControl compact />
+        </div>
+
         <div className="divide-y divide-stone-100 text-sm">
           {POS_SHORTCUTS.map((s, i) => (
             <div key={i} className="flex items-center justify-between gap-3 py-2">
