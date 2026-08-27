@@ -605,9 +605,17 @@ export function AyudaClient({ ticket, corte }: Props) {
             con todo incluido. No pedimos tarjeta y no se cobra nada solo.
           </li>
           <li>
+            ¿Cuántos días te quedan? En <strong>Negocio</strong>, hasta arriba, siempre está el renglón con los días
+            restantes y la fecha en que termina.
+          </li>
+          <li>
             Te avisamos por correo <strong>dos días antes</strong> y otra vez <strong>el último día</strong>. Ese último
             día verás además una <strong>franja roja</strong> arriba del sistema; puedes cerrarla y vuelve al día
             siguiente.
+          </li>
+          <li>
+            El día que vence puedes <strong>seguir cobrando hasta cerrar tu caja</strong>: la pausa entra después, no a
+            media jornada. Verás una franja roja avisándotelo.
           </li>
           <li>
             Cuando termina, la cafetería queda <strong>en pausa</strong>: no se puede vender, pero{" "}

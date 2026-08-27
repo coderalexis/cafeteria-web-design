@@ -3,12 +3,24 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target, QrCode, PauseCircle } from "lucide-react"
+import {
+  Store,
+  Loader2,
+  Printer,
+  Clock,
+  LockKeyhole,
+  Mail,
+  Target,
+  QrCode,
+  PauseCircle,
+  CalendarClock,
+} from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, MENU_NOTE_MAX } from "@/lib/settings"
+import { trialState } from "@/lib/signup"
 import { MEXICO_TIMEZONES, dateStringInTz } from "@/lib/dates"
-import { formatDateTime } from "@/lib/format"
+import { formatDate, formatDateTime } from "@/lib/format"
 import { buildTicketLines } from "@/lib/receipt"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { MenuQrCard } from "./qr-card"
@@ -22,6 +34,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const currentSettings = parseBusinessSettings(business.settings)
+  const prueba = trialState(business.trialEndsAt)
 
   const inList = MEXICO_TIMEZONES.some((t) => t.value === business.timezone)
   const [tzChoice, setTzChoice] = useState<string>(inList ? business.timezone : OTHER)
@@ -93,6 +106,36 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
           <code className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-700">{business.slug}</code>
         </p>
       </div>
+
+      {/* Estado de la prueba. Aquí y no solo en la franja de aviso: la franja
+          solo sale los últimos dos días, y quien se pregunta "¿cuántos me
+          quedan?" el día tres no tenía dónde verlo. */}
+      {prueba.state !== "none" && (
+        <div
+          className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-4 py-3 text-sm ${
+            prueba.state === "expired" || prueba.state === "last-day"
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
+          <CalendarClock className="h-4 w-4 shrink-0" />
+          <span className="font-semibold">
+            {prueba.state === "expired"
+              ? "Tu prueba gratis terminó"
+              : prueba.state === "last-day"
+                ? "Hoy es el último día de tu prueba gratis"
+                : `Prueba gratis · te ${prueba.daysLeft === 1 ? "queda 1 día" : `quedan ${prueba.daysLeft} días`}`}
+          </span>
+          <span className="opacity-80">
+            {prueba.state === "expired"
+              ? "La cafetería queda en pausa al cerrar tu caja. No se borra nada."
+              : `Termina el ${formatDate(business.trialEndsAt!, business.timezone)}`}
+          </span>
+          <a href="mailto:soporte@cafecitopos.com" className="font-medium underline underline-offset-2">
+            ¿Quieres continuar?
+          </a>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <form action={handleSubmit} className="space-y-6">
