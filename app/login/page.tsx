@@ -5,7 +5,7 @@ import Link from "next/link"
 import { login } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Coffee, AlertCircle, Loader2 } from "lucide-react"
+import { Coffee, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react"
 
 const BUSINESS_STORAGE_KEY = "pos-business-slug"
 
@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [identifier, setIdentifier] = useState("")
   const [business, setBusiness] = useState("")
+  const [verContrasena, setVerContrasena] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   // Recuerda el café en este dispositivo; `?c=slug` (p. ej. desde un acceso
@@ -121,16 +122,29 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-sm font-medium text-stone-700">
               Contraseña
             </label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Tu contraseña"
-              required
-              autoComplete="current-password"
-              className="bg-stone-50"
-              disabled={isPending}
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                name="password"
+                type={verContrasena ? "text" : "password"}
+                placeholder="Tu contraseña"
+                required
+                autoComplete="current-password"
+                className="bg-stone-50 pr-11"
+                disabled={isPending}
+              />
+              {/* type="button": dentro de un form, un botón sin tipo lo envía. */}
+              <button
+                type="button"
+                onClick={() => setVerContrasena((v) => !v)}
+                disabled={isPending}
+                aria-label={verContrasena ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-pressed={verContrasena}
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-stone-400 transition-colors hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 disabled:opacity-50"
+              >
+                {verContrasena ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <Button
