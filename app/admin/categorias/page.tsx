@@ -3,6 +3,7 @@ import { createCategory, updateCategory, deleteCategory, moveCategory } from "@/
 import { ActionForm } from "@/components/action-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { CATEGORY_NOTE_MAX } from "@/lib/settings"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORY_COLORS, COLOR_CLASSES, isCategoryColor } from "@/lib/category-colors"
@@ -48,7 +49,7 @@ export default async function CategoriasPage() {
 
   const { data: categories } = await supabase
     .from("menu_categories")
-    .select("id, name, slug, sort_order, color")
+    .select("id, name, slug, sort_order, color, note")
     .order("sort_order")
 
   // Count products per category
@@ -103,6 +104,12 @@ export default async function CategoriasPage() {
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700 shrink-0">
               Crear
             </Button>
+            <Input
+              name="note"
+              maxLength={CATEGORY_NOTE_MAX}
+              placeholder="Nota para el menú público (opcional): «Incluyen café del día y fruta»"
+              className="w-full"
+            />
           </ActionForm>
           <p className="text-xs text-stone-400 mt-2">
             El color pinta la categoría en el POS (chips y tarjetas) para encontrarla más rápido.
@@ -179,6 +186,13 @@ export default async function CategoriasPage() {
                 <Button type="submit" variant="secondary" size="sm" className="shrink-0">
                   Guardar
                 </Button>
+                <Input
+                  name="note"
+                  defaultValue={category.note ?? ""}
+                  maxLength={CATEGORY_NOTE_MAX}
+                  placeholder="Nota para el menú público (opcional)"
+                  className="w-full text-sm"
+                />
               </ActionForm>
 
               {/* Product count */}

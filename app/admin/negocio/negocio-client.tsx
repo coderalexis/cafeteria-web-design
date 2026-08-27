@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Store, Loader2, Printer, Clock, LockKeyhole, Mail, Target, QrCode, PauseCircle } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
-import { LOCK_MINUTES_OPTIONS, parseBusinessSettings } from "@/lib/settings"
+import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, MENU_NOTE_MAX } from "@/lib/settings"
 import { MEXICO_TIMEZONES, dateStringInTz } from "@/lib/dates"
 import { formatDateTime } from "@/lib/format"
 import { buildTicketLines } from "@/lib/receipt"
@@ -378,6 +378,25 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 Se publica en <code className="rounded bg-stone-100 px-1 py-0.5">/menu/{business.slug}</code>. Los
                 productos y variantes desactivados no aparecen.
               </p>
+
+              <div className="space-y-1.5 pt-2">
+                <label htmlFor="menu_note" className="text-sm font-medium text-stone-700">
+                  Nota al pie del menú
+                </label>
+                <textarea
+                  id="menu_note"
+                  name="menu_note"
+                  rows={2}
+                  maxLength={MENU_NOTE_MAX}
+                  defaultValue={currentSettings.menuNote}
+                  placeholder="Nuestros jarabes son libres de azúcar."
+                  className="w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-stone-400">
+                  La letra chica de tu carta. Sale al final del menú público, no en el ticket. Si aplica solo a una
+                  sección, ponla en la categoría desde <strong>Categorías</strong>.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

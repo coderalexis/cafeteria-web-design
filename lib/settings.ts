@@ -27,6 +27,12 @@ export interface BusinessSettings {
    * RPC, no solo la pantalla.
    */
   discountMaxCashier: number
+  /**
+   * Nota al pie del menú público: lo que en la carta impresa va en letra chica
+   * ("nuestros jarabes son libres de azúcar", "precios con IVA"). No sale en el
+   * ticket — para eso está `receipt_footer`.
+   */
+  menuNote: string
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -42,6 +48,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   parkedOrders: true,
   // 100 = como se comportaba antes de existir el ajuste.
   discountMaxCashier: 100,
+  menuNote: "",
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -52,6 +59,10 @@ export function parseGoal(value: unknown): number | null {
 }
 
 export const LOCK_MINUTES_OPTIONS = [0, 1, 2, 5, 10, 15, 30] as const
+
+/** Tope de las notas del menú: son letra chica, no un párrafo. */
+export const MENU_NOTE_MAX = 200
+export const CATEGORY_NOTE_MAX = 140
 
 export function parseBusinessSettings(raw: unknown): BusinessSettings {
   const out = { ...DEFAULT_SETTINGS }
@@ -74,6 +85,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     if (Number.isFinite(tope) && tope >= 0 && tope <= 100) {
       out.discountMaxCashier = Math.round(tope)
     }
+    if (typeof r.menu_note === "string") out.menuNote = r.menu_note.slice(0, MENU_NOTE_MAX)
   }
   return out
 }
@@ -92,5 +104,6 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     auto_print: s.autoPrint,
     parked_orders: s.parkedOrders,
     discount_max_cashier: s.discountMaxCashier,
+    menu_note: s.menuNote,
   }
 }

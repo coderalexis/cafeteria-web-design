@@ -517,6 +517,13 @@ export function AyudaClient({ ticket, corte }: Props) {
               imprimir. Quien lo escanee ve tu carta en su celular, sin instalar nada; se actualiza sola al cambiar
               precios, así que el QR impreso nunca se reemplaza. No muestra costos ni nada interno.
             </li>
+            <li>
+              <strong>La letra chica de tu carta</strong>: lo que aplica a todo el menú («nuestros jarabes son libres
+              de azúcar», «precios con IVA») va en <strong>Nota al pie del menú</strong>, aquí mismo. Lo que aplica
+              solo a una sección («incluyen café del día y fruta») va en la <strong>nota de esa categoría</strong>,
+              desde <strong>Categorías</strong>. Las dos salen únicamente en el menú público, no en el ticket — para
+              el ticket está el pie del recibo.
+            </li>
           </ul>
           <DemoQR />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">

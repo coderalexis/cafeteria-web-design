@@ -20,6 +20,8 @@ export interface PublicMenuCategory {
   name: string
   slug: string
   color: string | null
+  /** Letra chica bajo el título de la categoría (migración 25). */
+  note: string | null
   products: PublicMenuProduct[]
 }
 
@@ -30,6 +32,8 @@ export interface PublicMenu {
     address: string | null
     phone: string | null
     tagline: string | null
+    /** Letra chica al pie de todo el menú (migración 25). */
+    menu_note: string | null
   }
   categories: PublicMenuCategory[]
 }

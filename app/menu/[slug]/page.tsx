@@ -104,6 +104,7 @@ export default async function MenuPublicoPage({
                   {color && <span className={`h-3 w-3 rounded-full ${color.dot}`} aria-hidden />}
                   {cat.name}
                 </h2>
+                {cat.note && <p className="mt-1 text-sm italic text-stone-500">{cat.note}</p>}
                 <div className="mt-3 overflow-hidden rounded-xl border border-stone-200 bg-white">
                   {cat.products.map((product, i) => (
                     <div
@@ -142,6 +143,9 @@ export default async function MenuPublicoPage({
         </main>
 
         <footer className="mt-12 text-center text-xs text-stone-400">
+          {business.menu_note && (
+            <p className="mx-auto mb-3 max-w-sm text-sm italic text-stone-500">{business.menu_note}</p>
+          )}
           <p>Los precios pueden cambiar sin previo aviso.</p>
           <p className="mt-1">Menú de {business.name} · Cafecito POS</p>
         </footer>

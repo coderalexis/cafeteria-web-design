@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
 import { isCategoryColor } from "@/lib/category-colors"
+import { CATEGORY_NOTE_MAX } from "@/lib/settings"
 import { computeBulkPrice, type BulkPricesInput } from "@/lib/pricing"
 
 function revalidateAll() {
@@ -34,6 +35,7 @@ export async function createCategory(formData: FormData) {
   const slug = String(formData.get("slug") ?? "")
   const colorRaw = String(formData.get("color") ?? "")
   const color = isCategoryColor(colorRaw) ? colorRaw : null
+  const note = String(formData.get("note") ?? "").trim().slice(0, CATEGORY_NOTE_MAX) || null
 
   if (!name || !slug) {
     return { error: "Nombre y slug son obligatorios." }
@@ -44,7 +46,7 @@ export async function createCategory(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("menu_categories").insert({ name, slug, color })
+  const { error } = await supabase.from("menu_categories").insert({ name, slug, color, note })
 
   if (error) return { error: error.message }
 
@@ -62,6 +64,7 @@ export async function updateCategory(formData: FormData) {
   const slug = String(formData.get("slug") ?? "")
   const colorRaw = String(formData.get("color") ?? "")
   const color = isCategoryColor(colorRaw) ? colorRaw : null
+  const note = String(formData.get("note") ?? "").trim().slice(0, CATEGORY_NOTE_MAX) || null
 
   if (!id || !name || !slug) {
     return { error: "ID, nombre y slug son obligatorios." }
@@ -72,7 +75,7 @@ export async function updateCategory(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("menu_categories").update({ name, slug, color }).eq("id", id)
+  const { error } = await supabase.from("menu_categories").update({ name, slug, color, note }).eq("id", id)
 
   if (error) return { error: error.message }
 
