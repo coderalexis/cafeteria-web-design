@@ -32,6 +32,9 @@ type Selection = Record<string, string[]>
 function groupHint(g: ModifierGroup): string {
   if (g.maxSelect === 1 && g.minSelect >= 1) return "Elige una"
   if (g.maxSelect === 1) return "Elige una (opcional)"
+  // Un grupo de "elige exactamente N" es común (los 2 ingredientes de un
+  // omelette); decirlo "de 2 a 2" suena a error de programa.
+  if (g.minSelect > 0 && g.minSelect === g.maxSelect) return `Elige ${g.minSelect}`
   if (g.minSelect > 0 && g.maxSelect) return `Elige de ${g.minSelect} a ${g.maxSelect}`
   if (g.minSelect > 0) return `Elige al menos ${g.minSelect}`
   if (g.maxSelect) return `Hasta ${g.maxSelect} (opcional)`
