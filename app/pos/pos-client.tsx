@@ -1564,7 +1564,7 @@ export default function POSClient({
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuContent align="end" className="w-60">
                     {parkedEnabled && parked.orders.length > 0 && (
                       <DropdownMenuItem onSelect={() => setShowTray(true)}>
                         <PauseCircle className="h-4 w-4 mr-2" />
@@ -1577,11 +1577,11 @@ export default function POSClient({
                     {/* No es un DropdownMenuItem a propósito: ajustar la letra
                         suele ser probar un tamaño y luego otro, y un Item
                         cerraría el menú en cada toque. */}
-                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                      <span className="flex items-center gap-2 text-sm text-stone-600">
-                        <AArrowUp className="h-4 w-4" /> Letra
-                      </span>
-                      <TextSizeControl size={textSize.size} setSize={textSize.setSize} compact />
+                    <div className="px-2 py-1.5">
+                      <p className="mb-1.5 flex items-center gap-2 text-sm text-stone-600">
+                        <AArrowUp className="h-4 w-4" /> Tamaño de letra
+                      </p>
+                      <TextSizeControl size={textSize.size} setSize={textSize.setSize} block />
                     </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>

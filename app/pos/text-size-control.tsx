@@ -11,38 +11,42 @@ import { Button } from "@/components/ui/button"
 export function TextSizeControl({
   size,
   setSize,
-  compact = false,
+  block = false,
 }: {
   size: TextSizeKey
   setSize: (next: TextSizeKey) => void
-  compact?: boolean
+  /** Ocupa todo el ancho disponible, con botones anchos de dedo. */
+  block?: boolean
 }) {
   const actual = TEXT_SIZES.find((s) => s.key === size)
   const enMinimo = size === TEXT_SIZES[0].key
   const enMaximo = size === TEXT_SIZES[TEXT_SIZES.length - 1].key
 
   return (
-    <div className={`flex items-center ${compact ? "gap-0.5" : "gap-1"}`}>
+    <div className={`flex items-center gap-1 ${block ? "w-full" : ""}`}>
       <Button
         variant="outline"
-        size="icon"
+        size={block ? "default" : "icon"}
         onClick={() => setSize(stepTextSize(size, -1))}
         disabled={enMinimo}
-        className="h-9 w-9"
+        className={block ? "flex-1" : "h-9 w-9"}
         title="Letra más chica"
         aria-label="Letra más chica"
       >
         <AArrowDown className="h-4 w-4" />
       </Button>
-      <span className="w-16 select-none text-center text-xs font-medium text-stone-500" aria-live="polite">
+      <span
+        className={`select-none text-center text-xs font-medium text-stone-500 ${block ? "flex-1" : "w-16"}`}
+        aria-live="polite"
+      >
         {actual?.label ?? "Normal"}
       </span>
       <Button
         variant="outline"
-        size="icon"
+        size={block ? "default" : "icon"}
         onClick={() => setSize(stepTextSize(size, 1))}
         disabled={enMaximo}
-        className="h-9 w-9"
+        className={block ? "flex-1" : "h-9 w-9"}
         title="Letra más grande"
         aria-label="Letra más grande"
       >

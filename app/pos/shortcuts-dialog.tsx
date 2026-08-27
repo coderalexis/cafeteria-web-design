@@ -27,7 +27,10 @@ export function ShortcutsDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      {/* Con tope y desplazamiento: en una tablet acostada (768 px de alto) la
+          lista completa de atajos más el bloque de letra medía 771 px y se
+          cortaba por abajo. */}
+      <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5 text-amber-700" />
@@ -45,7 +48,7 @@ export function ShortcutsDialog({
             <p className="text-sm font-medium text-stone-700">Tamaño de letra</p>
             <p className="text-xs text-stone-400">Solo en esta pantalla; se recuerda en este dispositivo.</p>
           </div>
-          <TextSizeControl size={textSize} setSize={setTextSize} compact />
+          <TextSizeControl size={textSize} setSize={setTextSize} />
         </div>
 
         <div className="divide-y divide-stone-100 text-sm">
