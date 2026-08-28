@@ -222,6 +222,22 @@ const UMBRAL_GESTO = 90
 /** Mantener presionado este tiempo abre la nota de la línea. */
 const PRESION_LARGA_MS = 500
 
+/**
+ * ¿El evento nació DE VERDAD dentro de la tarjeta, y no sobre un control?
+ *
+ * Dos trampas que ya mordieron:
+ * - Los eventos de React ATRAVIESAN los portales: tocar una opción del menú ⋯
+ *   (que vive en un portal del body) burbujea por el árbol de React hasta la
+ *   tarjeta. contains() lo descarta, porque en el DOM esa opción no es hija
+ *   de la tarjeta.
+ * - Las opciones de Radix son div[role="menuitem"], no <button>: la lista de
+ *   exclusión debe nombrarlas.
+ */
+function gestoEnTarjeta(e: { currentTarget: EventTarget & Element; target: EventTarget }): boolean {
+  const t = e.target as HTMLElement
+  return e.currentTarget.contains(t) && !t.closest("button, input, a, [role='menuitem']")
+}
+
 /** Opciones de propina: porcentaje del total, "sin propina" o monto libre. */
 type TipChoice = number | "otro"
 const TIP_OPTIONS: TipChoice[] = [0, 5, 10, 15, "otro"]
@@ -1381,7 +1397,7 @@ export default function POSClient({
                       }
                     }}
                     onPointerDown={(e) => {
-                      if ((e.target as HTMLElement).closest("button, input, a")) return
+                      if (!gestoEnTarjeta(e)) return
                       gestoRef.current = { x: e.clientX, y: e.clientY, lineId: line.lineId, downAt: Date.now(), largo: false, arrastre: false }
                       if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
                       pressTimerRef.current = setTimeout(() => {
@@ -1418,7 +1434,7 @@ export default function POSClient({
                       if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
                     }}
                     onClick={(e) => {
-                      if ((e.target as HTMLElement).closest("button, input, a")) return
+                      if (!gestoEnTarjeta(e)) return
                       const g = gestoRef.current
                       gestoRef.current = null
                       if (!g) return
