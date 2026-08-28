@@ -102,6 +102,7 @@ import { CashTenderDialog } from "./cash-tender-dialog"
 import { formatPhone, LoyaltyDialog, RedeemDialog } from "./loyalty-dialog"
 import type { LoyaltyCustomer } from "@/app/actions/loyalty"
 import { ProductInfoDialog } from "./product-info-dialog"
+import { CartLineDialog } from "./cart-line-dialog"
 import { TextSizeControl } from "./text-size-control"
 import { usePosTextSize } from "./use-text-size"
 import { usePosCart } from "./use-pos-cart"
@@ -214,6 +215,12 @@ const QUICK_NOTES = ["Para llevar", "Aquí"]
 
 /** Si el plegable de "Más opciones" queda abierto, por dispositivo. */
 const MORE_OPTIONS_KEY = "pos-more-options"
+
+/** Cuánto hay que arrastrar una línea del carrito para que cuente el gesto.
+ *  90px: un tirón franco. Menos y el scroll diagonal disparaba acciones. */
+const UMBRAL_GESTO = 90
+/** Mantener presionado este tiempo abre la nota de la línea. */
+const PRESION_LARGA_MS = 500
 
 /** Opciones de propina: porcentaje del total, "sin propina" o monto libre. */
 type TipChoice = number | "otro"
@@ -557,6 +564,16 @@ export default function POSClient({
     })
   }, [])
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
+  // ── Gestos sobre las líneas del carrito ──
+  // Toque = detalle en ventana; arrastre a la derecha = duplicar; a la
+  // izquierda = quitar; presión larga = nota. Todo existe también en el menú
+  // ⋯ de la línea — los gestos son el atajo, no el único camino, porque un
+  // gesto no se descubre solo. El ref lleva el gesto EN CURSO (solo hay uno):
+  // el click que llega al final decide si fue toque limpio o resto de un
+  // arrastre/presión, y los toques sobre botones/inputs no cuentan.
+  const [infoLine, setInfoLine] = useState<CartLine | null>(null)
+  const gestoRef = useRef<{ x: number; y: number; lineId: string; largo: boolean; arrastre: boolean } | null>(null)
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Producto/tamaño esperando modificadores: alta nueva, o edición de una
   // línea existente (lineId presente = "mejor con avena" sin rearmar todo).
   const [pendingModifiers, setPendingModifiers] = useState<{
@@ -1324,15 +1341,81 @@ export default function POSClient({
                   key={line.lineId}
                   layout
                   initial={{ opacity: 0, x: 20 }}
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                    backgroundColor: line.isNew ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0)",
-                  }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="rounded-lg border-b border-stone-100 px-1.5 py-2"
+                  className="relative border-b border-stone-100"
                 >
+                  {/* Debajo de la tarjeta viven las pistas del gesto: al
+                      arrastrar a la derecha asoma «Duplicar», a la izquierda
+                      «Quitar». En reposo la tarjeta (fondo blanco sólido) las
+                      tapa por completo. */}
+                  <div aria-hidden className="absolute inset-0 flex items-center justify-between rounded-lg bg-stone-100 px-3">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                      <Copy className="h-4 w-4" />
+                      Duplicar
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-red-600">
+                      Quitar
+                      <Trash2 className="h-4 w-4" />
+                    </span>
+                  </div>
+                  <motion.div
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.9}
+                    onDragStart={() => {
+                      if (gestoRef.current) gestoRef.current.arrastre = true
+                      if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+                    }}
+                    onDragEnd={(_, info) => {
+                      // info.offset trae el desplazamiento del PUNTERO, no el
+                      // de la tarjeta (que el elástico recorta) — es el gesto
+                      // real de la mano.
+                      if (info.offset.x > UMBRAL_GESTO) {
+                        duplicateLine(line.lineId)
+                        vibra(12)
+                      } else if (info.offset.x < -UMBRAL_GESTO) {
+                        removeLine(line.lineId)
+                        vibra(20)
+                      }
+                    }}
+                    onPointerDown={(e) => {
+                      if ((e.target as HTMLElement).closest("button, input, a")) return
+                      gestoRef.current = { x: e.clientX, y: e.clientY, lineId: line.lineId, largo: false, arrastre: false }
+                      if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+                      pressTimerRef.current = setTimeout(() => {
+                        const g = gestoRef.current
+                        if (!g || g.lineId !== line.lineId || g.arrastre) return
+                        g.largo = true
+                        vibra(20)
+                        setEditingNoteFor(line.lineId)
+                      }, PRESION_LARGA_MS)
+                    }}
+                    onPointerMove={(e) => {
+                      const g = gestoRef.current
+                      if (!g) return
+                      // Moverse cancela la presión larga: ya es scroll o arrastre.
+                      if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 10 && pressTimerRef.current) {
+                        clearTimeout(pressTimerRef.current)
+                      }
+                    }}
+                    onPointerUp={() => {
+                      if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+                    }}
+                    onPointerCancel={() => {
+                      if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+                    }}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("button, input, a")) return
+                      const g = gestoRef.current
+                      gestoRef.current = null
+                      if (g && (g.largo || g.arrastre)) return
+                      setInfoLine(line)
+                    }}
+                    animate={{ backgroundColor: line.isNew ? "rgba(251,191,36,0.12)" : "#ffffff" }}
+                    className="relative cursor-pointer select-none rounded-lg px-1.5 py-2"
+                  >
                   <div className="flex items-center justify-between gap-[8px]">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-stone-800 text-sm truncate">{line.product.name}</p>
@@ -1500,6 +1583,7 @@ export default function POSClient({
 
                   {/* Nota por artículo */}
                   {editingNoteFor === line.lineId && (
+                    /* dentro de la tarjeta arrastrable, para moverse con ella */
                     <div className="mt-2 flex items-center gap-2">
                       <Input
                         autoFocus
@@ -1520,6 +1604,7 @@ export default function POSClient({
                       />
                     </div>
                   )}
+                  </motion.div>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -2422,6 +2507,7 @@ export default function POSClient({
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />
+      <CartLineDialog line={infoLine} onClose={() => setInfoLine(null)} />
       <LoyaltyDialog
         open={showLoyalty}
         onOpenChange={setShowLoyalty}
