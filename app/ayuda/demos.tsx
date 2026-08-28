@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Delete } from "lucide-react"
 import QRCode from "react-qr-code"
 import { COLOR_CLASSES, DEFAULT_CHIP_ACTIVE } from "@/lib/category-colors"
@@ -287,6 +287,141 @@ export function DemoQR() {
         </div>
       </div>
       <p className="mt-1.5 text-[11px] text-stone-500">Este de muestra lleva a cafecitopos.com; el tuyo llevará a tu menú.</p>
+    </MarcoDemo>
+  )
+}
+
+/* ── Gestos del carrito: practica tocar, deslizar y mantener ──────── */
+export function DemoGestos() {
+  const [qty, setQty] = useState(1)
+  const [estado, setEstado] = useState<"normal" | "detalle" | "nota" | "quitada">("normal")
+  const [nota, setNota] = useState("")
+  const [dx, setDx] = useState(0)
+  const [aviso, setAviso] = useState<string | null>(null)
+  // El gesto vivo va en un REF, como en el POS real: los pointermove de un
+  // manotazo rápido llegan antes de que React re-renderice, y un estado aún
+  // sin asentar los perdería. El estado solo pinta (dx mueve la tarjeta).
+  const gestoRef = useRef<{ x: number; t: number; dx: number; timer: ReturnType<typeof setTimeout> } | null>(null)
+
+  const abajo = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button, input")) return
+    const timer = setTimeout(() => {
+      const g = gestoRef.current
+      if (g && Math.abs(g.dx) <= 10) {
+        g.t = 0 // ya no cuenta como toque
+        setEstado("nota")
+        setAviso(null)
+      }
+    }, 500)
+    gestoRef.current = { x: e.clientX, t: Date.now(), dx: 0, timer }
+  }
+  const mueve = (e: React.PointerEvent) => {
+    const g = gestoRef.current
+    if (!g) return
+    g.dx = e.clientX - g.x
+    if (Math.abs(g.dx) > 10) clearTimeout(g.timer)
+    setDx(Math.max(-120, Math.min(120, g.dx)))
+  }
+  const suelta = () => {
+    const g = gestoRef.current
+    gestoRef.current = null
+    if (!g) return
+    clearTimeout(g.timer)
+    if (g.dx > 70) {
+      setQty((q) => {
+        setAviso("¡Duplicado! Ahora son " + (q + 1))
+        return q + 1
+      })
+    } else if (g.dx < -70) {
+      setEstado("quitada")
+    } else if (Math.abs(g.dx) < 10 && g.t > 0 && Date.now() - g.t < 500 && estado === "normal") {
+      setEstado("detalle")
+      setAviso(null)
+    }
+    setDx(0)
+  }
+
+  const reinicia = () => {
+    setQty(1)
+    setNota("")
+    setEstado("normal")
+    setAviso(null)
+  }
+
+  return (
+    <MarcoDemo titulo="Practica aquí mismo — esta línea responde como las del carrito">
+      {estado === "quitada" ? (
+        <div className="flex items-center justify-between rounded-lg border border-dashed border-stone-300 bg-white px-3 py-4 text-sm text-stone-400">
+          La línea se quitó del carrito.
+          <button onClick={reinicia} className="rounded-md border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-600 hover:border-amber-400">
+            Traerla de vuelta
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="relative overflow-hidden rounded-lg">
+            <div aria-hidden className="absolute inset-0 flex items-center justify-between rounded-lg bg-stone-200/70 px-3 text-xs font-bold">
+              <span className="text-emerald-700">→ Duplicar</span>
+              <span className="text-red-600">Quitar ←</span>
+            </div>
+            <div
+              onPointerDown={abajo}
+              onPointerMove={mueve}
+              onPointerUp={suelta}
+              onPointerCancel={suelta}
+              onContextMenu={(e) => e.preventDefault()}
+              style={{ transform: `translateX(${dx}px)`, touchAction: "pan-y" }}
+              className="relative flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white px-3 py-3"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-stone-800">Latte · Grande</span>
+                <span className="text-xs text-stone-400">{formatCurrency(50)}</span>
+                {nota && <span className="block truncate text-[11px] italic text-stone-500">📝 {nota}</span>}
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="text-sm font-bold text-stone-700">{qty}</span>
+                <span className="text-sm font-bold text-stone-800">{formatCurrency(50 * qty)}</span>
+                <span className="text-stone-300">⋯</span>
+              </span>
+            </div>
+          </div>
+          {aviso && <p className="mt-2 text-xs font-medium text-emerald-700">{aviso}</p>}
+          {estado === "detalle" && (
+            <div className="mt-2 rounded-lg border border-stone-200 bg-white p-3 text-sm">
+              <p className="font-semibold text-stone-800">Latte · Grande</p>
+              <p className="mt-1 text-xs text-stone-500">Así se ve la ventana de detalle: nombre completo, opciones, nota y las cuentas.</p>
+              <div className="mt-2 flex justify-between text-xs text-stone-600">
+                <span>Cantidad {qty} × {formatCurrency(50)}</span>
+                <span className="font-bold text-stone-800">{formatCurrency(50 * qty)}</span>
+              </div>
+              <button onClick={() => setEstado("normal")} className="mt-2 rounded-md border border-stone-300 px-2.5 py-1 text-xs font-semibold text-stone-600 hover:border-amber-400">
+                Cerrar
+              </button>
+            </div>
+          )}
+          {estado === "nota" && (
+            <input
+              autoFocus
+              placeholder="ej. sin azúcar — y toca afuera para guardar"
+              defaultValue={nota}
+              maxLength={60}
+              onBlur={(e) => {
+                setNota(e.target.value.trim())
+                setEstado("normal")
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur()
+              }}
+              className="mt-2 w-full rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-sm"
+            />
+          )}
+          {qty > 1 && (
+            <button onClick={reinicia} className="mt-2 text-[11px] text-stone-400 underline underline-offset-2 hover:text-stone-600">
+              reiniciar la demo
+            </button>
+          )}
+        </>
+      )}
     </MarcoDemo>
   )
 }

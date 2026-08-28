@@ -11,6 +11,7 @@ import {
   CalendarClock,
   ChefHat,
   Coffee,
+  Hand,
   Keyboard,
   Lock,
   PauseCircle,
@@ -32,7 +33,7 @@ import {
 import { POS_SHORTCUTS } from "@/app/pos/shortcuts"
 import { TRIAL_DAYS } from "@/lib/signup"
 import { GRACIA_HORAS, HORAS_SIN_HORARIO } from "@/lib/cash-session"
-import { DemoDiferencia, DemoEfectivo, DemoPOS, DemoPropina, DemoQR, TicketImpreso } from "./demos"
+import { DemoDiferencia, DemoEfectivo, DemoGestos, DemoPOS, DemoPropina, DemoQR, TicketImpreso } from "./demos"
 
 /**
  * Guía de uso. La misma página sirve en pantalla (con navegación fija,
@@ -134,7 +135,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: Coffee,
       titulo: "Abrir el turno y vender",
-      palabras: "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir duplicar cantidad para llevar",
+      palabras:
+        "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir cantidad para llevar mas opciones descuento",
       href: "/pos",
       nodo: (
         <>
@@ -154,10 +156,12 @@ export function AyudaClient({ ticket, corte }: Props) {
           <DemoPOS />
           <ol className="mt-4 space-y-3">
             <Step n={3} title="Ajusta cantidades y notas">
-              Con <strong>+ / −</strong> cambias la cantidad. El icono de nota en cada línea permite instrucciones de
-              ese artículo («sin azúcar»). Abajo, los controles van en el orden en que se usan: método de pago,
-              efectivo recibido, propina, y hasta el final los chips de <strong>Para llevar / Aquí</strong> y la{" "}
-              <strong>nota del ticket</strong> (mesa, nombre).
+              Con <strong>+ / −</strong> cambias la cantidad (y tocándola la tecleas: 12 conchas sin doce toques). Cada
+              línea tiene su menú <strong>⋯</strong> con duplicar, nota del artículo («sin azúcar») y quitar — o usa
+              los <strong>gestos</strong> de la siguiente sección, que es más rápido. Abajo van método de pago,
+              efectivo y propina; lo ocasional (<strong>Para llevar / Aquí</strong>, la nota del ticket y el descuento)
+              vive plegado en <strong>Más opciones</strong> — al cerrarse, el botón resume lo que trae puesto, y si lo
+              dejas abierto se queda así en ese aparato.
             </Step>
             <Step n={4} title="Elige método de pago y cobra">
               Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, tócala antes de cobrar.
@@ -166,18 +170,58 @@ export function AyudaClient({ ticket, corte }: Props) {
               prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp — útil si no hay impresora.
             </Step>
             <Step n={5} title="Atajos del carrito">
-              Toca la <strong>cantidad</strong> para teclearla (12 conchas sin doce toques), el icono de{" "}
-              <strong>copiar</strong> duplica una línea («otro igual, pero sin azúcar»), y tocando las{" "}
-              <strong>opciones</strong> de una línea las cambias sin rearmarla. Con el carrito vacío aparece{" "}
-              <strong>Repetir última venta</strong>. Sobre la nota del ticket hay chips de{" "}
-              <strong>Para llevar / Aquí</strong> de un toque.
+              Tocando las <strong>opciones</strong> de una línea (el renglón «+ leche de avena») las cambias sin
+              rearmarla. Con el carrito vacío aparece <strong>Repetir última venta</strong>, y el detalle completo de
+              cualquier línea está a un toque — mira la sección de gestos aquí abajo.
             </Step>
             <Step n={6} title="Si te equivocaste antes de cobrar">
-              Quita la línea con el bote de basura o usa <strong>Vaciar</strong>. Si recargas la página por accidente,
-              la venta en curso se restaura sola.
+              <strong>−</strong> en una línea de cantidad 1 la quita; también puedes deslizarla a la izquierda, usar su
+              menú <strong>⋯</strong>, o <strong>Vaciar</strong> para empezar de cero. Si recargas la página por
+              accidente, la venta en curso se restaura sola.
             </Step>
           </ol>
           <TicketImpreso lineas={ticket} titulo="Un ticket de este sistema, tal cual sale de la impresora" />
+        </>
+      ),
+    },
+    {
+      id: "gestos",
+      grupo: "cajero",
+      icon: Hand,
+      titulo: "La línea del carrito: toca, desliza, mantén",
+      palabras:
+        "gestos deslizar arrastrar duplicar quitar eliminar mantener presionado nota detalle ventana tocar linea articulo tres puntos",
+      href: "/pos",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            Cada línea del carrito responde a la mano, para no andar cazando iconos con fila de clientes. Todo esto
+            también está en el menú <strong>⋯</strong> de la línea — los gestos son el atajo, no el único camino.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Tócala</strong> y se abre su <strong>ventana de detalle</strong>: nombre completo (sin
+              recortes), descripción, opciones con su precio, nota, cantidad y el total de esa línea. Útil cuando el
+              nombre es largo y en la fila se lee cortado.
+            </li>
+            <li>
+              <strong>Deslízala a la derecha</strong> → <span className="font-semibold text-emerald-700">duplica</span>{" "}
+              («otro igual»). <strong>A la izquierda</strong> →{" "}
+              <span className="font-semibold text-red-600">la quita</span>. Es un tirón franco, no un roce: un dedazo a
+              medias no hace nada.
+            </li>
+            <li>
+              <strong>Mantenla presionada</strong> medio segundo (vibra como aviso), suelta, y se abre la{" "}
+              <strong>nota del artículo</strong> con el teclado listo. Escribes «sin azúcar», tocas cualquier espacio
+              libre, y quedó.
+            </li>
+          </ul>
+          <DemoGestos />
+          <p className="mt-3 text-xs text-stone-400">
+            Ejemplos rápidos: piden «otro latte igual» → desliza a la derecha. «Mejor sin el pan» → desliza esa línea a
+            la izquierda. «El mío sin azúcar» → mantén presionado y escribe. «¿Este cuánto era?» → tócala y ves sus
+            cuentas.
+          </p>
         </>
       ),
     },
@@ -396,12 +440,25 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: Smartphone,
       titulo: "En tablet o celular",
-      palabras: "instalar app pantalla inicio android ipad iphone barra inferior",
+      palabras:
+        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            En pantallas chicas el carrito vive en la <strong>barra inferior</strong>: muestra artículos y total; tócala
-            para abrirlo y cobrar. En pantallas grandes va como columna a la derecha.
+            En celular el carrito vive en la <strong>barra inferior</strong>, partida en dos: la izquierda muestra los
+            artículos (y anuncia lo recién agregado: «+ Latte · Grande $50», con una vibración) y la derecha es{" "}
+            <strong>Cobrar directo</strong> — la venta común de «dos cosas y ya» sale sin abrir el carrito. En
+            pantallas grandes el carrito va como columna a la derecha.
+          </li>
+          <li>
+            <strong>Ejemplo completo en celular</strong>: toca Espresso → toca Chico → el punto vuela al carrito y la
+            barra dice qué entró → toca <strong>Cobrar</strong>. Dos artículos en efectivo exacto son{" "}
+            <strong>tres toques</strong>.
+          </li>
+          <li>
+            Al abrir el carrito queda una <strong>rendija</strong> arriba: tócala para minimizarlo (también está la{" "}
+            <strong>X</strong> ámbar). Y al bajar por los productos, el encabezado <strong>se encoge</strong> para dar
+            espacio — la <strong>lupa</strong> reabre el buscador.
           </li>
           <li>
             En cualquier tamaño, a la vista arriba queda solo el <strong>estado de la caja</strong>; lo demás (Tickets,
@@ -495,7 +552,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Coffee,
       titulo: "Menú: categorías, productos y precios",
-      palabras: "categorias colores slug variantes tamanos costo margen precios lote orden desactivar",
+      palabras: "categorias colores slug variantes tamanos costo margen precios lote orden desactivar sin precio no aparece",
       href: "/admin/productos",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
@@ -533,6 +590,11 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             Un producto o variante que <strong>ya tiene ventas no se puede borrar</strong> (para no perder el
             historial); desactívalo.
+          </li>
+          <li>
+            Un producto <strong>sin ningún precio activo</strong> (todas sus variantes borradas o desactivadas){" "}
+            <strong>no aparece en el punto de venta</strong> — sin precio no hay nada que cobrar. El editor te lo avisa
+            en ese producto; activa o agrega una variante para volver a venderlo.
           </li>
         </ul>
       ),
