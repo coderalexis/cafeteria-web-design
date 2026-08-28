@@ -562,6 +562,22 @@ function EditProductSheet({
 
           {/* ── Variants section ── */}
           <div className="space-y-4">
+            {/* Un producto sin precios activos no aparece en el punto de venta:
+                sin variante no hay precio, y sin precio no hay nada que cobrar.
+                Antes se quedaba en la rejilla del POS sin precio y reventaba al
+                cobrar, así que ahora se filtra allá — y se avisa aquí, que es
+                donde alguien acaba de desactivar el último precio y se
+                preguntaría a dónde se fue su producto. */}
+            {product.isActive && !product.variants.some((v) => v.isActive) && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <p>
+                  <strong>Este producto no aparece en el punto de venta.</strong> No tiene ningún precio activo, y sin
+                  precio no se puede cobrar. Activa una variante {product.variants.length === 0 ? "o agrega una" : ""}{" "}
+                  para volver a venderlo.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
                 <Layers className="h-4 w-4 text-purple-600" />

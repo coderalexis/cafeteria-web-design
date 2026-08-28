@@ -69,15 +69,27 @@ export default async function POSPage() {
    * La regla: un encabezado tiene que agrupar al menos dos productos. Si no,
    * es descripción y va como subtítulo de la tarjeta.
    */
+  /**
+   * Un producto sin NINGUNA variante activa no tiene precio, así que no se
+   * puede vender: el panel deja desactivar (o borrar) la última variante, y
+   * entonces el producto seguía apareciendo en la rejilla sin precio, entraba
+   * al carrito por $0.00 y al cobrar reventaba con «Invalid uuid» —la venta
+   * nunca se registra, pero el cajero no entiende por qué—. Mejor no ofrecer
+   * lo que no se puede cobrar. En /admin/productos se avisa que quedó fuera.
+   */
+  const vendibles = (dbProducts ?? []).filter((p) =>
+    (p.menu_variants ?? []).some((v) => v.is_active),
+  )
+
   const productosPorDescripcion = new Map<string, number>()
-  for (const p of dbProducts ?? []) {
+  for (const p of vendibles) {
     const desc = p.description?.trim()
     if (!desc) continue
     const clave = `${p.menu_categories?.slug ?? ""}|${desc}`
     productosPorDescripcion.set(clave, (productosPorDescripcion.get(clave) ?? 0) + 1)
   }
 
-  const products = (dbProducts ?? []).map((p) => {
+  const products = vendibles.map((p) => {
     const cat = p.menu_categories
     const variants = [...(p.menu_variants ?? [])]
       .filter((v) => v.is_active)
