@@ -2223,8 +2223,10 @@ export default function POSClient({
                 probó a pantalla completa y el usuario lo regresó — la rendija
                 es el escape universal (tocarla cierra el carrito, cortesía del
                 overlay de Radix) que funciona aunque algún tamaño de letra
-                descuadre la X. La X ámbar del encabezado se queda igual. */}
-            <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col rounded-t-2xl overflow-hidden [&>button]:hidden">
+                descuadre la X. La X ámbar del encabezado se queda igual.
+                5% y no 8%: lo justo para que se vea el POS atrás y haya dónde
+                tocar (~42px en un celular de 844), sin regalar más carrito. */}
+            <SheetContent side="bottom" className="h-[95dvh] p-0 flex flex-col rounded-t-2xl overflow-hidden [&>button]:hidden">
               <SheetTitle className="sr-only">Venta actual</SheetTitle>
               <div className="flex-1 min-h-0">{cartPanel}</div>
             </SheetContent>
