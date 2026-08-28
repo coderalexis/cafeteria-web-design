@@ -572,7 +572,7 @@ export default function POSClient({
   // el click que llega al final decide si fue toque limpio o resto de un
   // arrastre/presión, y los toques sobre botones/inputs no cuentan.
   const [infoLine, setInfoLine] = useState<CartLine | null>(null)
-  const gestoRef = useRef<{ x: number; y: number; lineId: string; largo: boolean; arrastre: boolean } | null>(null)
+  const gestoRef = useRef<{ x: number; y: number; lineId: string; downAt: number; largo: boolean; arrastre: boolean } | null>(null)
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Producto/tamaño esperando modificadores: alta nueva, o edición de una
   // línea existente (lineId presente = "mejor con avena" sin rearmar todo).
@@ -1382,7 +1382,7 @@ export default function POSClient({
                     }}
                     onPointerDown={(e) => {
                       if ((e.target as HTMLElement).closest("button, input, a")) return
-                      gestoRef.current = { x: e.clientX, y: e.clientY, lineId: line.lineId, largo: false, arrastre: false }
+                      gestoRef.current = { x: e.clientX, y: e.clientY, lineId: line.lineId, downAt: Date.now(), largo: false, arrastre: false }
                       if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
                       pressTimerRef.current = setTimeout(() => {
                         const g = gestoRef.current
@@ -1408,6 +1408,11 @@ export default function POSClient({
                     }}
                     onPointerUp={() => {
                       if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+                      const g = gestoRef.current
+                      if (g && g.largo && !g.arrastre && g.lineId === line.lineId) {
+                        gestoRef.current = null
+                        setTimeout(() => setEditingNoteFor(line.lineId), 60)
+                      }
                     }}
                     onPointerCancel={() => {
                       if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
@@ -1417,12 +1422,14 @@ export default function POSClient({
                       const g = gestoRef.current
                       gestoRef.current = null
                       if (!g) return
-                      // El arrastre gana: quien sostuvo y luego jaló, jaló.
-                      if (g.arrastre) return
-                      if (g.largo) {
-                        setEditingNoteFor(line.lineId)
-                        return
-                      }
+                      // El arrastre y la presión larga ya decidieron lo suyo.
+                      if (g.arrastre || g.largo) return
+                      // Un toque limpio es CORTO. Si el "gesto" tiene más de
+                      // 700 ms es un residuo (un scroll sin click, o el click
+                      // fantasma que suelta el navegador al cerrar el menú ⋯
+                      // sobre la tarjeta) — cobrarlo abría el detalle sin que
+                      // nadie lo pidiera.
+                      if (Date.now() - g.downAt > 700) return
                       setInfoLine(line)
                     }}
                     // Sin el menú contextual del navegador: en Android la
