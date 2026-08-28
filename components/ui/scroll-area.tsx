@@ -14,7 +14,16 @@ const ScrollArea = React.forwardRef<
     className={cn('relative overflow-hidden', className)}
     {...props}
   >
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+    {/* [&>div]:!block — Radix envuelve el contenido en un div con
+        `display:table` en línea, y una tabla se ANCHA hasta el mínimo de su
+        contenido. Basta un nombre largo ("Ensalada César con pollo a la
+        parrilla") para que ese div crezca a 506 px dentro de una pantalla de
+        390 y se lleve la fila entera fuera de la vista: el truncado nunca
+        llega a aplicarse porque nada obliga al ancho. Con `block` el div se
+        queda en el 100 % del visor y ahí sí manda el min-w-0 + truncate.
+        Lleva ! porque el display de Radix es estilo en línea. Todas nuestras
+        listas son verticales, así que no perdemos ningún scroll horizontal. */}
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
