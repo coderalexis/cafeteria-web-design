@@ -10,7 +10,7 @@ import {
   receiptBusinessFrom,
   type ReceiptData,
 } from "@/lib/receipt"
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from "framer-motion"
 import {
   Trash2,
   Coffee,
@@ -190,6 +190,13 @@ function cashSuggestions(due: number): number[] {
   }
   return out
 }
+
+/** ¿El navegador sabe animar sobre una curva? (Safari viejo no; ahí el
+ *  vuelo cae al arco de tres cuadros.) En SSR no existe CSS. */
+const FLIGHT_PATH_SUPPORTED =
+  typeof CSS !== "undefined" &&
+  typeof CSS.supports === "function" &&
+  CSS.supports("offset-path", 'path("M 0 0 L 1 1")')
 
 /** Vibración corta si el aparato puede: confirma el toque sin mirar. */
 function vibra(ms: number) {
@@ -641,8 +648,14 @@ export default function POSClient({
   const reducedMotion = useReducedMotion()
   const flyOriginRef = useRef<{ x: number; y: number } | null>(null)
   const flightSeq = useRef(0)
-  const [flights, setFlights] = useState<{ id: number; from: { x: number; y: number }; to: { x: number; y: number } }[]>([])
+  const [flights, setFlights] = useState<
+    { id: number; from: { x: number; y: number }; to: { x: number; y: number }; kind: "main" | "trail"; delay: number; duration: number }[]
+  >([])
+  // Aterrizajes: el anillo que se expande y el «+1» que rebota donde cayó el
+  // punto. Los dispara SOLO el punto principal — la estela aterriza muda.
+  const [landings, setLandings] = useState<{ id: number; x: number; y: number }[]>([])
   const [cartPulse, setCartPulse] = useState(0)
+  const barDip = useAnimationControls()
   const barTargetRef = useRef<HTMLButtonElement>(null)
   const bagTargetRef = useRef<HTMLSpanElement>(null)
   const markFlyOrigin = (e: React.MouseEvent<HTMLElement>) => {
@@ -670,8 +683,15 @@ export default function POSClient({
       const targetEl = isMobile ? barTargetRef.current : bagTargetRef.current
       if (targetEl) {
         const r = targetEl.getBoundingClientRect()
-        const id = ++flightSeq.current
-        setFlights((cur) => [...cur, { id, from: origin, to: { x: r.left + r.width / 2, y: r.top + r.height / 2 } }])
+        const to = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+        // Principal + dos rezagados (la estela): más chicos, translúcidos y
+        // con salida escalonada, como en la demo que eligió el usuario.
+        setFlights((cur) => [
+          ...cur,
+          { id: ++flightSeq.current, from: origin, to, kind: "main", delay: 0, duration: 0.48 },
+          { id: ++flightSeq.current, from: origin, to, kind: "trail", delay: 0.09, duration: 0.42 },
+          { id: ++flightSeq.current, from: origin, to, kind: "trail", delay: 0.16, duration: 0.36 },
+        ])
       }
     }
     if (!isMobile || cartOpen) return
@@ -2109,7 +2129,10 @@ export default function POSClient({
       {/* ───── Barra inferior + hoja del carrito — móvil ───── */}
       {isMobile && (
         <>
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <motion.div
+            animate={barDip}
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+          >
             {lines.length === 0 ? (
               <Button
                 className="w-full h-12 rounded-xl text-base font-bold justify-between px-4 bg-stone-100 text-stone-500 hover:bg-stone-200"
@@ -2175,7 +2198,7 @@ export default function POSClient({
                 )}
               </div>
             )}
-          </div>
+          </motion.div>
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col rounded-t-2xl overflow-hidden">
               <SheetTitle className="sr-only">Venta actual</SheetTitle>
@@ -2185,31 +2208,91 @@ export default function POSClient({
         </>
       )}
 
-      {/* Puntos volando al carrito. Sin AnimatePresence a propósito: el
-          punto desaparece justo al llegar — "entró al carrito" — y así
-          onAnimationComplete corre una sola vez (con exit correría dos y el
-          rebote de la bolsa se duplicaba). */}
-      {flights.map((flight) => (
-        <motion.span
-          key={flight.id}
-          data-fly-dot
-          className="pointer-events-none fixed left-0 top-0 z-[60] h-4 w-4 rounded-full bg-amber-600 shadow-md"
-          // Centrado con márgenes y no con translate de Tailwind: framer
-          // escribe transform completo y pisaría esas clases.
-          style={{ marginLeft: -8, marginTop: -8 }}
-          initial={{ x: flight.from.x, y: flight.from.y, scale: 1, opacity: 0.95 }}
-          animate={{
-            x: flight.to.x,
-            y: [flight.from.y, Math.min(flight.from.y, flight.to.y) - 40, flight.to.y],
-            scale: 0.45,
-            opacity: 0.9,
-          }}
-          transition={{ duration: 0.45, ease: "easeIn", times: [0, 0.35, 1] }}
-          onAnimationComplete={() => {
-            setFlights((cur) => cur.filter((x) => x.id !== flight.id))
-            setCartPulse((c) => c + 1)
-          }}
-        />
+      {/* Puntos volando al carrito, en curva Bézier (offset-path) con el
+          arco de tres cuadros como reserva para navegadores viejos. Sin
+          AnimatePresence a propósito: el punto desaparece justo al llegar —
+          "entró al carrito" — y así onAnimationComplete corre una sola vez
+          (con exit correría dos y el aterrizaje se duplicaba). */}
+      {flights.map((flight) => {
+        const trail = flight.kind === "trail"
+        // Control de la curva: 25% del camino en x y 90px por encima del
+        // punto más alto — el mismo trazo que la demo aprobada.
+        const cx = flight.from.x + (flight.to.x - flight.from.x) * 0.25
+        const cy = Math.min(flight.from.y, flight.to.y) - 90
+        const finish = () => {
+          setFlights((cur) => cur.filter((x) => x.id !== flight.id))
+          if (trail) return
+          // Solo el principal aterriza: rebote de la bolsa (escritorio),
+          // anillo + «+1», y el hundimiento de la barra (celular).
+          setCartPulse((c) => c + 1)
+          setLandings((cur) => [...cur, { id: ++flightSeq.current, x: flight.to.x, y: flight.to.y }])
+          if (isMobile) {
+            barDip.start({ y: [0, 3, 0], transition: { duration: 0.26, ease: "easeOut" } })
+          }
+        }
+        const common = {
+          "data-fly-dot": "",
+          className: `pointer-events-none fixed left-0 top-0 z-[60] rounded-full bg-amber-600 shadow-md ${
+            trail ? "h-[11px] w-[11px]" : "h-4 w-4"
+          }`,
+          transition: { duration: flight.duration, delay: flight.delay, ease: [0.5, 0.05, 0.75, 0.5] as const },
+          onAnimationComplete: finish,
+        }
+        // La estela nace invisible: con delay de framer el elemento ya existe
+        // en el DOM, y sin esto se verían tres puntos apilados en el origen.
+        return FLIGHT_PATH_SUPPORTED ? (
+          <motion.span
+            key={flight.id}
+            {...common}
+            // offset-anchor por defecto centra la caja sobre el trazo: sin
+            // márgenes ni translate, o quedaría corrido media caja.
+            style={{
+              offsetPath: `path("M ${flight.from.x} ${flight.from.y} Q ${cx} ${cy} ${flight.to.x} ${flight.to.y}")`,
+              offsetRotate: "0deg",
+            }}
+            initial={{ offsetDistance: "0%", scale: 1, opacity: trail ? 0 : 0.95 }}
+            animate={{ offsetDistance: "100%", scale: 0.4, opacity: trail ? 0.35 : 0.9 }}
+          />
+        ) : (
+          <motion.span
+            key={flight.id}
+            {...common}
+            // Centrado con márgenes y no con translate de Tailwind: framer
+            // escribe transform completo y pisaría esas clases.
+            style={trail ? { marginLeft: -5.5, marginTop: -5.5 } : { marginLeft: -8, marginTop: -8 }}
+            initial={{ x: flight.from.x, y: flight.from.y, scale: 1, opacity: trail ? 0 : 0.95 }}
+            animate={{
+              x: flight.to.x,
+              y: [flight.from.y, Math.min(flight.from.y, flight.to.y) - 40, flight.to.y],
+              scale: 0.4,
+              opacity: trail ? 0.35 : 0.9,
+            }}
+          />
+        )
+      })}
+
+      {/* Aterrizajes: anillo que se expande + «+1» que sube y se apaga. El
+          par se retira cuando termina el «+1», que es el que dura más. */}
+      {landings.map((landing) => (
+        <span key={landing.id} className="pointer-events-none">
+          <motion.span
+            className="pointer-events-none fixed z-[60] h-11 w-11 rounded-full border-[3px] border-amber-600"
+            style={{ left: landing.x - 22, top: landing.y - 22 }}
+            initial={{ scale: 0.25, opacity: 0.8 }}
+            animate={{ scale: 1, opacity: 0 }}
+            transition={{ duration: 0.42, ease: "easeOut" }}
+          />
+          <motion.span
+            className="pointer-events-none fixed z-[61] flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-700 px-1 text-[11px] font-bold text-white"
+            style={{ left: landing.x - 10, top: landing.y - 40 }}
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: [0.4, 1.15, 1, 0.9], opacity: [0, 1, 1, 0], y: [0, 0, 0, -6] }}
+            transition={{ duration: 0.65, ease: "easeOut" }}
+            onAnimationComplete={() => setLandings((cur) => cur.filter((x) => x.id !== landing.id))}
+          >
+            +1
+          </motion.span>
+        </span>
       ))}
 
       {/* ── Dialogs ── */}
