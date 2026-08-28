@@ -1155,6 +1155,17 @@ export default function POSClient({
                 </Button>
               </>
             )}
+            {isMobile && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0 border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                onClick={() => setCartOpen(false)}
+                aria-label="Cerrar carrito"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            )}
           </div>
         </div>
         {/* Tarjeta de sellos de esta venta (solo con el módulo encendido) */}
@@ -1274,7 +1285,7 @@ export default function POSClient({
                   }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="py-3 border-b border-stone-100 rounded-lg px-2"
+                  className="py-2 border-b border-stone-100 rounded-lg px-2"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -1478,11 +1489,11 @@ export default function POSClient({
                   key={key}
                   type="button"
                   onClick={() => setPaymentMethod(key)}
-                  className={`relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  className={`relative flex-1 flex items-center justify-center gap-2 py-4 md:py-2.5 rounded-lg border-2 text-base md:text-sm font-semibold transition-all ${
                     active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5 md:h-4 md:w-4" />
                   {info.shortLabel}
                   <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
                 </button>
@@ -2205,7 +2216,7 @@ export default function POSClient({
                 pero en un celular vale una línea más de carrito. Cerrar queda
                 en la X. El padding superior es por si la PWA corre a pantalla
                 completa en un teléfono con notch; en navegador vale 0. */}
-            <SheetContent side="bottom" className="h-[100dvh] p-0 pt-[env(safe-area-inset-top)] flex flex-col overflow-hidden">
+            <SheetContent side="bottom" className="h-[100dvh] p-0 pt-[env(safe-area-inset-top)] flex flex-col overflow-hidden [&>button]:hidden">
               <SheetTitle className="sr-only">Venta actual</SheetTitle>
               <div className="flex-1 min-h-0">{cartPanel}</div>
             </SheetContent>
