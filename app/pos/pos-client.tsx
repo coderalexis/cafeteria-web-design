@@ -39,6 +39,7 @@ import {
   LogOut,
   BookOpen,
   ChevronUp,
+  ChevronDown,
   UserCircle,
   Star,
   Share2,
@@ -209,6 +210,9 @@ function vibra(ms: number) {
 
 /** Notas rápidas de un toque; el texto libre sigue disponible. */
 const QUICK_NOTES = ["Para llevar", "Aquí"]
+
+/** Si el plegable de "Más opciones" queda abierto, por dispositivo. */
+const MORE_OPTIONS_KEY = "pos-more-options"
 
 /** Opciones de propina: porcentaje del total, "sin propina" o monto libre. */
 type TipChoice = number | "otro"
@@ -526,6 +530,31 @@ export default function POSClient({
   // está cerrado, y el tamaño guardado debe aplicarse al abrir el POS.
   const textSize = usePosTextSize()
   const [confirmClear, setConfirmClear] = useState(false)
+  // "Más opciones": nota, «Para llevar» y descuento son de cada tantas ventas,
+  // no de cada venta — y eran las que obligaban a desplazar dentro del bloque
+  // de cobro. Plegadas, lo de siempre (método, efectivo, propina, total, botón)
+  // cabe sin scroll. Se recuerda POR DISPOSITIVO: una cafetería con servicio a
+  // mesa escribe la mesa en todas, y para ellos lo correcto es abrirlo una vez
+  // y que se quede así.
+  const [moreOpen, setMoreOpen] = useState(false)
+  useEffect(() => {
+    try {
+      setMoreOpen(window.localStorage.getItem(MORE_OPTIONS_KEY) === "1")
+    } catch {
+      /* sin almacenamiento: queda plegado */
+    }
+  }, [])
+  const toggleMore = useCallback(() => {
+    setMoreOpen((abierto) => {
+      const next = !abierto
+      try {
+        window.localStorage.setItem(MORE_OPTIONS_KEY, next ? "1" : "0")
+      } catch {
+        /* vale solo para esta sesión */
+      }
+      return next
+    })
+  }, [])
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
   // Producto/tamaño esperando modificadores: alta nueva, o edición de una
   // línea existente (lineId presente = "mejor con avena" sin rearmar todo).
@@ -828,6 +857,16 @@ export default function POSClient({
   const cashReceived = paymentMethod === "efectivo" ? parseCash(cashReceivedInput) : null
   const changeDue = cashReceived !== null ? cashReceived - due : null
   const cashInsufficient = cashReceived !== null && cashReceived < due
+  // Lo plegado nunca queda invisible: si hay nota o descuento, el propio
+  // botón de "Más opciones" lo dice.
+  const extrasResumen = [
+    ticketNotes.trim() || null,
+    discount
+      ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
 
   const canCharge =
     lines.length > 0 && !isProcessing && !!openSession && !cashInsufficient && !discountInvalid
@@ -1596,6 +1635,22 @@ export default function POSClient({
               <span className="ml-auto text-sm font-bold text-emerald-700">+{formatCurrency(tipAmount)}</span>
             )}
           </div>
+          {/* Plegable con lo ocasional. El botón dice qué trae cuando está
+              cerrado, para que nada quede escondido sin avisar. */}
+          <button
+            type="button"
+            onClick={toggleMore}
+            aria-expanded={moreOpen}
+            className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-500 transition-colors hover:border-amber-400 hover:text-amber-700"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+            <span className="shrink-0">Más opciones</span>
+            {!moreOpen && extrasResumen && (
+              <span className="ml-auto min-w-0 truncate font-medium text-amber-700">{extrasResumen}</span>
+            )}
+          </button>
+          {moreOpen && (
+          <>
           {/* Nota del ticket: chips de un toque + texto libre */}
           <div className="flex gap-1.5">
             {QUICK_NOTES.map((qn) => {
@@ -1629,6 +1684,31 @@ export default function POSClient({
             maxLength={500}
             className="bg-white border-stone-200 h-9 text-sm"
           />
+          {/* El descuento se muda aquí: el CONTROL es ocasional. Su efecto en
+              el dinero sigue siempre a la vista, abajo en los totales. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (loyaltyRedeem) toast.info("Quita el canje del premio para cambiar el descuento.")
+              else setShowDiscount(true)
+            }}
+            disabled={lines.length === 0}
+            className={`inline-flex w-full items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
+              discount
+                ? "border-amber-300 bg-amber-50 text-amber-700"
+                : "border-stone-200 bg-white text-stone-500 hover:border-amber-300 hover:text-amber-700"
+            }`}
+          >
+            <Percent className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 truncate">
+              {discount
+                ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
+                : "Agregar descuento"}
+            </span>
+            <Kbd className="ml-auto shrink-0">D</Kbd>
+          </button>
+          </>
+          )}
         </div>
         <div className="shrink-0 space-y-3 p-4 pt-3">
           {/* Subtotal / descuento / total */}
@@ -1639,30 +1719,20 @@ export default function POSClient({
                 <span className="text-stone-600">{formatCurrency(subtotal)}</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-sm">
-              <button
-                type="button"
-                onClick={() => {
-                  if (loyaltyRedeem) toast.info("Quita el canje del premio para cambiar el descuento.")
-                  else setShowDiscount(true)
-                }}
-                disabled={lines.length === 0}
-                className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 -ml-1.5 transition-colors disabled:opacity-40 ${
-                  discount ? "text-amber-700 hover:bg-amber-50" : "text-stone-400 hover:text-amber-700 hover:bg-amber-50"
-                }`}
-              >
-                <Percent className="h-3.5 w-3.5" />
-                {discount
-                  ? `Descuento ${discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} · ${discount.reason}`
-                  : "Agregar descuento"}
-                <Kbd>D</Kbd>
-              </button>
-              {discount && (
-                <span className={discountInvalid ? "text-red-600 font-medium" : "text-amber-700"}>
+            {/* Solo de lectura: el botón para PONER descuento vive en "Más
+                opciones", pero el descuento aplicado nunca se pliega — es
+                dinero que ya se le quitó al total. */}
+            {discount && (
+              <div className="flex justify-between items-center gap-2 text-sm">
+                <span className="min-w-0 truncate text-amber-700">
+                  Descuento {discount.type === "percent" ? `${discount.value}%` : formatCurrency(discount.value)} ·{" "}
+                  {discount.reason}
+                </span>
+                <span className={discountInvalid ? "shrink-0 text-red-600 font-medium" : "shrink-0 text-amber-700"}>
                   {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className={tipAmount > 0 ? "text-sm text-stone-500" : "text-base font-medium text-stone-500"}>
                 Total
