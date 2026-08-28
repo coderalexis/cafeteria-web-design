@@ -32,6 +32,8 @@ interface Props {
   session: OpenSession | null
   /** Pedidos en espera de este dispositivo, solo para avisar al cerrar. */
   parkedCount?: number
+  /** Comisión de la terminal (%): solo para mostrar el neto de tarjeta. */
+  cardFeePct?: number
 }
 
 const FLOAT_PRESETS = [0, 200, 500, 1000]
@@ -41,12 +43,12 @@ function parseMoney(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
-export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0 }: Props) {
+export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0, cardFeePct = 0 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         {session ? (
-          <CloseSessionForm session={session} parkedCount={parkedCount} onDone={() => onOpenChange(false)} />
+          <CloseSessionForm session={session} parkedCount={parkedCount} cardFeePct={cardFeePct} onDone={() => onOpenChange(false)} />
         ) : (
           <OpenSessionForm onDone={() => onOpenChange(false)} />
         )}
@@ -157,10 +159,12 @@ function OpenSessionForm({ onDone }: { onDone: () => void }) {
 function CloseSessionForm({
   session,
   parkedCount,
+  cardFeePct = 0,
   onDone,
 }: {
   session: OpenSession
   parkedCount: number
+  cardFeePct?: number
   onDone: () => void
 }) {
   const router = useRouter()
@@ -282,11 +286,25 @@ function CloseSessionForm({
             </div>
             {summary.by_method.length === 0 && <p className="text-stone-400">Sin ventas en este turno.</p>}
             {summary.by_method.map((m) => (
-              <div key={m.method} className="flex justify-between">
-                <span className="text-stone-600">
-                  {paymentLabel(m.method)} <span className="text-stone-400">({m.tickets})</span>
-                </span>
-                <span className="font-medium text-stone-800">{formatCurrency(m.revenue)}</span>
+              <div key={m.method}>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">
+                    {paymentLabel(m.method)} <span className="text-stone-400">({m.tickets})</span>
+                  </span>
+                  <span className="font-medium text-stone-800">{formatCurrency(m.revenue)}</span>
+                </div>
+                {/* Lo que la terminal se queda: ESTIMADO con el % de los
+                    ajustes. No toca el arqueo (la tarjeta no pasa por el
+                    cajón); es para saber el neto de hoy. */}
+                {m.method === "tarjeta_clip" && cardFeePct > 0 && m.revenue > 0 && (
+                  <div className="flex justify-between text-xs text-stone-400">
+                    <span>Comisión terminal ≈ {cardFeePct}%</span>
+                    <span>
+                      −{formatCurrency((m.revenue * cardFeePct) / 100)} · neto{" "}
+                      {formatCurrency(m.revenue - (m.revenue * cardFeePct) / 100)}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
             {summary.cancelled_count > 0 && (

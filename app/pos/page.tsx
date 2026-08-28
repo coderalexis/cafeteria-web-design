@@ -190,6 +190,8 @@ export default async function POSPage() {
       loyaltyTarget={settings.loyaltyTarget}
       loyaltyReward={settings.loyaltyReward}
       discountMaxCashier={settings.discountMaxCashier}
+      takeoutFee={settings.takeoutFee}
+      cardFeePct={settings.cardFeePct}
       hasPin={pinSet === true}
       favoriteVariantIds={(topVariants ?? []).map((t) => t.variant_id).filter((id): id is string => !!id)}
       initialTotalSales={dbTotalSales}

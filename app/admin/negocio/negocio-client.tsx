@@ -14,6 +14,7 @@ import {
   QrCode,
   PauseCircle,
   CalendarClock,
+  HandCoins,
   Stamp,
 } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
@@ -437,6 +438,61 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                   arqueo.
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HandCoins className="h-4 w-4 text-amber-700" />
+                Para llevar y comisión de tarjeta
+              </CardTitle>
+              <CardDescription>
+                Dos cobros que cada cafetería maneja distinto: lo que cobras de más por el empaque, y lo que tu
+                terminal te descuenta por cobrar con tarjeta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="takeout_fee" className="text-sm font-medium text-stone-700">
+                  Cargo por «Para llevar» ($)
+                </label>
+                <Input
+                  id="takeout_fee"
+                  name="takeout_fee"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  defaultValue={currentSettings.takeoutFee || ""}
+                  placeholder="0 = sin cargo"
+                  className="w-40"
+                />
+                <p className="text-xs text-stone-400">
+                  Se suma solo cuando la venta se marca <strong>Para llevar</strong> (el chip del POS muestra el monto).
+                  El cobro lo aplica el servidor con este valor — p. ej. $5 por el empaque.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="card_fee_pct" className="text-sm font-medium text-stone-700">
+                  Comisión de tu terminal de tarjeta (%)
+                </label>
+                <Input
+                  id="card_fee_pct"
+                  name="card_fee_pct"
+                  type="number"
+                  min={0}
+                  max={20}
+                  step={0.1}
+                  defaultValue={currentSettings.cardFeePct || ""}
+                  placeholder="0 = no mostrar"
+                  className="w-40"
+                />
+                <p className="text-xs text-stone-400">
+                  Mercado Pago cobra ≈ 4%. <strong>Solo para tus reportes</strong>: al cliente no se le cobra de más;
+                  Ventas y el corte te muestran la comisión estimada y tu <strong>neto</strong> de tarjeta.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

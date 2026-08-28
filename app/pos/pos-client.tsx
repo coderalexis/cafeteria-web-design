@@ -139,6 +139,8 @@ interface CompletedSale {
   discountTotal: number
   discountReason: string | null
   total: number
+  /** Cargo por «Para llevar», ya incluido en total. */
+  takeoutFee: number
   /** Propina cobrada encima del total (no cuenta como venta). */
   tip: number
   paymentMethod: PaymentMethod
@@ -173,6 +175,10 @@ interface POSClientProps {
   loyaltyReward: string
   /** Techo de descuento en % para cajeros (100 = sin límite). */
   discountMaxCashier: number
+  /** Cargo por «Para llevar» ($, 0 = sin cargo). El monto lo valida el servidor. */
+  takeoutFee: number
+  /** Comisión de la terminal (%), solo para mostrar el neto en el corte. */
+  cardFeePct: number
   initialTotalSales: number
   openSession: OpenSession | null
 }
@@ -268,6 +274,7 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
     subtotal: sale.subtotal,
     discountTotal: sale.discountTotal,
     discountReason: sale.discountReason,
+    takeoutFee: sale.takeoutFee,
     total: sale.total,
     tip: sale.tip,
     cashReceived: sale.cashReceived,
@@ -395,17 +402,26 @@ function ReceiptView({
 
         <Separator />
 
-        {/* Subtotal / descuento */}
-        {sale.discountTotal > 0 && (
+        {/* Subtotal / descuento / para llevar: con cualquiera de los dos,
+            el total no se explica solo y se enseña la suma completa. */}
+        {(sale.discountTotal > 0 || sale.takeoutFee > 0) && (
           <div className="space-y-1 text-sm">
             <div className="flex justify-between text-stone-500">
               <span>Subtotal</span>
               <span>{formatCurrency(sale.subtotal)}</span>
             </div>
-            <div className="flex justify-between text-amber-700">
-              <span>Descuento{sale.discountReason ? ` · ${sale.discountReason}` : ""}</span>
-              <span>-{formatCurrency(sale.discountTotal)}</span>
-            </div>
+            {sale.discountTotal > 0 && (
+              <div className="flex justify-between text-amber-700">
+                <span>Descuento{sale.discountReason ? ` · ${sale.discountReason}` : ""}</span>
+                <span>-{formatCurrency(sale.discountTotal)}</span>
+              </div>
+            )}
+            {sale.takeoutFee > 0 && (
+              <div className="flex justify-between text-stone-600">
+                <span>Para llevar</span>
+                <span>+{formatCurrency(sale.takeoutFee)}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -493,6 +509,8 @@ export default function POSClient({
   loyaltyTarget,
   loyaltyReward,
   discountMaxCashier,
+  takeoutFee,
+  cardFeePct,
   initialTotalSales,
   openSession,
 }: POSClientProps) {
@@ -818,7 +836,12 @@ export default function POSClient({
 
   const subtotal = cartSubtotal(lines)
   const discountAmount = computeDiscount(subtotal, discount)
-  const total = Math.round((subtotal - discountAmount) * 100) / 100
+  // «Para llevar» activo = el ticket lleva el cargo del negocio. La bandera
+  // sale del MISMO predicado que pinta el chip; el monto real lo pone el
+  // servidor con sus ajustes — esto es solo el espejo en pantalla.
+  const esParaLlevar = ticketNotes === "Para llevar" || ticketNotes.startsWith("Para llevar · ")
+  const takeoutCharge = esParaLlevar && lines.length > 0 ? takeoutFee : 0
+  const total = Math.round((subtotal - discountAmount + takeoutCharge) * 100) / 100
   // Un descuento fijo mayor al subtotal (p.ej. tras quitar artículos) no se puede cobrar
   const discountInvalid = discount !== null && discount.type === "amount" && discount.value > subtotal && subtotal > 0
 
@@ -928,6 +951,7 @@ export default function POSClient({
         discount: discount ?? undefined,
         loyaltyCustomerId: loyaltyCustomer?.id,
         loyaltyRedeem: loyaltyRedeem || undefined,
+        takeout: esParaLlevar || undefined,
         items: lines.map((line) => ({
           variant_id: getLineVariantId(line) ?? "",
           quantity: line.quantity,
@@ -945,6 +969,7 @@ export default function POSClient({
           discountTotal: result.discountTotal,
           discountReason: discount?.reason ?? null,
           total: result.total,
+          takeoutFee: result.takeoutFee,
           tip: result.tip,
           paymentMethod,
           date: new Date(),
@@ -998,7 +1023,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, cashReceived, tipAmount, discount, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -1841,7 +1866,7 @@ export default function POSClient({
                       : "border-stone-200 bg-white text-stone-500 hover:border-amber-300"
                   }`}
                 >
-                  {qn}
+                  {qn === "Para llevar" && takeoutFee > 0 ? `${qn} +${formatCurrency(takeoutFee)}` : qn}
                 </button>
               )
             })}
@@ -1886,6 +1911,12 @@ export default function POSClient({
               <div className="flex justify-between items-center text-sm">
                 <span className="text-stone-500">Subtotal</span>
                 <span className="text-stone-600">{formatCurrency(subtotal)}</span>
+              </div>
+            )}
+            {takeoutCharge > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-stone-500">Para llevar</span>
+                <span className="text-stone-700">+{formatCurrency(takeoutCharge)}</span>
               </div>
             )}
             {/* Solo de lectura: el botón para PONER descuento vive en "Más
@@ -2566,6 +2597,7 @@ export default function POSClient({
         onOpenChange={setShowCashDialog}
         session={openSession}
         parkedCount={parkedEnabled ? parked.orders.length : 0}
+        cardFeePct={cardFeePct}
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />

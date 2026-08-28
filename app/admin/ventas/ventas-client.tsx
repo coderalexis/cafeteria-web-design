@@ -70,6 +70,8 @@ interface VentasClientProps {
   totalCount: number
   pageCount: number
   cashiers: Array<{ id: string; name: string }>
+  /** Comisión de la terminal (%): 0 = no mostrar el neto de tarjeta. */
+  cardFeePct: number
   /** Día de operación del negocio (YYYY-MM-DD en su zona). */
   today: string
   /** Zona horaria IANA del negocio (fechas/horas de tickets). */
@@ -128,6 +130,7 @@ export default function VentasClient({
   totalCount,
   pageCount,
   cashiers,
+  cardFeePct,
   today,
   timezone,
 }: VentasClientProps) {
@@ -324,6 +327,16 @@ export default function VentasClient({
                       <div className="text-right">
                         <p className="font-medium text-stone-800">{formatCurrency(value)}</p>
                         <p className="text-xs text-stone-500">{percentage.toFixed(1)}%</p>
+                        {/* La comisión es ESTIMADA con el % de Negocio, sobre
+                            lo vendido con tarjeta del periodo filtrado. */}
+                        {key === "tarjeta_clip" && cardFeePct > 0 && value > 0 && (
+                          <p className="text-xs text-stone-400">
+                            comisión ≈ −{formatCurrency((value * cardFeePct) / 100)} · neto{" "}
+                            <span className="font-medium text-stone-600">
+                              {formatCurrency(value - (value * cardFeePct) / 100)}
+                            </span>
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">

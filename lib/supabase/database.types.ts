@@ -884,6 +884,7 @@ export type Database = {
           session_id: string
           status: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
+          takeout_fee: number
           tax_total: number
           tip_amount: number
           total: number
@@ -909,6 +910,7 @@ export type Database = {
           session_id: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
+          takeout_fee?: number
           tax_total?: number
           tip_amount?: number
           total: number
@@ -934,6 +936,7 @@ export type Database = {
           session_id?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal?: number
+          takeout_fee?: number
           tax_total?: number
           tip_amount?: number
           total?: number
@@ -1018,6 +1021,7 @@ export type Database = {
           p_loyalty_redeem?: boolean
           p_notes?: string
           p_payment_method: Database["public"]["Enums"]["payment_method"]
+          p_takeout?: boolean
           p_tip?: number
         }
         Returns: Json

@@ -161,7 +161,8 @@ export function AyudaClient({ ticket, corte }: Props) {
               los <strong>gestos</strong> de la siguiente sección, que es más rápido. Abajo van método de pago,
               efectivo y propina; lo ocasional (<strong>Para llevar / Aquí</strong>, la nota del ticket y el descuento)
               vive plegado en <strong>Más opciones</strong> — al cerrarse, el botón resume lo que trae puesto, y si lo
-              dejas abierto se queda así en ese aparato.
+              dejas abierto se queda así en ese aparato. Si tu café cobra extra por <strong>Para llevar</strong>, el
+              chip muestra el monto («Para llevar +$5») y se suma solo al total.
             </Step>
             <Step n={4} title="Elige método de pago y cobra">
               Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, tócala antes de cobrar.
@@ -743,7 +744,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Store,
       titulo: "Datos del negocio, metas y menú con QR",
-      palabras: "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada",
+      palabras:
+        "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto",
       href: "/admin/negocio",
       nodo: (
         <>
@@ -786,6 +788,16 @@ export function AyudaClient({ ticket, corte }: Props) {
               También defines nombre, <strong>zona horaria</strong> (marca el «día de operación» de reportes y cortes),
               dirección, teléfono y los textos del <strong>ticket</strong>, con vista previa al editar. El identificador
               corto del café (para el login de cajeros) se muestra ahí y no se puede cambiar.
+            </li>
+            <li>
+              <strong>Para llevar con cargo</strong>: si cobras extra por el empaque (p. ej. $5), ponlo en Negocio y el
+              chip <em>Para llevar</em> del POS mostrará el monto y lo sumará solo — el cobro lo aplica el servidor,
+              no la pantalla. Sale desglosado en el ticket.
+            </li>
+            <li>
+              <strong>Comisión de tu terminal</strong>: captura el % que te descuenta tu terminal de tarjeta (Mercado
+              Pago cobra ≈4%) y Ventas y el corte te mostrarán la comisión estimada y tu <strong>neto</strong>. Al
+              cliente no se le cobra de más: es solo para que sepas cuánto te queda.
             </li>
             <li>
               <strong>Hora de cierre</strong>: a qué hora cierras tu café. Con eso, una caja que se quedó abierta se

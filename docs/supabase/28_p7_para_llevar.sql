@@ -1,0 +1,21 @@
+-- ============================================================
+-- 28 · P7a — Cargo por «Para llevar» (aplicada como p7_para_llevar)
+-- ============================================================
+-- Pedido real de Gym Coffe: "$5 extra cuando es para llevar", configurable
+-- por cafetería. Reglas de dinero:
+--   · El MONTO vive en businesses.settings.takeout_fee y lo aplica el
+--     SERVIDOR: el POS solo manda la bandera p_takeout. Tope de 100.
+--   · Va DESPUÉS del descuento: el cargo del empaque no se descuenta.
+--   · tickets.takeout_fee es snapshot por venta (cambiar el ajuste no
+--     mueve tickets pasados) y entra al CHECK de consistencia:
+--     total = subtotal - descuento + impuestos + para_llevar.
+--   · La firma de create_ticket CAMBIA (param nuevo): se dropea la vieja
+--     para no dejar sobrecargas ambiguas en PostgREST y se re-otorgan
+--     grants. El código desplegado llama con argumentos nombrados y
+--     p_takeout tiene default: siguió funcionando sin redeploy.
+-- Ensayado con rollback: 40+5 con bandera, 40 sin ella, idempotencia
+-- devuelve el cargo, ajustes con 9999 se topan en 100 y negativos en 0,
+-- y el cambio de efectivo considera cargo + propina.
+-- El cuerpo aplicado vive en la migración p7_para_llevar (parche por
+-- anclas sobre pg_get_functiondef, verificando cada ancla exactamente
+-- una vez — misma técnica que la migración 20).

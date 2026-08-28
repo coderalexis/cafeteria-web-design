@@ -100,6 +100,8 @@ export interface ReceiptData {
   subtotal?: number
   discountTotal?: number
   discountReason?: string | null
+  /** Cargo por «Para llevar», ya incluido en total. */
+  takeoutFee?: number
   total: number
   /** Propina: se cobra encima del total, no forma parte de la venta. */
   tip?: number
@@ -129,6 +131,7 @@ export function receiptFromTicket(ticket: TicketRecord, reprint = false): Receip
     subtotal: ticket.subtotal,
     discountTotal: ticket.discountTotal,
     discountReason: ticket.discountReason,
+    takeoutFee: ticket.takeoutFee,
     total: ticket.total,
     tip: ticket.tip,
     cashReceived: ticket.cashReceived,
@@ -164,10 +167,17 @@ export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[]
 
   lines.push(THIN, "")
   const hasDiscount = (r.discountTotal ?? 0) > 0
+  const takeout = r.takeoutFee ?? 0
+  // Con descuento O cargo, el total no se explica solo: se enseña la suma.
+  if (hasDiscount || takeout > 0) {
+    lines.push(row("  Subtotal:", formatCurrency(r.subtotal ?? r.total + (r.discountTotal ?? 0) - takeout)))
+  }
   if (hasDiscount) {
-    lines.push(row("  Subtotal:", formatCurrency(r.subtotal ?? r.total + (r.discountTotal ?? 0))))
     lines.push(row("  Descuento:", `-${formatCurrency(r.discountTotal ?? 0)}`))
     if (r.discountReason) lines.push(`  (${r.discountReason})`)
+  }
+  if (takeout > 0) {
+    lines.push(row("  Para llevar:", `+${formatCurrency(takeout)}`))
   }
   lines.push(row("  TOTAL:", formatCurrency(r.total)))
   const tip = r.tip ?? 0

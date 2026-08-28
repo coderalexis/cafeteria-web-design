@@ -44,6 +44,8 @@ const createTicketSchema = z.object({
   /** Propina: se cobra encima del total y no cuenta como venta. */
   tip: z.number().finite().nonnegative().max(99_999).optional(),
   discount: discountSchema.optional(),
+  /** La venta va para llevar: el SERVIDOR decide el cargo desde los ajustes. */
+  takeout: z.boolean().optional(),
   /** Cliente de la tarjeta de sellos adjunto a esta venta (opcional). */
   loyaltyCustomerId: z.string().uuid().optional(),
   /** Canjear el premio en esta venta (el RPC valida saldo, monto y motivo). */
@@ -72,6 +74,7 @@ interface CreateTicketData {
   subtotal: number
   discountTotal: number
   total: number
+  takeoutFee: number
   tip: number
   cashReceived: number | null
   changeDue: number | null
@@ -87,7 +90,7 @@ export async function createTicket(
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, loyaltyCustomerId, loyaltyRedeem } = parsed.data
+  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, loyaltyCustomerId, loyaltyRedeem } = parsed.data
 
   const businessError = await checkExpectedBusiness(expectedBusinessId)
   if (businessError) {
@@ -105,6 +108,7 @@ export async function createTicket(
     p_tip: tip,
     p_loyalty_customer: loyaltyCustomerId,
     p_loyalty_redeem: loyaltyRedeem,
+    p_takeout: takeout ?? false,
   })
 
   if (error) {
@@ -117,6 +121,7 @@ export async function createTicket(
     subtotal: number
     discount_total: number
     total: number
+    takeout_fee: number | null
     tip_amount: number | null
     cash_received: number | null
     change_due: number | null
@@ -132,6 +137,7 @@ export async function createTicket(
     subtotal: ticket.subtotal,
     discountTotal: ticket.discount_total ?? 0,
     total: ticket.total,
+    takeoutFee: ticket.takeout_fee ?? 0,
     tip: ticket.tip_amount ?? 0,
     cashReceived: ticket.cash_received ?? null,
     changeDue: ticket.change_due ?? null,

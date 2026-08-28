@@ -35,6 +35,18 @@ export interface BusinessSettings {
    * a las 12 h de abierta. Ver `lib/cash-session.ts`.
    */
   closingTime: string
+  /**
+   * Cargo por «Para llevar» ($): se suma al total cuando la venta se marca
+   * así. 0 = sin cargo. El MONTO lo aplica el servidor desde estos ajustes;
+   * el POS solo manda la bandera.
+   */
+  takeoutFee: number
+  /**
+   * Comisión de la terminal de tarjeta (%), p. ej. Mercado Pago ≈ 4. SOLO
+   * para reportes: al cliente no se le cobra de más — ventas y cortes
+   * muestran la comisión estimada y el neto del negocio.
+   */
+  cardFeePct: number
   /** Lealtad con sellos: tarjeta digital por teléfono. Apagado por defecto —
    *  guardar teléfonos de clientes es una decisión del dueño. */
   loyalty: boolean
@@ -65,6 +77,8 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   discountMaxCashier: 100,
   menuNote: "",
   closingTime: "",
+  takeoutFee: 0,
+  cardFeePct: 0,
   loyalty: false,
   loyaltyTarget: 10,
   loyaltyReward: "Bebida gratis",
@@ -106,6 +120,10 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     }
     if (typeof r.menu_note === "string") out.menuNote = r.menu_note.slice(0, MENU_NOTE_MAX)
     if (typeof r.closing_time === "string") out.closingTime = normalizeClosingTime(r.closing_time)
+    const cargo = Number(r.takeout_fee)
+    if (Number.isFinite(cargo) && cargo > 0) out.takeoutFee = Math.min(Math.round(cargo * 100) / 100, 100)
+    const comision = Number(r.card_fee_pct)
+    if (Number.isFinite(comision) && comision > 0) out.cardFeePct = Math.min(Math.round(comision * 100) / 100, 20)
     out.loyalty = r.loyalty === true
     const meta = Number(r.loyalty_target)
     if (Number.isFinite(meta) && meta >= 2 && meta <= 30) out.loyaltyTarget = Math.round(meta)
@@ -132,6 +150,8 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     discount_max_cashier: s.discountMaxCashier,
     menu_note: s.menuNote,
     closing_time: s.closingTime,
+    takeout_fee: s.takeoutFee,
+    card_fee_pct: s.cardFeePct,
     loyalty: s.loyalty,
     loyalty_target: s.loyaltyTarget,
     loyalty_reward: s.loyaltyReward,

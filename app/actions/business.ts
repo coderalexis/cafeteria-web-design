@@ -77,6 +77,8 @@ const settingsSchema = z.object({
   discountMaxCashier: z.number().int().min(0).max(100),
   menuNote: z.string().trim().max(MENU_NOTE_MAX, "La nota del menú es demasiado larga."),
   closingTime: z.string().trim().max(5),
+  takeoutFee: z.number().min(0, "El cargo no puede ser negativo.").max(100, "El cargo por Para llevar es demasiado alto."),
+  cardFeePct: z.number().min(0, "La comisión no puede ser negativa.").max(20, "La comisión no puede pasar de 20%."),
   loyalty: z.enum(["on", "off"]).transform((v) => v === "on"),
   loyaltyTarget: z.number().int().min(2).max(30),
   loyaltyReward: z.string().trim().max(60, "El nombre del premio es demasiado largo."),
@@ -103,6 +105,8 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     discountMaxCashier: Number(formData.get("discount_max_cashier") ?? 100),
     menuNote: formData.get("menu_note") ?? "",
     closingTime: formData.get("closing_time") ?? "",
+    takeoutFee: Number(formData.get("takeout_fee") ?? 0) || 0,
+    cardFeePct: Number(formData.get("card_fee_pct") ?? 0) || 0,
     loyalty: formData.get("loyalty") ?? "off",
     loyaltyTarget: Number(formData.get("loyalty_target") ?? 10),
     loyaltyReward: formData.get("loyalty_reward") ?? "",
@@ -132,6 +136,8 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       discountMaxCashier: v.discountMaxCashier,
       menuNote: v.menuNote,
       closingTime: normalizeClosingTime(v.closingTime),
+      takeoutFee: Math.round(v.takeoutFee * 100) / 100,
+      cardFeePct: Math.round(v.cardFeePct * 100) / 100,
       loyalty: v.loyalty,
       loyaltyTarget: v.loyaltyTarget,
       loyaltyReward: v.loyaltyReward || "Bebida gratis",
@@ -174,6 +180,8 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.publicMenu !== v.publicMenu) cambios.push(v.publicMenu ? "menú público activado" : "menú público desactivado")
   if (prevSettings.menuNote !== v.menuNote) cambios.push("nota del menú")
   if (prevSettings.closingTime !== normalizeClosingTime(v.closingTime)) cambios.push("hora de cierre")
+  if (prevSettings.takeoutFee !== v.takeoutFee) cambios.push(`cargo para llevar: ${v.takeoutFee}`)
+  if (prevSettings.cardFeePct !== v.cardFeePct) cambios.push(`comisión de tarjeta: ${v.cardFeePct}%`)
   if (prevSettings.loyalty !== v.loyalty) cambios.push(v.loyalty ? "lealtad activada" : "lealtad desactivada")
   if (prevSettings.loyaltyTarget !== v.loyaltyTarget) cambios.push(`meta de sellos: ${v.loyaltyTarget}`)
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")

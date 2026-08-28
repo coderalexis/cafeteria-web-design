@@ -4,6 +4,7 @@ import { getContext } from "@/lib/context"
 import { homePathFor } from "@/lib/context-shape"
 import { dateStringInTz, daysToUtcRange } from "@/lib/dates"
 import { getMemberDirectory, memberLabel } from "@/lib/team"
+import { parseBusinessSettings } from "@/lib/settings"
 import { TICKET_SELECT, buildProfileNameMap, serializeTicket, type TicketRow } from "@/lib/tickets"
 import { PAGE_SIZE, parseVentasFilters, type SalesReport } from "./params"
 import VentasClient from "./ventas-client"
@@ -67,6 +68,7 @@ export default async function VentasPage({
       cashiers={cashiers}
       today={today}
       timezone={tz}
+      cardFeePct={parseBusinessSettings(ctx.business.settings).cardFeePct}
     />
   )
 }
