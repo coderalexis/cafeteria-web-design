@@ -1387,9 +1387,15 @@ export default function POSClient({
                       pressTimerRef.current = setTimeout(() => {
                         const g = gestoRef.current
                         if (!g || g.lineId !== line.lineId || g.arrastre) return
+                        // Solo marcar y vibrar: el editor se abre AL SOLTAR.
+                        // Abrirlo aquí, con el dedo abajo, moría al instante:
+                        // al soltar, el navegador dispara mousedown/click de
+                        // compatibilidad DESPUÉS del pointerup, ese mousedown
+                        // cae fuera del campo recién enfocado y su onBlur lo
+                        // cierra. Además el teclado del teléfono solo se abre
+                        // de forma confiable dentro de un gesto del usuario.
                         g.largo = true
                         vibra(20)
-                        setEditingNoteFor(line.lineId)
                       }, PRESION_LARGA_MS)
                     }}
                     onPointerMove={(e) => {
@@ -1410,9 +1416,18 @@ export default function POSClient({
                       if ((e.target as HTMLElement).closest("button, input, a")) return
                       const g = gestoRef.current
                       gestoRef.current = null
-                      if (g && (g.largo || g.arrastre)) return
+                      if (!g) return
+                      // El arrastre gana: quien sostuvo y luego jaló, jaló.
+                      if (g.arrastre) return
+                      if (g.largo) {
+                        setEditingNoteFor(line.lineId)
+                        return
+                      }
                       setInfoLine(line)
                     }}
+                    // Sin el menú contextual del navegador: en Android la
+                    // presión larga lo dispara y se tragaría nuestro click.
+                    onContextMenu={(e) => e.preventDefault()}
                     animate={{ backgroundColor: line.isNew ? "rgba(251,191,36,0.12)" : "#ffffff" }}
                     className="relative cursor-pointer select-none rounded-lg px-1.5 py-2"
                   >
