@@ -125,7 +125,16 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
                         {groupHint(g)}
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Dos columnas cuando los nombres son cortos (Sin
+                        azúcar / Normal); UNA cuando alguno es largo — en un
+                        celular la media columna deja ~70px de texto y
+                        «Pechuga a la parrilla» quedaba como «pechug…». El
+                        cajero no puede elegir lo que no puede leer. */}
+                    <div
+                      className={`grid gap-2 ${
+                        g.options.some((o) => o.name.length > 18) ? "grid-cols-1" : "grid-cols-2"
+                      }`}
+                    >
                       {g.options.map((opt) => {
                         const isOn = selected.includes(opt.id)
                         const disabled = !isOn && full && g.maxSelect !== 1
@@ -149,7 +158,9 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
                               >
                                 {isOn && <Check className="h-3 w-3 text-white" />}
                               </span>
-                              <span className="truncate font-medium">{opt.name}</span>
+                              {/* envuelve, no trunca: el nombre completo
+                                  siempre se lee, aunque tome dos renglones */}
+                              <span className="break-words font-medium">{opt.name}</span>
                             </span>
                             <span className={`text-xs shrink-0 ${opt.priceDelta > 0 ? "text-amber-700" : "text-stone-400"}`}>
                               {opt.priceDelta > 0
