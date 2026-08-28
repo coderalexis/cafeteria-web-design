@@ -40,6 +40,7 @@ import {
   BookOpen,
   ChevronUp,
   ChevronDown,
+  MoreHorizontal,
   UserCircle,
   Star,
   Share2,
@@ -1285,7 +1286,7 @@ export default function POSClient({
 
       {/* Cart items */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="p-4">
+        <div className="px-3 py-4">
           {lines.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-stone-300">
               <ShoppingBag className="h-14 w-14 mb-3 opacity-40" />
@@ -1330,17 +1331,21 @@ export default function POSClient({
                   }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="py-2 border-b border-stone-100 rounded-lg px-2"
+                  className="rounded-lg border-b border-stone-100 px-1.5 py-2"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-[8px]">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-stone-800 text-sm truncate">{line.product.name}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-stone-400">{formatCurrency(getLinePrice(line))}</span>
+                      {/* min-w-0: sin esto, precio + tamaño fijaban un ancho
+                          mínimo que la columna del nombre no podía bajar, y con
+                          la letra en Muy grande la fila entera se salía de la
+                          pantalla llevándose el menú de la línea. */}
+                      <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                        <span className="shrink-0 text-xs text-stone-400">{formatCurrency(getLinePrice(line))}</span>
                         {line.size && (
                           <Badge
                             variant="outline"
-                            className="text-[10px] px-1.5 py-0 h-4 border-stone-300 text-stone-500"
+                            className="h-4 min-w-0 truncate border-stone-300 px-1.5 py-0 text-[10px] text-stone-500"
                           >
                             {line.size.label}
                           </Badge>
@@ -1381,12 +1386,21 @@ export default function POSClient({
                       )}
                     </div>
 
-                    {/* Quantity controls (táctiles: 40px en móvil) */}
-                    <div className="flex items-center gap-1">
+                    {/* Cantidad. Medidas en PÍXELES a propósito, no en rem:
+                        un dedo mide lo mismo con la letra en Normal que en Muy
+                        grande. Dejarlos escalar los llevaba a 50 px cada uno y
+                        el ancho mínimo de la fila superaba la pantalla —y el
+                        visor de la lista se ensancha al mínimo de su contenido,
+                        así que el menú de la línea terminaba fuera.
+                        Sin gap: los botones abrazan al número —el
+                        aire entre ellos costaba 8 px por línea y no ayudaba a
+                        distinguirlos, que para eso son redondos. Siguen siendo
+                        de 40 px táctiles en celular. */}
+                    <div className="flex shrink-0 items-center">
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-10 w-10 md:h-8 md:w-8 rounded-full border-stone-300 text-stone-500"
+                        className="h-[40px] w-[40px] shrink-0 rounded-full border-stone-300 text-stone-500 md:h-[32px] md:w-[32px]"
                         onClick={() => updateQuantity(line.lineId, -1)}
                         aria-label="Quitar uno"
                       >
@@ -1411,14 +1425,14 @@ export default function POSClient({
                               ;(e.target as HTMLInputElement).blur()
                             }
                           }}
-                          className="h-8 w-11 rounded-md border border-amber-300 bg-white text-center text-sm font-bold text-stone-800"
+                          className="h-8 w-[38px] shrink-0 rounded-md border border-amber-300 bg-white text-center text-sm font-bold text-stone-800"
                         />
                       ) : (
                         <button
                           type="button"
                           onClick={() => setEditingQtyFor(line.lineId)}
                           title="Teclear la cantidad"
-                          className="w-8 rounded text-center text-sm font-bold text-stone-700 hover:bg-stone-100"
+                          className="w-[28px] shrink-0 rounded text-center text-sm font-bold text-stone-700 hover:bg-stone-100"
                         >
                           {line.quantity}
                         </button>
@@ -1426,7 +1440,7 @@ export default function POSClient({
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-10 w-10 md:h-8 md:w-8 rounded-full border-stone-300 text-stone-500"
+                        className="h-[40px] w-[40px] shrink-0 rounded-full border-stone-300 text-stone-500 md:h-[32px] md:w-[32px]"
                         onClick={() => updateQuantity(line.lineId, 1)}
                         aria-label="Agregar uno"
                       >
@@ -1434,46 +1448,54 @@ export default function POSClient({
                       </Button>
                     </div>
 
-                    <span className="font-bold text-sm text-stone-800 w-16 text-right">
+                    <span className="min-w-[52px] shrink-0 text-right text-sm font-bold text-stone-800">
                       {formatCurrency(getLinePrice(line) * line.quantity)}
                     </span>
 
-                    <div className="flex items-center shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 md:h-8 md:w-8 text-stone-300 hover:text-amber-700 hover:bg-amber-50"
-                        onClick={() => {
-                          duplicateLine(line.lineId)
-                          vibra(12)
-                        }}
-                        title="Duplicar esta línea (otro igual)"
-                        aria-label="Duplicar esta línea"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-10 w-10 md:h-8 md:w-8 ${
-                          line.notes ? "text-amber-600" : "text-stone-300"
-                        } hover:text-amber-700 hover:bg-amber-50`}
-                        onClick={() => setEditingNoteFor(editingNoteFor === line.lineId ? null : line.lineId)}
-                        title="Nota para este artículo"
-                        aria-label="Nota para este artículo"
-                      >
-                        <StickyNote className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 md:h-8 md:w-8 text-stone-300 hover:text-red-500 hover:bg-red-50"
-                        onClick={() => removeLine(line.lineId)}
-                        aria-label="Quitar línea"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    {/* Duplicar, nota y quitar en UN menú. Como tres iconos
+                        reservaban 120 px fijos por línea, la fila medía 416 px
+                        dentro de una pantalla de 390 y los últimos quedaban
+                        cortados —también en el panel de 304 px de una tablet—.
+                        Aquí no se pierde nada: el menú los nombra con palabras,
+                        que se leen mejor que tres iconos grises. Quitar sigue
+                        estando a un toque por otro lado: «−» en cantidad 1
+                        borra la línea. */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-[40px] w-[40px] shrink-0 md:h-[32px] md:w-[32px] ${
+                            line.notes ? "text-amber-600" : "text-stone-400"
+                          } hover:text-amber-700 hover:bg-amber-50`}
+                          aria-label={`Opciones de ${line.product.name}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            duplicateLine(line.lineId)
+                            vibra(12)
+                          }}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Duplicar (otro igual)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditingNoteFor(line.lineId)}>
+                          <StickyNote className="mr-2 h-4 w-4" />
+                          {line.notes ? "Cambiar la nota" : "Nota para este artículo"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => removeLine(line.lineId)}
+                          className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Quitar del carrito
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   {/* Nota por artículo */}
