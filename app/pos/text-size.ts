@@ -12,6 +12,10 @@
  */
 
 export const TEXT_SIZES = [
+  // 12px raíz: todo lo que mide en rem encoge un 25% respecto de Normal. Los
+  // botones táctiles del carrito no, que van en px a propósito — un dedo mide
+  // lo mismo con cualquier letra.
+  { key: "muy-compacto", label: "Muy compacto", hint: "Lo más que cabe", px: 12 },
   { key: "compacto", label: "Compacto", hint: "Cabe más en pantalla", px: 14 },
   { key: "normal", label: "Normal", hint: "El de siempre", px: 16 },
   { key: "grande", label: "Grande", hint: "Más fácil de leer", px: 18 },

@@ -426,7 +426,8 @@ export function AyudaClient({ ticket, corte }: Props) {
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
             En el punto de venta, menú <strong>⋮</strong> arriba a la derecha → <strong>Tamaño de letra</strong>, con{" "}
-            <strong>A−</strong> y <strong>A+</strong>. Van entre cuatro tamaños: Compacto, Normal, Grande y Muy grande.
+            <strong>A−</strong> y <strong>A+</strong>. Van entre cinco tamaños: Muy compacto, Compacto, Normal, Grande
+            y Muy grande.
             El menú <strong>no se cierra</strong> mientras ajustas, para que puedas probar uno y otro.
           </li>
           <li>
@@ -440,7 +441,8 @@ export function AyudaClient({ ticket, corte }: Props) {
             campo Recibido sigue ahí (atajo <strong>F4</strong>).
           </li>
           <li>
-            <strong>Compacto</strong> encoge todo —letra, botones y espacios— para que quepan más productos y más
+            <strong>Compacto</strong> y <strong>Muy compacto</strong> encogen todo —letra, botones y espacios— para
+            que quepan más productos y más
             renglones del carrito. Útil en tablets acostadas, que son anchas pero bajitas.
           </li>
           <li>
