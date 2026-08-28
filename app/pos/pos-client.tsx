@@ -10,7 +10,7 @@ import {
   receiptBusinessFrom,
   type ReceiptData,
 } from "@/lib/receipt"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import {
   Trash2,
   Coffee,
@@ -630,10 +630,29 @@ export default function POSClient({
   // vibración corta. Con la hoja abierta no hace falta: el carrito se ve.
   const [lastAdded, setLastAdded] = useState<{ label: string; price: number; key: number } | null>(null)
   const prevLinesRef = useRef<CartLine[]>(lines)
+
+  // ── Vuelo al carrito ──
+  // Un punto sale de la tarjeta tocada y aterriza en el carrito: barra
+  // inferior en celular, panel en tablet/escritorio. El origen se apunta en el
+  // onClick de la tarjeta/chip — si el producto abre modificadores, el punto
+  // vuela al confirmar DESDE esa tarjeta, que es lo que el ojo espera. Las
+  // altas que no nacen de un toque en el menú (repetir venta, duplicar línea,
+  // retomar pedido) no vuelan: ahí el carrito ya está a la vista.
+  const reducedMotion = useReducedMotion()
+  const flyOriginRef = useRef<{ x: number; y: number } | null>(null)
+  const flightSeq = useRef(0)
+  const [flights, setFlights] = useState<{ id: number; from: { x: number; y: number }; to: { x: number; y: number } }[]>([])
+  const [cartPulse, setCartPulse] = useState(0)
+  const barTargetRef = useRef<HTMLButtonElement>(null)
+  const bagTargetRef = useRef<HTMLSpanElement>(null)
+  const markFlyOrigin = (e: React.MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    flyOriginRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  }
+
   useEffect(() => {
     const prev = prevLinesRef.current
     prevLinesRef.current = lines
-    if (!isMobile || cartOpen) return
     let added: CartLine | null = null
     for (const line of lines) {
       const before = prev.find((x) => x.lineId === line.lineId)
@@ -642,14 +661,27 @@ export default function POSClient({
         break
       }
     }
+    // El origen se consume aunque no haya alta (p. ej. abrió el picker y no
+    // eligió): así no vuela después desde una tarjeta que ya nadie tocó.
+    const origin = flyOriginRef.current
+    flyOriginRef.current = null
     if (!added) return
+    if (origin && !reducedMotion) {
+      const targetEl = isMobile ? barTargetRef.current : bagTargetRef.current
+      if (targetEl) {
+        const r = targetEl.getBoundingClientRect()
+        const id = ++flightSeq.current
+        setFlights((cur) => [...cur, { id, from: origin, to: { x: r.left + r.width / 2, y: r.top + r.height / 2 } }])
+      }
+    }
+    if (!isMobile || cartOpen) return
     vibra(15)
     setLastAdded({
       label: added.size ? `${added.product.name} · ${added.size.label}` : added.product.name,
       price: getLinePrice(added),
       key: Date.now(),
     })
-  }, [lines, isMobile, cartOpen])
+  }, [lines, isMobile, cartOpen, reducedMotion])
   useEffect(() => {
     if (!lastAdded) return
     const t = setTimeout(() => setLastAdded(null), 1800)
@@ -1050,7 +1082,17 @@ export default function POSClient({
       <header className="shrink-0 px-5 py-3 md:py-4 border-b border-stone-200 bg-amber-50/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5 text-amber-700" />
+            {/* key=cartPulse: al aterrizar un vuelo se remonta y rebota */}
+            <motion.span
+              key={cartPulse}
+              ref={bagTargetRef}
+              initial={{ scale: cartPulse ? 1.35 : 1 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 15 }}
+              className="inline-flex"
+            >
+              <ShoppingBag className="h-5 w-5 text-amber-700" />
+            </motion.span>
             <h2 className="text-lg font-bold text-stone-800">Venta Actual</h2>
           </div>
           <div className="flex items-center gap-2">
@@ -1926,7 +1968,10 @@ export default function POSClient({
                     <motion.button
                       key={size?.variantId ?? product.id}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => chooseProduct(product, size)}
+                      onClick={(e) => {
+                        markFlyOrigin(e)
+                        chooseProduct(product, size)
+                      }}
                       className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:border-amber-400 hover:bg-amber-100 transition-colors"
                     >
                       <span className="block text-sm font-semibold text-stone-800 leading-tight">
@@ -1974,7 +2019,10 @@ export default function POSClient({
                         )}
                         <motion.button
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => handleProductClick(product)}
+                          onClick={(e) => {
+                            markFlyOrigin(e)
+                            handleProductClick(product)
+                          }}
                           className={`w-full text-left rounded-xl border transition-all duration-150 overflow-hidden ${
                             sizePickerFor === product.id
                               ? "border-amber-400 bg-amber-50 shadow-md"
@@ -2019,7 +2067,10 @@ export default function POSClient({
                                   <motion.button
                                     key={size.label}
                                     whileTap={{ scale: 0.92 }}
-                                    onClick={() => chooseProduct(product, size)}
+                                    onClick={(e) => {
+                                      markFlyOrigin(e)
+                                      chooseProduct(product, size)
+                                    }}
                                     className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
                                   >
                                     {index < 9 && (
@@ -2078,6 +2129,7 @@ export default function POSClient({
                  el botón de la hoja: verde efectivo, violeta transferencia. */
               <div className="flex gap-2">
                 <Button
+                  ref={barTargetRef}
                   className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
                   onClick={() => setCartOpen(true)}
                 >
@@ -2132,6 +2184,33 @@ export default function POSClient({
           </Sheet>
         </>
       )}
+
+      {/* Puntos volando al carrito. Sin AnimatePresence a propósito: el
+          punto desaparece justo al llegar — "entró al carrito" — y así
+          onAnimationComplete corre una sola vez (con exit correría dos y el
+          rebote de la bolsa se duplicaba). */}
+      {flights.map((flight) => (
+        <motion.span
+          key={flight.id}
+          data-fly-dot
+          className="pointer-events-none fixed left-0 top-0 z-[60] h-4 w-4 rounded-full bg-amber-600 shadow-md"
+          // Centrado con márgenes y no con translate de Tailwind: framer
+          // escribe transform completo y pisaría esas clases.
+          style={{ marginLeft: -8, marginTop: -8 }}
+          initial={{ x: flight.from.x, y: flight.from.y, scale: 1, opacity: 0.95 }}
+          animate={{
+            x: flight.to.x,
+            y: [flight.from.y, Math.min(flight.from.y, flight.to.y) - 40, flight.to.y],
+            scale: 0.45,
+            opacity: 0.9,
+          }}
+          transition={{ duration: 0.45, ease: "easeIn", times: [0, 0.35, 1] }}
+          onAnimationComplete={() => {
+            setFlights((cur) => cur.filter((x) => x.id !== flight.id))
+            setCartPulse((c) => c + 1)
+          }}
+        />
+      ))}
 
       {/* ── Dialogs ── */}
       <CashSessionDialog
