@@ -577,6 +577,16 @@ export default function POSClient({
   const isMobile = useIsMobile()
   const [cartOpen, setCartOpen] = useState(false)
 
+  // ── Encabezado que se encoge (móvil) ──
+  // Antes del primer producto hay nombre, chip de caja, "Vendido hoy",
+  // buscador y categorías: en un celular chico queda UNA fila de productos.
+  // Al bajar se ocultan las dos filas prescindibles; las categorías se quedan,
+  // que son la navegación. Con búsqueda activa (o recién pedida con la lupa)
+  // nunca se colapsa: quitarle el buscador a quien lo está usando no.
+  const [gridScrolled, setGridScrolled] = useState(false)
+  const [searchPinned, setSearchPinned] = useState(false)
+  const gridScrollRef = useRef<HTMLDivElement>(null)
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const cashInputRef = useRef<HTMLInputElement>(null)
 
@@ -585,6 +595,66 @@ export default function POSClient({
   useEffect(() => {
     setTotalSales(initialTotalSales)
   }, [initialTotalSales])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setGridScrolled(false)
+      return
+    }
+    const viewport = gridScrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
+    if (!viewport) return
+    let compact = false
+    // Histéresis: colapsar achica el encabezado y mueve el contenido; con un
+    // solo umbral, ese brinco lo volvería a expandir y quedaría parpadeando.
+    const onScroll = () => {
+      const next = compact ? viewport.scrollTop > 8 : viewport.scrollTop > 40
+      if (next !== compact) {
+        compact = next
+        setGridScrolled(next)
+      }
+    }
+    viewport.addEventListener("scroll", onScroll, { passive: true })
+    return () => viewport.removeEventListener("scroll", onScroll)
+  }, [isMobile])
+
+  // La lupa del encabezado colapsado: expandir y enfocar cuando ya exista el input.
+  useEffect(() => {
+    if (searchPinned) searchInputRef.current?.focus()
+  }, [searchPinned])
+
+  // ── "¿Sí lo agregó?" (móvil) ──
+  // En tablet ves el carrito crecer al tocar un producto; en celular solo
+  // cambia un numerito en la barra de abajo. Ese silencio provoca dobles
+  // toques. Se detecta la línea nueva (o la cantidad que subió) comparando
+  // con el carrito anterior y la barra lo dice con nombre, precio y una
+  // vibración corta. Con la hoja abierta no hace falta: el carrito se ve.
+  const [lastAdded, setLastAdded] = useState<{ label: string; price: number; key: number } | null>(null)
+  const prevLinesRef = useRef<CartLine[]>(lines)
+  useEffect(() => {
+    const prev = prevLinesRef.current
+    prevLinesRef.current = lines
+    if (!isMobile || cartOpen) return
+    let added: CartLine | null = null
+    for (const line of lines) {
+      const before = prev.find((x) => x.lineId === line.lineId)
+      if (!before || line.quantity > before.quantity) {
+        added = line
+        break
+      }
+    }
+    if (!added) return
+    vibra(15)
+    setLastAdded({
+      label: added.size ? `${added.product.name} · ${added.size.label}` : added.product.name,
+      price: getLinePrice(added),
+      key: Date.now(),
+    })
+  }, [lines, isMobile, cartOpen])
+  useEffect(() => {
+    if (!lastAdded) return
+    const t = setTimeout(() => setLastAdded(null), 1800)
+    return () => clearTimeout(t)
+  }, [lastAdded])
 
   // Aviso único si se restauró un carrito guardado
   useEffect(() => {
@@ -1571,6 +1641,8 @@ export default function POSClient({
   )
 
   /* Chip de estado de caja (compartido entre escritorio y móvil) */
+  const headerCompact = isMobile && gridScrolled && !searchQuery && !searchPinned
+
   const cashChip = (compact: boolean) => (
     <Button
       variant="outline"
@@ -1679,6 +1751,17 @@ export default function POSClient({
                   <span className="text-lg font-bold text-amber-800">{formatCurrency(totalSales)}</span>
                 </div>
               )}
+              {headerCompact && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label="Buscar producto"
+                  onClick={() => setSearchPinned(true)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              )}
               <span className="lg:hidden">{cashChip(true)}</span>
               <span className="hidden lg:inline-flex">{cashChip(false)}</span>
               {isMobile && (
@@ -1751,13 +1834,13 @@ export default function POSClient({
                 </DropdownMenu>
             </div>
           </div>
-          {isMobile && (
+          {isMobile && !headerCompact && (
             <p className="text-xs text-amber-800 mt-1">
               Vendido hoy: <span className="font-bold">{formatCurrency(totalSales)}</span>
             </p>
           )}
-          {/* Buscador (móvil): en su propio renglón */}
-          {isMobile && (
+          {/* Buscador (móvil): en su propio renglón; colapsado, lo reabre la lupa */}
+          {isMobile && !headerCompact && (
             <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
             <Input
@@ -1767,6 +1850,9 @@ export default function POSClient({
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 setSizePickerFor(null)
+              }}
+              onBlur={() => {
+                if (!searchQuery) setSearchPinned(false)
               }}
               className="pl-9 pr-16 bg-stone-50 border-stone-200 h-10 md:h-9 text-sm"
             />
@@ -1813,7 +1899,7 @@ export default function POSClient({
         </header>
 
         {/* Product grid */}
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea ref={gridScrollRef} className="flex-1 min-h-0">
           <div className={`p-4 space-y-6 ${isMobile ? "pb-24" : ""}`}>
             {products.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-stone-400">
@@ -1973,21 +2059,70 @@ export default function POSClient({
       {isMobile && (
         <>
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-            <Button
-              className={`w-full h-12 rounded-xl text-base font-bold justify-between px-4 ${
-                lines.length > 0 ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-stone-100 text-stone-500 hover:bg-stone-200"
-              }`}
-              onClick={() => setCartOpen(true)}
-            >
-              <span className="flex items-center gap-2">
-                <ShoppingBag className="h-5 w-5" />
-                {lines.length === 0 ? "Carrito vacío" : `${itemCount} artículo${itemCount === 1 ? "" : "s"}`}
-              </span>
-              <span className="flex items-center gap-2">
-                {formatCurrency(total)}
+            {lines.length === 0 ? (
+              <Button
+                className="w-full h-12 rounded-xl text-base font-bold justify-between px-4 bg-stone-100 text-stone-500 hover:bg-stone-200"
+                onClick={() => setCartOpen(true)}
+              >
+                <span className="flex items-center gap-2">
+                  <ShoppingBag className="h-5 w-5" />
+                  Carrito vacío
+                </span>
                 <ChevronUp className="h-4 w-4 opacity-70" />
-              </span>
-            </Button>
+              </Button>
+            ) : (
+              /* Con artículos, la barra se parte: ver el carrito a la
+                 izquierda, Cobrar directo a la derecha. La venta común es "2
+                 cosas y ya" — abrir la hoja solo para tocar Cobrar era un
+                 viaje de más. Mismo finalizeSale y mismo color por método que
+                 el botón de la hoja: verde efectivo, violeta transferencia. */
+              <div className="flex gap-2">
+                <Button
+                  className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
+                  onClick={() => setCartOpen(true)}
+                >
+                  {lastAdded ? (
+                    <span key={lastAdded.key} className="flex min-w-0 items-center gap-1.5 text-amber-700">
+                      <Plus className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 truncate">{lastAdded.label}</span>
+                      <span className="shrink-0 text-sm">{formatCurrency(lastAdded.price)}</span>
+                    </span>
+                  ) : (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <ShoppingBag className="h-5 w-5 shrink-0" />
+                      <span className="truncate">
+                        {itemCount} artículo{itemCount === 1 ? "" : "s"} · {formatCurrency(total)}
+                      </span>
+                    </span>
+                  )}
+                  <ChevronUp className="h-4 w-4 shrink-0 opacity-70" />
+                </Button>
+                {openSession ? (
+                  <Button
+                    className={`h-12 shrink-0 rounded-xl px-4 text-base font-bold text-white ${
+                      paymentMethod === "efectivo"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : paymentMethod === "transferencia"
+                        ? "bg-violet-600 hover:bg-violet-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                    disabled={!canCharge}
+                    onClick={finalizeSale}
+                    title={`Cobrar · ${paymentLabel(paymentMethod)}`}
+                  >
+                    {isProcessing ? "Procesando…" : `Cobrar ${formatCurrency(due)}`}
+                  </Button>
+                ) : (
+                  <Button
+                    className="h-12 shrink-0 gap-1.5 rounded-xl bg-red-600 px-4 text-base font-bold text-white hover:bg-red-700"
+                    onClick={() => setShowCashDialog(true)}
+                  >
+                    <Lock className="h-4 w-4" />
+                    Abrir caja
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col rounded-t-2xl overflow-hidden">
