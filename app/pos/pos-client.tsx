@@ -2200,7 +2200,12 @@ export default function POSClient({
             )}
           </motion.div>
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
-            <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col rounded-t-2xl overflow-hidden">
+            {/* A toda pantalla por decisión del usuario: el hueco de 8% era la
+                señal de «hoja» (ver el POS atrás = toca afuera para cerrar),
+                pero en un celular vale una línea más de carrito. Cerrar queda
+                en la X. El padding superior es por si la PWA corre a pantalla
+                completa en un teléfono con notch; en navegador vale 0. */}
+            <SheetContent side="bottom" className="h-[100dvh] p-0 pt-[env(safe-area-inset-top)] flex flex-col overflow-hidden">
               <SheetTitle className="sr-only">Venta actual</SheetTitle>
               <div className="flex-1 min-h-0">{cartPanel}</div>
             </SheetContent>
