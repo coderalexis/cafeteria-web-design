@@ -1100,8 +1100,11 @@ export default function POSClient({
   const cartPanel = (
     <div className="flex flex-col h-full bg-white">
       <header className="shrink-0 px-5 py-3 md:py-4 border-b border-stone-200 bg-amber-50/60">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        {/* Se envuelve a propósito: el tamaño de letra escala TODO en rem
+            (la X de 2.5rem llega a 50px) y este renglón deja de caber en un
+            celular. Mejor dos renglones que una X fuera de la pantalla. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+          <div className="flex min-w-0 items-center gap-2">
             {/* key=cartPulse: al aterrizar un vuelo se remonta y rebota */}
             <motion.span
               key={cartPulse}
@@ -1113,9 +1116,9 @@ export default function POSClient({
             >
               <ShoppingBag className="h-5 w-5 text-amber-700" />
             </motion.span>
-            <h2 className="text-lg font-bold text-stone-800">Venta Actual</h2>
+            <h2 className="truncate text-lg font-bold text-stone-800">Venta Actual</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             {parkedEnabled && (parked.orders.length > 0 || lines.length > 0) && (
               <Button
                 variant="ghost"
@@ -1123,9 +1126,10 @@ export default function POSClient({
                 className="h-8 gap-1 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700"
                 onClick={() => (lines.length > 0 ? setShowPark(true) : setShowTray(true))}
                 title={lines.length > 0 ? "Guardar este pedido para retomarlo después" : "Ver pedidos en espera"}
+                aria-label={lines.length > 0 ? "Guardar pedido" : "Pedidos en espera"}
               >
                 <PauseCircle className="h-3.5 w-3.5" />
-                {lines.length > 0 ? "Guardar" : "En espera"}
+                <span className="hidden md:inline">{lines.length > 0 ? "Guardar" : "En espera"}</span>
               </Button>
             )}
             {parkedEnabled && parked.orders.length > 0 && (
@@ -1141,7 +1145,8 @@ export default function POSClient({
             {lines.length > 0 && (
               <>
                 <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
-                  {itemCount} items
+                  {itemCount}
+                  <span className="hidden md:inline">&nbsp;items</span>
                 </Badge>
                 <Button
                   variant="ghost"
@@ -1149,9 +1154,10 @@ export default function POSClient({
                   className="h-8 px-2 text-stone-400 hover:text-red-600 hover:bg-red-50 gap-1"
                   onClick={() => setConfirmClear(true)}
                   title="Vaciar carrito (Ctrl+⌫)"
+                  aria-label="Vaciar carrito"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Vaciar
+                  <span className="hidden md:inline">Vaciar</span>
                 </Button>
               </>
             )}
