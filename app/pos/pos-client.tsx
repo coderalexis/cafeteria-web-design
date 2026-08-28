@@ -1463,10 +1463,12 @@ export default function POSClient({
       {/* Checkout */}
       {/* Bloque de cobro. En una tablet horizontal (768 px de alto) esto medía
           555 px y, siendo shrink-0, aplastaba la lista de artículos a 125 px: el
-          cajero no alcanzaba a ver lo que estaba cobrando. Ahora se topa en 55%
-          del panel; los controles ceden y se desplazan, y el total con el botón
-          de cobro nunca se mueven — son lo único que no se puede perder de vista. */}
-      <div className="flex max-h-[46%] shrink-0 flex-col border-t border-stone-200 bg-stone-50/80">
+          cajero no alcanzaba a ver lo que estaba cobrando. Se topa en 46% del
+          panel (52% en celular, donde el usuario pidió darle un poco más de
+          aire al cobro a costa de la lista); los controles ceden y se
+          desplazan, y el total con el botón de cobro nunca se mueven — son lo
+          único que no se puede perder de vista. */}
+      <div className="flex max-h-[52%] md:max-h-[46%] shrink-0 flex-col border-t border-stone-200 bg-stone-50/80">
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-0">
           {/* Orden por frecuencia de uso, no por lógica de formulario: el
               espacio visible sin desplazar es corto en una tablet acostada,
@@ -1489,11 +1491,11 @@ export default function POSClient({
                   key={key}
                   type="button"
                   onClick={() => setPaymentMethod(key)}
-                  className={`relative flex-1 flex items-center justify-center gap-2 py-4 md:py-2.5 rounded-lg border-2 text-base md:text-sm font-semibold transition-all ${
+                  className={`relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
                     active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
                   }`}
                 >
-                  <Icon className="h-5 w-5 md:h-4 md:w-4" />
+                  <Icon className="h-4 w-4" />
                   {info.shortLabel}
                   <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
                 </button>
