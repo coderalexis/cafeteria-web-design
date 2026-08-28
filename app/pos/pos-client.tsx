@@ -589,6 +589,12 @@ export default function POSClient({
   // arrastre/presión, y los toques sobre botones/inputs no cuentan.
   const [infoLine, setInfoLine] = useState<CartLine | null>(null)
   const gestoRef = useRef<{ x: number; y: number; lineId: string; downAt: number; largo: boolean; arrastre: boolean } | null>(null)
+  // La nota pedida desde el menú ⋯: al cerrarse, Radix devuelve el foco al
+  // botón que lo abrió — y ese robo mataría el autoFocus del campo de nota
+  // (sin foco no hay teclado, y sin foco tampoco hay «toca afuera para
+  // guardar», que es un blur). Este ref avisa a onCloseAutoFocus que esta vez
+  // el foco es del campo.
+  const notaDesdeMenuRef = useRef(false)
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Producto/tamaño esperando modificadores: alta nueva, o edición de una
   // línea existente (lineId presente = "mejor con avena" sin rearmar todo).
@@ -1594,7 +1600,16 @@ export default function POSClient({
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-52"
+                        onCloseAutoFocus={(e) => {
+                          if (notaDesdeMenuRef.current) {
+                            notaDesdeMenuRef.current = false
+                            e.preventDefault()
+                          }
+                        }}
+                      >
                         <DropdownMenuItem
                           onSelect={() => {
                             duplicateLine(line.lineId)
@@ -1604,7 +1619,16 @@ export default function POSClient({
                           <Copy className="mr-2 h-4 w-4" />
                           Duplicar (otro igual)
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setEditingNoteFor(line.lineId)}>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            notaDesdeMenuRef.current = true
+                            // Igual que la presión larga: el campo se monta
+                            // DESPUÉS de que el menú cierre y pasen los
+                            // eventos fantasma — así el autoFocus sobrevive
+                            // y el teléfono sube el teclado.
+                            setTimeout(() => setEditingNoteFor(line.lineId), 60)
+                          }}
+                        >
                           <StickyNote className="mr-2 h-4 w-4" />
                           {line.notes ? "Cambiar la nota" : "Nota para este artículo"}
                         </DropdownMenuItem>
