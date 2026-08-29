@@ -366,7 +366,13 @@ export default function ProductosClient({
             />
           ) : selectedProduct ? (
             <EditProductSheet
-              product={selectedProduct}
+              /* SIEMPRE la versión fresca de products (que router.refresh()
+                 sí actualiza), no la foto guardada al abrir la hoja. Con la
+                 foto, marcar un grupo de modificadores guardaba pero el
+                 checkbox seguía apagado — y el siguiente toque, calculado
+                 sobre la foto, DESHACÍA en silencio lo recién guardado. Le
+                 pasó a una dueña real: cuatro toques, cero vínculos. */
+              product={products.find((p) => p.id === selectedProduct.id) ?? selectedProduct}
               categories={categories}
               modifierGroups={modifierGroups}
               onClose={() => setSheetOpen(false)}
