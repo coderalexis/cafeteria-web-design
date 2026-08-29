@@ -5,6 +5,7 @@ import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
+import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActiveContext } from "@/lib/context"
 import type { BusinessRole } from "@/lib/context-shape"
 import {
@@ -95,11 +96,9 @@ async function createAccountWithMembership(
   })
   if (memberError) {
     await admin.auth.admin.deleteUser(userId)
-    return {
-      error: /unique|duplicate/i.test(memberError.message)
-        ? "Ese usuario ya existe en esta cafetería."
-        : memberError.message,
-    }
+    // El nombre de la restricción distingue «ese usuario ya está tomado» de
+    // «esa persona ya es del equipo»; antes ambas decían lo primero.
+    return { error: dbErrorMessage(memberError) }
   }
   return { userId }
 }
@@ -195,7 +194,7 @@ export async function addMemberByEmail(
         .update({ is_active: true, role })
         .eq("business_id", ctx.business.id)
         .eq("user_id", existingId)
-      if (error) return { error: error.message }
+      if (error) return { error: dbErrorMessage(error) }
     } else {
       const { error } = await admin.from("business_members").insert({
         business_id: ctx.business.id,
@@ -203,7 +202,7 @@ export async function addMemberByEmail(
         role,
         username: null,
       })
-      if (error) return { error: error.message }
+      if (error) return { error: dbErrorMessage(error) }
     }
     // Si no tenía negocio activo, este será el suyo
     await admin
@@ -262,7 +261,7 @@ export async function updateMember(formData: FormData): Promise<ActionResult> {
   }
 
   const { error: profileError } = await admin.from("profiles").update({ full_name: fullName }).eq("id", userId)
-  if (profileError) return { error: profileError.message }
+  if (profileError) return { error: dbErrorMessage(profileError) }
 
   if (membership.role !== role) {
     const { error } = await admin
@@ -270,7 +269,7 @@ export async function updateMember(formData: FormData): Promise<ActionResult> {
       .update({ role })
       .eq("business_id", ctx.business.id)
       .eq("user_id", userId)
-    if (error) return { error: error.message }
+    if (error) return { error: dbErrorMessage(error) }
   }
 
   await logAudit("miembro.editado", fullName, { rol: role })
@@ -305,7 +304,7 @@ export async function setMemberActive(formData: FormData): Promise<ActionResult>
     .update({ is_active: active })
     .eq("business_id", ctx.business.id)
     .eq("user_id", userId)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   if (!active) {
     // Que no siga operando aquí: si este era su negocio activo, se lo quitamos.
@@ -394,7 +393,7 @@ export async function removeMember(formData: FormData): Promise<ActionResult> {
     .delete()
     .eq("business_id", ctx.business.id)
     .eq("user_id", userId)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await admin
     .from("profiles")

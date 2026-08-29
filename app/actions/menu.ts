@@ -5,6 +5,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
+import { dbErrorMessage } from "@/lib/db-errors"
 import { isCategoryColor } from "@/lib/category-colors"
 import { CATEGORY_NOTE_MAX } from "@/lib/settings"
 import { computeBulkPrice, type BulkPricesInput } from "@/lib/pricing"
@@ -48,7 +49,7 @@ export async function createCategory(formData: FormData) {
   const supabase = await createClient()
   const { error } = await supabase.from("menu_categories").insert({ name, slug, color, note })
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("categoria.creada", name)
   revalidateAll()
@@ -77,7 +78,7 @@ export async function updateCategory(formData: FormData) {
   const supabase = await createClient()
   const { error } = await supabase.from("menu_categories").update({ name, slug, color, note }).eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("categoria.editada", name)
   revalidateAll()
@@ -103,7 +104,7 @@ export async function createProduct(formData: FormData) {
     description: description || null,
   })
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("producto.creado", name)
   revalidateAll()
@@ -129,7 +130,7 @@ export async function updateProduct(formData: FormData) {
     .update({ name, category_id: categoryId, description: description || null })
     .eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("producto.editado", name)
   revalidateAll()
@@ -162,7 +163,7 @@ export async function createVariant(formData: FormData) {
     size_label: sizeLabel || null,
   })
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const { data: product } = await supabase.from("menu_products").select("name").eq("id", productId).maybeSingle()
   await logAudit("variante.creada", `${product?.name ?? "?"} (${name})`, { precio: price, costo: cost })
@@ -201,7 +202,7 @@ export async function updateVariant(formData: FormData) {
     .update({ name, price, cost, size_label: sizeLabel || null })
     .eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const productName = (Array.isArray(before?.menu_products) ? before?.menu_products[0] : before?.menu_products)?.name
   if (before && Number(before.price) !== price) {
@@ -255,7 +256,7 @@ export async function deleteVariant(formData: FormData) {
 
   const { error } = await supabase.from("menu_variants").delete().eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const productName = (Array.isArray(before?.menu_products) ? before?.menu_products[0] : before?.menu_products)?.name
   await logAudit("variante.eliminada", `${productName ?? "?"} (${before?.name ?? id})`)
@@ -280,7 +281,7 @@ export async function toggleVariantActive(formData: FormData) {
     .update({ is_active: isActive })
     .eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const { data: v } = await supabase
     .from("menu_variants")
@@ -310,7 +311,7 @@ export async function toggleProductActive(formData: FormData) {
     .update({ is_active: isActive })
     .eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const { data: p } = await supabase.from("menu_products").select("name").eq("id", id).maybeSingle()
   await logAudit(isActive ? "producto.activado" : "producto.desactivado", p?.name ?? id)
@@ -348,7 +349,7 @@ export async function deleteProduct(formData: FormData) {
   // Variants cascade automatically (ON DELETE CASCADE)
   const { error } = await supabase.from("menu_products").delete().eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("producto.eliminado", before?.name ?? id)
   revalidateAll()
@@ -383,7 +384,7 @@ export async function deleteCategory(formData: FormData) {
 
   const { error } = await supabase.from("menu_categories").delete().eq("id", id)
 
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("categoria.eliminada", before?.name ?? id)
   revalidateAll()
@@ -424,7 +425,7 @@ export async function bulkUpdatePrices(
   let query = supabase.from("menu_variants").select("id, price, menu_products!inner(category_id)")
   if (v.categoryId) query = query.eq("menu_products.category_id", v.categoryId)
   const { data: variants, error } = await query
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const changes = (variants ?? [])
     .map((row) => ({ id: row.id, price: computeBulkPrice(row.price, v) }))
@@ -437,7 +438,7 @@ export async function bulkUpdatePrices(
       changes.slice(i, i + CHUNK).map((c) => supabase.from("menu_variants").update({ price: c.price }).eq("id", c.id)),
     )
     const failed = results.find((r) => r.error)
-    if (failed?.error) return { error: `Se actualizaron ${i} precios y falló: ${failed.error.message}` }
+    if (failed?.error) return { error: `Se actualizaron ${i} precios y ahí se detuvo. ${dbErrorMessage(failed.error)}` }
   }
 
   let scopeName = "todo el menú"
@@ -477,7 +478,7 @@ export async function reorderProducts(
     .from("menu_products")
     .select("id, sort_order")
     .eq("category_id", categoryId)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const current = new Map((rows ?? []).map((r) => [r.id, r.sort_order]))
   if (current.size !== orderedIds.length || orderedIds.some((id) => !current.has(id))) {
@@ -496,7 +497,7 @@ export async function reorderProducts(
         .map((c) => supabase.from("menu_products").update({ sort_order: c.sort_order }).eq("id", c.id)),
     )
     const failed = results.find((r) => r.error)
-    if (failed?.error) return { error: failed.error.message }
+    if (failed?.error) return { error: dbErrorMessage(failed.error) }
   }
 
   revalidateAll()
@@ -520,7 +521,7 @@ export async function moveCategory(formData: FormData) {
     .select("id, sort_order")
     .order("sort_order")
     .order("name")
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const list = rows ?? []
   const index = list.findIndex((r) => r.id === id)
@@ -537,7 +538,7 @@ export async function moveCategory(formData: FormData) {
 
   for (const c of changes) {
     const { error: upErr } = await supabase.from("menu_categories").update({ sort_order: c.sort_order }).eq("id", c.id)
-    if (upErr) return { error: upErr.message }
+    if (upErr) return { error: dbErrorMessage(upErr) }
   }
 
   revalidateAll()

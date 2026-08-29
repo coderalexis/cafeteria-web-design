@@ -5,6 +5,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
+import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -52,7 +53,7 @@ export async function createModifierGroup(formData: FormData): Promise<ActionRes
     max_select: g.maxSelect,
     is_required: g.isRequired || g.minSelect > 0,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("grupo.creado", g.name)
   revalidateAll()
@@ -83,7 +84,7 @@ export async function updateModifierGroup(formData: FormData): Promise<ActionRes
       is_required: g.isRequired || g.minSelect > 0,
     })
     .eq("id", id)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("grupo.editado", g.name)
   revalidateAll()
@@ -100,7 +101,7 @@ export async function toggleModifierGroupActive(formData: FormData): Promise<Act
 
   const supabase = await createClient()
   const { error } = await supabase.from("modifier_groups").update({ is_active: isActive }).eq("id", id)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const { data: g } = await supabase.from("modifier_groups").select("name").eq("id", id).maybeSingle()
   await logAudit("grupo.editado", g?.name ?? id, { activo: isActive })
@@ -134,7 +135,7 @@ export async function deleteModifierGroup(formData: FormData): Promise<ActionRes
   const { data: before } = await supabase.from("modifier_groups").select("name").eq("id", id).maybeSingle()
 
   const { error } = await supabase.from("modifier_groups").delete().eq("id", id)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("grupo.eliminado", before?.name ?? id)
   revalidateAll()
@@ -171,7 +172,7 @@ export async function createModifier(formData: FormData): Promise<ActionResult> 
     name: parsed.data.name,
     price_delta: parsed.data.priceDelta,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const { data: g } = await supabase.from("modifier_groups").select("name").eq("id", groupId).maybeSingle()
   await logAudit("modificador.creado", `${g?.name ?? "?"}: ${parsed.data.name}`, { precio_extra: parsed.data.priceDelta })
@@ -194,7 +195,7 @@ export async function updateModifier(formData: FormData): Promise<ActionResult> 
     .from("modifiers")
     .update({ name: parsed.data.name, price_delta: parsed.data.priceDelta })
     .eq("id", id)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("modificador.editado", parsed.data.name, { precio_extra: parsed.data.priceDelta })
   revalidateAll()
@@ -211,7 +212,7 @@ export async function toggleModifierActive(formData: FormData): Promise<ActionRe
 
   const supabase = await createClient()
   const { error } = await supabase.from("modifiers").update({ is_active: isActive }).eq("id", id)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   const { data: m } = await supabase.from("modifiers").select("name").eq("id", id).maybeSingle()
   await logAudit("modificador.editado", m?.name ?? id, { activo: isActive })
@@ -238,7 +239,7 @@ export async function deleteModifier(formData: FormData): Promise<ActionResult> 
   const { data: before } = await supabase.from("modifiers").select("name").eq("id", id).maybeSingle()
 
   const { error } = await supabase.from("modifiers").delete().eq("id", id)
-  if (error) return { error: error.message }
+  if (error) return { error: dbErrorMessage(error) }
 
   await logAudit("modificador.eliminado", before?.name ?? id)
   revalidateAll()
@@ -268,7 +269,7 @@ export async function setProductModifierGroups(
     .from("product_modifier_groups")
     .select("group_id")
     .eq("product_id", productId)
-  if (readError) return { error: readError.message }
+  if (readError) return { error: dbErrorMessage(readError) }
 
   const have = new Set((current ?? []).map((r) => r.group_id))
   const want = new Set(groupIds)
@@ -281,13 +282,13 @@ export async function setProductModifierGroups(
       .delete()
       .eq("product_id", productId)
       .in("group_id", toRemove)
-    if (error) return { error: error.message }
+    if (error) return { error: dbErrorMessage(error) }
   }
   if (toAdd.length > 0) {
     const { error } = await supabase
       .from("product_modifier_groups")
       .insert(toAdd.map((group_id) => ({ product_id: productId, group_id })))
-    if (error) return { error: error.message }
+    if (error) return { error: dbErrorMessage(error) }
   }
 
   if (toAdd.length > 0 || toRemove.length > 0) {
