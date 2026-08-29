@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatTime } from "@/lib/format"
+import { useBusiness } from "@/components/business-provider"
 import type { QueueState } from "./queue"
 
 /**
@@ -26,6 +27,9 @@ export function QueueReviewDialog({
   onQuitar: (clientRef: string) => void
 }) {
   const revisar = state.sales.filter((s) => s.status === "revisar")
+  // La hora de captura se muestra en la zona de la CAFETERÍA: es la hora a la
+  // que el cajero cobró, y con ella va a buscar la venta en su turno.
+  const { timezone } = useBusiness()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,7 +49,7 @@ export function QueueReviewDialog({
               <div key={s.clientRef} className="rounded-lg border border-red-200 bg-red-50/50 p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="font-semibold text-stone-800">{s.provisional}</span>
-                  <span className="text-xs text-stone-500">{formatTime(new Date(s.capturedAt))}</span>
+                  <span className="text-xs text-stone-500">{formatTime(new Date(s.capturedAt), timezone)}</span>
                 </div>
                 <ul className="mt-1.5 space-y-0.5 text-sm text-stone-700">
                   {s.lines.map((l, i) => (

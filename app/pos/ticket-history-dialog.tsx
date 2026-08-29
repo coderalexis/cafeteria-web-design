@@ -136,7 +136,9 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-stone-800">#{ticket.folio}</span>
-                          <span className="text-xs text-stone-400">{formatTime(ticket.createdAt)}</span>
+                          <span className="text-xs text-stone-400">
+                            {formatTime(ticket.createdAt, receiptBiz.timezone)}
+                          </span>
                           {Icon && (
                             <span className="flex items-center gap-1 text-xs text-stone-500">
                               <Icon className={`h-3.5 w-3.5 ${info.iconColor}`} />

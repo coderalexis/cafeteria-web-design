@@ -270,7 +270,8 @@ function CloseSessionForm({
           Cerrar caja
         </DialogTitle>
         <DialogDescription>
-          Abierta desde las {formatTime(session.openedAt)} con fondo de {formatCurrency(session.openingFloat)}. Aquí
+          Abierta desde las {formatTime(session.openedAt, business.timezone)} con fondo de{" "}
+          {formatCurrency(session.openingFloat)}. Aquí
           también registras entradas y salidas de efectivo del turno.
         </DialogDescription>
       </DialogHeader>
@@ -418,7 +419,8 @@ function CloseSessionForm({
                 {(summary.movements ?? []).map((m) => (
                   <li key={m.id} className="flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-stone-600">
-                      <span className="text-stone-400 text-xs">{formatTime(m.created_at)}</span> {m.reason}
+                      <span className="text-stone-400 text-xs">{formatTime(m.created_at, business.timezone)}</span>{" "}
+                      {m.reason}
                     </span>
                     <span className={`shrink-0 font-medium ${m.kind === "entrada" ? "text-emerald-700" : "text-red-700"}`}>
                       {m.kind === "entrada" ? "+" : "-"}

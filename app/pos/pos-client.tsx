@@ -367,8 +367,8 @@ function ReceiptView({
       {/* Ticket preview */}
       <div className="w-full bg-stone-50 rounded-xl border border-stone-200 p-4 space-y-3">
         <div className="flex justify-between text-sm text-stone-500">
-          <span>{sale.date.toLocaleDateString("es-MX")}</span>
-          <span>{formatTime(sale.date)}</span>
+          <span>{formatDate(sale.date, business.timezone)}</span>
+          <span>{formatTime(sale.date, business.timezone)}</span>
         </div>
 
         {sale.notes && (
@@ -644,6 +644,16 @@ export default function POSClient({
 }: POSClientProps) {
   const appCtx = useAppContext()
   const businessName = appCtx.business?.name ?? "Cafecito POS"
+  /**
+   * Zona horaria del NEGOCIO para toda hora que se pinte en pantalla.
+   *
+   * Sin ella, `toLocaleTimeString` usa la del aparato que renderiza: en el
+   * servidor la del centro de datos (Oregón) y en el celular la del cajero.
+   * Eso daba dos horas distintas para la misma caja y React se quejaba de que
+   * la pantalla no coincidía con lo que había mandado el servidor. La hora de
+   * una cafetería es la de la CAFETERÍA, no la de quien la mira.
+   */
+  const tz = appCtx.business?.timezone
   // Carrito por negocio y cajero: cambiar de cafetería no mezcla carritos.
   const cart = usePosCart(`pos-cart:${businessId}:${cashierId}`, products)
   const {
@@ -689,7 +699,7 @@ export default function POSClient({
   // Una caja de otro día no se distingue de una recién abierta si el chip solo
   // dice la hora: hay que decirlo con todas sus letras.
   const cajaDeOtroDia =
-    openSession != null && formatDate(openSession.openedAt) !== formatDate(new Date())
+    openSession != null && formatDate(openSession.openedAt, tz) !== formatDate(new Date(), tz)
   const loyaltyEnabled = loyalty
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<LoyaltyCustomer | null>(null)
   const [loyaltyRedeem, setLoyaltyRedeem] = useState(false)
@@ -2203,8 +2213,8 @@ export default function POSClient({
           : "Cerrada"
         : openSession
         ? cajaDeOtroDia
-          ? `Caja abierta desde ${formatDate(openSession.openedAt)}`
-          : `Caja abierta · ${formatTime(openSession.openedAt)}`
+          ? `Caja abierta desde ${formatDate(openSession.openedAt, tz)}`
+          : `Caja abierta · ${formatTime(openSession.openedAt, tz)}`
         : "Caja cerrada"}
       {!compact && <Kbd>K</Kbd>}
     </Button>

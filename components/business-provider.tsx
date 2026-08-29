@@ -18,7 +18,7 @@ export function useAppContext(): AppContext {
   return ctx
 }
 
-/** Negocio activo. Solo para árboles donde el middleware ya garantizó que existe (/pos, /admin). */
+/** Negocio activo. Solo para árboles donde la página o el layout ya garantizó que existe (/pos, /admin). */
 export function useBusiness(): BusinessInfo {
   const ctx = useAppContext()
   if (!ctx.business) {
