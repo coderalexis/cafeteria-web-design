@@ -10,6 +10,7 @@ import {
   BookOpen,
   CalendarClock,
   ChefHat,
+  Cloud,
   Coffee,
   Hand,
   Keyboard,
@@ -223,6 +224,63 @@ export function AyudaClient({ ticket, corte }: Props) {
             la izquierda. «El mío sin azúcar» → mantén presionado y escribe. «¿Este cuánto era?» → tócala y ves sus
             cuentas.
           </p>
+        </>
+      ),
+    },
+    {
+      id: "sin-internet",
+      grupo: "cajero",
+      icon: Cloud,
+      titulo: "Si se cae el internet",
+      palabras:
+        "sin internet offline conexion cola ventas pendientes subir provisional se cayo la senal wifi datos guardadas",
+      href: "/pos",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            <strong>Sigue cobrando.</strong> Si se cae la señal a media fila, el POS guarda cada venta en la tablet y
+            las sube solas en cuanto vuelve el internet. No hay que apuntar en papel ni pedirle al cliente que espere.
+          </p>
+          <ol className="mt-3 space-y-3">
+            <Step n={1} title="Cobras igual que siempre">
+              Arriba aparece una franja roja avisando que no hay internet. Cobras normal y, en vez del folio, la venta
+              recibe un <strong>número provisional</strong> (P-1, P-2…). El ticket que imprimas lleva ese número.
+            </Step>
+            <Step n={2} title="Una franja te dice cuántas faltan">
+              «3 ventas sin subir». No se puede quitar a propósito: mientras esté ahí, hay dinero cobrado que el
+              sistema todavía no tiene registrado.
+            </Step>
+            <Step n={3} title="Al volver la señal, se suben solas">
+              En orden, una por una, y cada venta queda con la <strong>hora en que la cobraste</strong>, no la de la
+              subida — así tus reportes por hora siguen siendo verdad. Ya con su folio real, la puedes reimprimir desde
+              Tickets.
+            </Step>
+          </ol>
+          <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>No puedes cerrar la caja con ventas sin subir.</strong> El botón se bloquea: si cortaras ahora,
+              esas ventas entrarían al turno siguiente y tu corte no cuadraría con el efectivo del cajón.
+            </li>
+            <li>
+              <strong>Si cambiaste un precio</strong> mientras había ventas esperando, el sistema te avisa cuál se
+              registró distinta a lo que cobraste («cobraste $85 y se registró $87»). No lo corrige solo: te lo enseña
+              para que lo tomes en cuenta al cuadrar.
+            </li>
+            <li>
+              <strong>Si un producto se desactivó</strong> mientras la venta esperaba, esa venta queda marcada
+              «necesita tu revisión» —con lo que cobraste, para no perder el dato— y <em>no</em> detiene a las demás.
+              La cobras de nuevo desde el POS y la quitas de la lista.
+            </li>
+            <li>
+              <strong>Tope de 30 ventas.</strong> Después de eso el POS se niega a seguir capturando a ciegas: es
+              momento de recuperar la señal (mover la tablet, prender el celular como módem).
+            </li>
+            <li>
+              <strong>Lo que NO se puede sin internet</strong>: abrir o cerrar la caja, cancelar una venta, canjear un
+              premio de lealtad, ni entrar al panel de administración. Y si <em>cierras la app</em> sin señal, no se
+              podrá abrir de nuevo hasta que vuelva (las ventas ya guardadas no se pierden: siguen ahí esperando).
+            </li>
+          </ul>
         </>
       ),
     },

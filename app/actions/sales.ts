@@ -44,6 +44,8 @@ const createTicketSchema = z.object({
   /** Propina: se cobra encima del total y no cuenta como venta. */
   tip: z.number().finite().nonnegative().max(99_999).optional(),
   discount: discountSchema.optional(),
+  /** Hora REAL de la venta si se capturó sin internet (ISO). El servidor la valida. */
+  capturedAt: z.string().datetime().optional(),
   /** La venta va para llevar: el SERVIDOR decide el cargo desde los ajustes. */
   takeout: z.boolean().optional(),
   /** Cliente de la tarjeta de sellos adjunto a esta venta (opcional). */
@@ -90,7 +92,7 @@ export async function createTicket(
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, loyaltyCustomerId, loyaltyRedeem } = parsed.data
+  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, capturedAt, loyaltyCustomerId, loyaltyRedeem } = parsed.data
 
   const businessError = await checkExpectedBusiness(expectedBusinessId)
   if (businessError) {
@@ -109,6 +111,7 @@ export async function createTicket(
     p_loyalty_customer: loyaltyCustomerId,
     p_loyalty_redeem: loyaltyRedeem,
     p_takeout: takeout ?? false,
+    p_captured_at: capturedAt,
   })
 
   if (error) {

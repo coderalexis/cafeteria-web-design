@@ -106,6 +106,10 @@ import { CartLineDialog } from "./cart-line-dialog"
 import { TextSizeControl } from "./text-size-control"
 import { usePosTextSize } from "./use-text-size"
 import { usePosCart } from "./use-pos-cart"
+import { useOfflineQueue } from "./use-offline-queue"
+import { QueueBanner } from "./queue-banner"
+import { QueueReviewDialog } from "./queue-review-dialog"
+import { QUEUE_MAX, serializeLines } from "./queue"
 import {
   cartItemCount,
   cartSubtotal,
@@ -571,6 +575,10 @@ export default function POSClient({
   // Aquí y no en el control: el control vive dentro del menú, que casi siempre
   // está cerrado, y el tamaño guardado debe aplicarse al abrir el POS.
   const textSize = usePosTextSize()
+  // Cola de ventas sin internet (docs/cola-sin-internet.md). Vive aquí y no
+  // dentro de un componente hijo porque cobrar la usa y el aviso la muestra.
+  const cola = useOfflineQueue(businessId)
+  const [showQueueReview, setShowQueueReview] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   // "Más opciones": nota, «Para llevar» y descuento son de cada tantas ventas,
   // no de cada venta — y eran las que obligaban a desplazar dentro del bloque
@@ -1014,16 +1022,49 @@ export default function POSClient({
         toast.error(result.error || "Error al registrar la venta")
       }
     } catch {
-      const offline = typeof navigator !== "undefined" && !navigator.onLine
-      toast.error(
-        offline
-          ? "Sin conexión. El pedido queda guardado aquí; vuelve a pulsar Cobrar cuando regrese el internet."
-          : "Error de conexión al registrar la venta. Intenta de nuevo.",
-      )
+      // No llegó al servidor: en vez de dejar al cajero con la fila parada,
+      // la venta se guarda en la cola con SU MISMO clientRef y se sube sola
+      // al volver la señal. La idempotencia de create_ticket hace que
+      // reenviarla sea inofensivo aunque en realidad sí hubiera entrado.
+      const provisional = cola.encolar({
+        clientRef: saleRef,
+        capturedAt: Date.now(),
+        items: lines.map((line) => ({
+          variant_id: getLineVariantId(line) ?? "",
+          quantity: line.quantity,
+          notes: line.notes.trim() || undefined,
+          modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
+        })),
+        paymentMethod,
+        notes: ticketNotes.trim() || undefined,
+        tip: tipAmount > 0 ? tipAmount : undefined,
+        discount: discount ?? undefined,
+        cashReceived: cashReceived ?? undefined,
+        takeout: esParaLlevar || undefined,
+        loyaltyCustomerId: loyaltyCustomer?.id,
+        // El total de la VENTA, sin propina: es lo que el servidor
+        // recalcula y devuelve como `total`. Comparar contra `due` marcaba
+        // como «cambió un precio» cualquier venta con propina.
+        chargedTotal: total,
+        lines: serializeLines(lines, getLinePrice, getLineLabel),
+      })
+      if (provisional) {
+        toast.success(`Venta guardada sin conexión · ${provisional}. Se subirá sola al volver el internet.`)
+        vibra(30)
+        clearTip()
+        setLoyaltyCustomer(null)
+        setLoyaltyRedeem(false)
+        resetAfterSale()
+        setCartOpen(false)
+      } else {
+        toast.error(
+          `Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`,
+        )
+      }
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -2028,6 +2069,17 @@ export default function POSClient({
     <div className="flex h-[100dvh] flex-col bg-stone-50 overflow-hidden">
       {/* Aviso de fin de prueba: arriba de todo, para que nadie lo descubra con la caja abierta. */}
       <TrialBanner trialEndsAt={appCtx.business?.trialEndsAt ?? null} />
+      {/* Ventas por subir: arriba de todo y sin forma de descartarlo — una
+          cola olvidada es dinero cobrado que no está registrado. */}
+      <QueueBanner
+        state={cola.state}
+        pendientes={cola.pendientes}
+        porRevisar={cola.porRevisar}
+        subiendo={cola.subiendo}
+        onSubir={() => void cola.subir()}
+        onRevisar={() => setShowQueueReview(true)}
+        onCerrarDiferencias={cola.limpiarDiferencias}
+      />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
       <OfflineBanner />
       <PosLockScreen
@@ -2592,12 +2644,19 @@ export default function POSClient({
       ))}
 
       {/* ── Dialogs ── */}
+      <QueueReviewDialog
+        open={showQueueReview}
+        onOpenChange={setShowQueueReview}
+        state={cola.state}
+        onQuitar={cola.quitar}
+      />
       <CashSessionDialog
         open={showCashDialog}
         onOpenChange={setShowCashDialog}
         session={openSession}
         parkedCount={parkedEnabled ? parked.orders.length : 0}
         cardFeePct={cardFeePct}
+        pendingUploads={cola.pendientes + cola.porRevisar}
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />

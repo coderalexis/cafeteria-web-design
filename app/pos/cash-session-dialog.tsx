@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Lock, Unlock, Printer, Wallet, ArrowDownToLine, ArrowUpFromLine, Plus } from "lucide-react"
+import { Lock, Unlock, Printer, Wallet, ArrowDownToLine, ArrowUpFromLine, Plus, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,6 +34,8 @@ interface Props {
   parkedCount?: number
   /** Comisión de la terminal (%): solo para mostrar el neto de tarjeta. */
   cardFeePct?: number
+  /** Ventas capturadas sin internet que aún no llegan al servidor. */
+  pendingUploads?: number
 }
 
 const FLOAT_PRESETS = [0, 200, 500, 1000]
@@ -43,12 +45,12 @@ function parseMoney(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
-export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0, cardFeePct = 0 }: Props) {
+export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0, cardFeePct = 0, pendingUploads = 0 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         {session ? (
-          <CloseSessionForm session={session} parkedCount={parkedCount} cardFeePct={cardFeePct} onDone={() => onOpenChange(false)} />
+          <CloseSessionForm session={session} parkedCount={parkedCount} cardFeePct={cardFeePct} pendingUploads={pendingUploads} onDone={() => onOpenChange(false)} />
         ) : (
           <OpenSessionForm onDone={() => onOpenChange(false)} />
         )}
@@ -160,11 +162,13 @@ function CloseSessionForm({
   session,
   parkedCount,
   cardFeePct = 0,
+  pendingUploads = 0,
   onDone,
 }: {
   session: OpenSession
   parkedCount: number
   cardFeePct?: number
+  pendingUploads?: number
   onDone: () => void
 }) {
   const router = useRouter()
@@ -523,18 +527,34 @@ function CloseSessionForm({
             />
           </div>
 
+          {/* Con ventas sin subir el corte se BLOQUEA: si se cerrara ahora,
+              esas ventas caerían en el turno siguiente y este corte quedaría
+              corto contra el efectivo que sí está en el cajón. Una regla
+              simple en vez de un problema de conciliación. */}
+          {pendingUploads > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p>
+                <strong>
+                  Hay {pendingUploads} venta{pendingUploads === 1 ? "" : "s"} sin subir.
+                </strong>{" "}
+                Súbelas antes de cerrar: si no, entrarían al turno siguiente y este corte no cuadraría con el efectivo
+                del cajón.
+              </p>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button
               variant="outline"
               className="flex-1 h-11"
-              disabled={counted === null || isSubmitting}
+              disabled={counted === null || isSubmitting || pendingUploads > 0}
               onClick={() => submit(false)}
             >
               Cerrar sin imprimir
             </Button>
             <Button
               className="flex-1 h-11 bg-red-600 hover:bg-red-700 text-white gap-2"
-              disabled={counted === null || isSubmitting}
+              disabled={counted === null || isSubmitting || pendingUploads > 0}
               onClick={() => submit(true)}
             >
               <Printer className="h-4 w-4" />

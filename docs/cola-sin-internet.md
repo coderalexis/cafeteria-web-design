@@ -1,7 +1,10 @@
 # Diseño: vender sin internet (cola de ventas)
 
-> Documento de diseño — **no implementado**. Escrito antes de tocar código para
-> que las decisiones difíciles se tomen en frío y no a media implementación.
+> Documento de diseño. La **Fase 1 está IMPLEMENTADA** (migración 29
+> `p8_hora_de_captura` + `app/pos/queue.ts`, `use-offline-queue.ts`,
+> `queue-banner.tsx`, `queue-review-dialog.tsx`). Las fases 2 y 3 siguen sin
+> hacerse. Escrito antes de tocar código para que las decisiones difíciles se
+> tomaran en frío — y se respetaron todas al implementar.
 
 ## El problema
 
@@ -33,7 +36,7 @@ Lo que ya tenemos a favor:
 
 ## Fases
 
-### Fase 1 — Cola con la página viva (la primera que vale la pena)
+### Fase 1 — Cola con la página viva ✅ IMPLEMENTADA
 
 Cubre el caso real más común: el internet se cae **mientras el POS está
 abierto**. No sobrevive a cerrar la pestaña sin conexión (eso es Fase 2).
@@ -115,7 +118,7 @@ lo necesita. Documentado solo para decir explícitamente que **no** es el plan.
 Casi nada — esa es la gracia:
 
 - `create_ticket`: **sin cambios**. La idempotencia ya está.
-- Opcional (recomendado): aceptar `p_captured_at timestamptz` para que el
+- `p_captured_at timestamptz` — HECHO (migración 29, `create_ticket` v12): el
   ticket registre la hora real de la venta y no la de la subida — el reporte
   por horas y el día de operación lo agradecen. Validado: no futuro, no más
   de 24 h atrás, dentro del turno de la caja abierta. Default null =
@@ -130,3 +133,31 @@ retoma sin duplicar (verificar por `client_ref` en la base). Cambiar un
 precio con cola pendiente → aparece en la lista de diferencias. Desactivar un
 producto → esa venta queda «necesita revisión» y las demás pasan. Intentar el
 corte con cola → bloqueado. Venta 31 → rechazada con mensaje claro.
+
+
+---
+
+## Lo que cambió al implementar (2026-08-28)
+
+Se respetaron las cuatro decisiones del diseño. Dos precisiones que solo
+aparecen al escribir el código:
+
+- **`chargedTotal` es el total SIN propina.** Comparar contra `due`
+  (total + propina) marcaba como «cambió un precio» cualquier venta con
+  propina — un falso positivo que habría enseñado al cajero a ignorar el
+  aviso. Lo cazó la verificación, no el diseño.
+- **Los folios provisionales cuentan también los ya subidos.** Si se reusara
+  P-1 tras subir el primero, dos tickets impresos distintos llevarían el
+  mismo número y cuadrar sería imposible.
+- **Distinguir error de RED de error de CONTENIDO** (`isNetworkError`) resultó
+  ser la pieza que evita los dos desastres opuestos: reintentar en bucle algo
+  que el servidor siempre rechazará (cola atorada para siempre) o mandar a
+  revisión manual lo que era un bache de señal (trabajo de a gratis).
+
+**Verificado** con el plan de arriba: 4 ventas capturadas con la red caída
+subieron solas y en orden al reconectar (folios 1–4, cero duplicados por
+`client_ref`, y cada una con la HORA DE SU CAPTURA, no la de la subida);
+cambiar un precio con cola pendiente produjo el aviso de diferencia
+(cobró $20, registró $25); una venta con la variante desactivada quedó en
+«necesita revisión» con el motivo del servidor y sin frenar a las demás; y el
+corte quedó bloqueado con los dos botones deshabilitados y su explicación.

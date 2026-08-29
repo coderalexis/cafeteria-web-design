@@ -1,0 +1,21 @@
+-- ============================================================
+-- 29 · P8a — Hora de captura para la cola sin internet
+--            (aplicada como p8_hora_de_captura)
+-- ============================================================
+-- `create_ticket` v12 acepta `p_captured_at timestamptz default null`.
+-- Una venta capturada sin señal y subida después debe registrar la hora REAL
+-- de la venta: si se quedara con la de la subida, el reporte por horas y el
+-- «día de operación» mentirían (una venta de las 11 pm subida a las 8 am
+-- caería en el día siguiente).
+--
+-- Tres candados, porque una hora que manda el cliente es un vector:
+--   · nada del futuro (>2 min de margen por relojes desfasados),
+--   · nada de hace más de 24 h,
+--   · nada anterior al turno de la caja ABIERTA — una venta de un corte ya
+--     cerrado no puede colarse en el actual; se rechaza con mensaje claro y
+--     el POS la manda a «necesita revisión» para recobrarla a mano.
+--
+-- default null = todo lo existente sigue igual. Ensayado con rollback:
+-- captura respetada, default now(), futuro y turno-anterior rechazados.
+-- El cuerpo vive en la migración (parche por anclas sobre
+-- pg_get_functiondef, cada ancla verificada exactamente una vez).

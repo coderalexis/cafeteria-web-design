@@ -224,7 +224,9 @@ export function OfflineBanner() {
     const goOffline = () => setOffline(true)
     const goOnline = () => {
       setOffline(false)
-      toast.success("Volvió el internet. Si tenías una venta pendiente, pulsa Cobrar de nuevo.")
+      // Sin promesas sobre la cola: de eso avisa la franja de ventas por
+      // subir, que sabe si de verdad hay algo esperando.
+      toast.success("Volvió el internet.")
     }
     window.addEventListener("offline", goOffline)
     window.addEventListener("online", goOnline)
@@ -237,7 +239,7 @@ export function OfflineBanner() {
   if (!offline) return null
   return (
     <div className="fixed inset-x-0 top-0 z-[150] bg-red-600 text-white text-sm font-medium text-center px-4 py-2 shadow">
-      Sin conexión a internet. Puedes seguir armando el pedido; el cobro se hará cuando vuelva la conexión.
+      Sin internet. Puedes seguir cobrando: las ventas se guardan aquí y se suben solas al volver la señal.
     </div>
   )
 }

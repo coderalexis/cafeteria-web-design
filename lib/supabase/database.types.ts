@@ -1013,6 +1013,7 @@ export type Database = {
       }
       create_ticket: {
         Args: {
+          p_captured_at?: string
           p_cash_received?: number
           p_client_ref: string
           p_discount?: Json
