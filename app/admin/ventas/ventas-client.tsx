@@ -2,15 +2,7 @@
 
 import { useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import dynamic from "next/dynamic"
 import {
   Sheet,
   SheetContent,
@@ -39,6 +31,17 @@ import { formatDateString } from "@/lib/dates"
 import { buildTicketLines, printLines, receiptBusinessFrom, receiptFromTicket } from "@/lib/receipt"
 import { useBusiness } from "@/components/business-provider"
 import type { TicketRecord } from "@/lib/tickets"
+
+/**
+ * La gráfica llega DESPUÉS. Son ~100 KB de JavaScript (recharts) que antes
+ * viajaban con la primera carga aunque estén abajo del pliegue: quien entra a
+ * ver la tabla de ventas ya no los espera. El hueco gris del tamaño exacto
+ * evita que la página brinque cuando la gráfica aterriza.
+ */
+const RevenueBarChart = dynamic(() => import("@/components/revenue-bar-chart"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse rounded-lg bg-stone-100" />,
+})
 import { toast } from "sonner"
 import {
   Receipt,
@@ -275,27 +278,12 @@ export default function VentasClient({
               <p className="text-xs text-stone-400">{chartData.length} días</p>
             </div>
             <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e7e5e4" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 11, fill: "#78716c" }}
-                    tickLine={false}
-                    axisLine={false}
-                    interval={chartData.length > 14 ? Math.ceil(chartData.length / 10) - 1 : 0}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#78716c" }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={56}
-                    tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `$${v}`)}
-                  />
-                  <Tooltip cursor={{ fill: "#fef3c7", opacity: 0.5 }} content={<DayTooltip />} />
-                  <Bar dataKey="revenue" fill="#d97706" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
+              <RevenueBarChart
+                data={chartData}
+                dataKey="revenue"
+                tooltip={<DayTooltip />}
+                xInterval={chartData.length > 14 ? Math.ceil(chartData.length / 10) - 1 : 0}
+              />
             </div>
           </CardContent>
         </Card>

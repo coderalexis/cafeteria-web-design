@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import dynamic from "next/dynamic"
 import {
   BarChart3,
   TrendingUp,
@@ -28,6 +28,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { formatDateString, type DateString } from "@/lib/dates"
+
+/** Igual que en Ventas: la gráfica (~100 KB de recharts) llega después de la página. */
+const RevenueBarChart = dynamic(() => import("@/components/revenue-bar-chart"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse rounded-lg bg-stone-100" />,
+})
 import { WEEKDAY_LABELS, WEEKDAY_LONG, type MarginReport, type SalesInsights } from "./types"
 
 interface Props {
@@ -321,21 +327,12 @@ export default function AnalisisClient({ insights, margin, error, from, to, toda
               </CardHeader>
               <CardContent>
                 <div className="h-52">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weekdayData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e7e5e4" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#78716c" }} tickLine={false} axisLine={false} />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: "#78716c" }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={56}
-                        tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `$${v}`)}
-                      />
-                      <Tooltip cursor={{ fill: "#fef3c7", opacity: 0.5 }} content={<WeekdayTooltip />} />
-                      <Bar dataKey="avg" fill="#d97706" radius={[4, 4, 0, 0]} maxBarSize={44} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <RevenueBarChart
+                    data={weekdayData}
+                    dataKey="avg"
+                    tooltip={<WeekdayTooltip />}
+                    maxBarSize={44}
+                  />
                 </div>
               </CardContent>
             </Card>

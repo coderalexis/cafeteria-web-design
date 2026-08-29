@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from "react"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS, formatDate } from "@/lib/format"
 import {
   buildKitchenLines,
@@ -10,7 +10,8 @@ import {
   receiptBusinessFrom,
   type ReceiptData,
 } from "@/lib/receipt"
-import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from "framer-motion"
+import { LazyMotion, m, AnimatePresence, useAnimationControls, useReducedMotion } from "framer-motion"
+import cargarAnimaciones from "./motion-features"
 import {
   Trash2,
   Coffee,
@@ -498,6 +499,129 @@ function ReceiptView({
 /* ------------------------------------------------------------------ */
 /*  Main POS Component                                                 */
 /* ------------------------------------------------------------------ */
+/**
+ * Una tarjeta de producto de la rejilla, memoizada.
+ *
+ * La rejilla tiene ~90 tarjetas y el POS redibuja el componente entero en cada
+ * toque del carrito: agregar algo, subir una cantidad, escribir una nota. Sin
+ * `memo`, cada uno de esos toques volvía a construir las noventa. En una
+ * laptop no se nota; en el Android de una cafetería es la diferencia entre
+ * fluido y trabado, y justo encima corre la animación de vuelo al carrito.
+ *
+ * Para que el `memo` sirva de algo, TODAS las props tienen que ser estables:
+ * `product` viene del servidor y no cambia de referencia, `accent` y
+ * `subcategory` son textos, `abierto` es un booleano (así solo se redibuja la
+ * tarjeta cuyo selector de tamaño se abre), y las tres funciones están
+ * envueltas en `useCallback` arriba. Si alguna dejara de serlo, esto seguiría
+ * funcionando pero dejaría de ahorrar nada.
+ */
+const ProductCard = memo(function ProductCard({
+  product,
+  accent,
+  subcategory,
+  abierto,
+  onInfo,
+  onMarcarOrigen,
+  onElegir,
+  onElegirTamano,
+}: {
+  product: Product
+  accent: string | undefined
+  subcategory: string
+  abierto: boolean
+  onInfo: (p: Product) => void
+  onMarcarOrigen: (e: React.MouseEvent<HTMLElement>) => void
+  onElegir: (p: Product) => void
+  onElegirTamano: (p: Product, size?: SizeOption) => void
+}) {
+  return (
+    <div className="relative">
+      {/* La "i" va FUERA del botón del producto —un botón dentro de otro no es
+          HTML válido— y encima de él con z-10, así que tocarla no agrega el
+          producto. */}
+      {product.description && (
+        <button
+          type="button"
+          onClick={() => onInfo(product)}
+          aria-label={`Qué lleva ${product.name}`}
+          title={`Qué lleva ${product.name}`}
+          className="absolute right-0 top-0 z-10 rounded-full p-2 text-stone-300 transition-colors hover:bg-amber-50 hover:text-amber-700"
+        >
+          <Info className="h-4 w-4" />
+        </button>
+      )}
+      <m.button
+        whileTap={{ scale: 0.95 }}
+        onClick={(e) => {
+          onMarcarOrigen(e)
+          onElegir(product)
+        }}
+        className={`w-full text-left rounded-xl border transition-all duration-150 overflow-hidden ${
+          abierto
+            ? "border-amber-400 bg-amber-50 shadow-md"
+            : "border-stone-200 bg-white hover:border-amber-300 hover:shadow-sm"
+        }`}
+      >
+        <div className="p-3 relative">
+          {accent && <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />}
+          <p
+            className={`text-sm font-semibold leading-tight text-stone-800 line-clamp-2 ${
+              product.description ? "pr-5" : ""
+            }`}
+          >
+            {product.name}
+          </p>
+          {product.description && product.description !== subcategory && (
+            <p className="text-xs text-stone-400 mt-0.5 truncate">{product.description}</p>
+          )}
+          <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
+            {getDisplayPrice(product)}
+            {product.modifierGroups && (
+              <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
+            )}
+          </p>
+        </div>
+      </m.button>
+
+      {/* Selector de tamaño – justo debajo de la tarjeta */}
+      <AnimatePresence>
+        {abierto && product.sizes && (
+          <m.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-1.5 mt-1.5">
+              {product.sizes.map((size, index) => (
+                <m.button
+                  key={size.label}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={(e) => {
+                    onMarcarOrigen(e)
+                    onElegirTamano(product, size)
+                  }}
+                  className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
+                >
+                  {index < 9 && (
+                    <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
+                      {index + 1}
+                    </Kbd>
+                  )}
+                  <span className="block text-xs font-bold">{size.label}</span>
+                  <span className="block text-[10px] opacity-80">{size.oz}</span>
+                  <span className="block text-xs font-bold mt-0.5">${size.price}</span>
+                </m.button>
+              ))}
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+})
+
 export default function POSClient({
   categories,
   products,
@@ -753,10 +877,13 @@ export default function POSClient({
   const barDip = useAnimationControls()
   const barTargetRef = useRef<HTMLButtonElement>(null)
   const bagTargetRef = useRef<HTMLSpanElement>(null)
-  const markFlyOrigin = (e: React.MouseEvent<HTMLElement>) => {
+  // `useCallback` sin dependencias: solo escribe en un ref. Estable a propósito
+  // —viaja como prop a cada tarjeta de producto, y una función nueva en cada
+  // render volvería inútil el `memo` de ProductCard.
+  const markFlyOrigin = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
     flyOriginRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-  }
+  }, [])
 
   useEffect(() => {
     const prev = prevLinesRef.current
@@ -828,19 +955,31 @@ export default function POSClient({
   }, [categories])
 
   /* filtered & grouped products */
+  // Filtrar y agrupar ~90 productos es trabajo que solo cambia si cambia la
+  // búsqueda o la categoría. Sin `useMemo` se rehacía en CADA render —y el
+  // carrito redibuja el componente entero en cada toque—, así que agregar algo
+  // volvía a recorrer y reagrupar toda la carta sin razón.
   const searchLower = searchQuery.toLowerCase().trim()
-  const filtered = products.filter((p) => {
-    const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower)
-    const matchesCategory = searchLower || activeCategory === "todos" || p.category === activeCategory
-    return matchesSearch && matchesCategory
-  })
+  const filtered = useMemo(
+    () =>
+      products.filter((p) => {
+        const matchesSearch = !searchLower || p.name.toLowerCase().includes(searchLower)
+        const matchesCategory = searchLower || activeCategory === "todos" || p.category === activeCategory
+        return matchesSearch && matchesCategory
+      }),
+    [products, searchLower, activeCategory],
+  )
 
-  const grouped = filtered.reduce<Record<string, Product[]>>((acc, p) => {
-    const key = p.subcategory
-    if (!acc[key]) acc[key] = []
-    acc[key].push(p)
-    return acc
-  }, {})
+  const grouped = useMemo(
+    () =>
+      filtered.reduce<Record<string, Product[]>>((acc, p) => {
+        const key = p.subcategory
+        if (!acc[key]) acc[key] = []
+        acc[key].push(p)
+        return acc
+      }, {}),
+    [filtered],
+  )
 
   const subtotal = cartSubtotal(lines)
   const discountAmount = computeDiscount(subtotal, discount)
@@ -1080,13 +1219,19 @@ export default function POSClient({
     [addLine],
   )
 
-  const handleProductClick = (product: Product) => {
-    if (product.sizes && product.sizes.length > 0) {
-      setSizePickerFor(sizePickerFor === product.id ? null : product.id)
-    } else {
-      chooseProduct(product)
-    }
-  }
+  // La actualización va en forma de función para NO depender de `sizePickerFor`:
+  // si dependiera, esta función cambiaría cada vez que se abre o cierra un
+  // selector de tamaño y volvería a redibujar las ~90 tarjetas.
+  const handleProductClick = useCallback(
+    (product: Product) => {
+      if (product.sizes && product.sizes.length > 0) {
+        setSizePickerFor((actual) => (actual === product.id ? null : product.id))
+      } else {
+        chooseProduct(product)
+      }
+    },
+    [chooseProduct],
+  )
 
   const focusCash = useCallback(() => {
     setPaymentMethod("efectivo")
@@ -1251,7 +1396,7 @@ export default function POSClient({
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
           <div className="flex min-w-0 items-center gap-2">
             {/* key=cartPulse: al aterrizar un vuelo se remonta y rebota */}
-            <motion.span
+            <m.span
               key={cartPulse}
               ref={bagTargetRef}
               initial={{ scale: cartPulse ? 1.35 : 1 }}
@@ -1260,7 +1405,7 @@ export default function POSClient({
               className="inline-flex"
             >
               <ShoppingBag className="h-5 w-5 text-amber-700" />
-            </motion.span>
+            </m.span>
             <h2 className="truncate text-lg font-bold text-stone-800">Venta Actual</h2>
           </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -1425,7 +1570,7 @@ export default function POSClient({
           ) : (
             <AnimatePresence mode="popLayout">
               {lines.map((line) => (
-                <motion.div
+                <m.div
                   key={line.lineId}
                   layout
                   initial={{ opacity: 0, x: 20 }}
@@ -1448,7 +1593,7 @@ export default function POSClient({
                       <Trash2 className="h-4 w-4" />
                     </span>
                   </div>
-                  <motion.div
+                  <m.div
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.9}
@@ -1732,8 +1877,8 @@ export default function POSClient({
                       />
                     </div>
                   )}
-                  </motion.div>
-                </motion.div>
+                  </m.div>
+                </m.div>
               ))}
             </AnimatePresence>
           )}
@@ -2066,6 +2211,12 @@ export default function POSClient({
   )
 
   return (
+    // `LazyMotion` con carga diferida: el POS aparece con el motor mínimo de
+    // animación y las capacidades completas (arrastre incluido) llegan un
+    // instante después. Por eso los componentes de aquí abajo son `m.*` y no
+    // `motion.*`: usar `motion.*` dentro de este árbol funcionaría igual, pero
+    // volvería a bajar la librería entera de entrada y anularía el ahorro.
+    <LazyMotion features={cargarAnimaciones}>
     <div className="flex h-[100dvh] flex-col bg-stone-50 overflow-hidden">
       {/* Aviso de fin de prueba: arriba de todo, para que nadie lo descubra con la caja abierta. */}
       <TrialBanner trialEndsAt={appCtx.business?.trialEndsAt ?? null} />
@@ -2326,7 +2477,7 @@ export default function POSClient({
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {favorites.map(({ product, size }) => (
-                    <motion.button
+                    <m.button
                       key={size?.variantId ?? product.id}
                       whileTap={{ scale: 0.95 }}
                       onClick={(e) => {
@@ -2342,7 +2493,7 @@ export default function POSClient({
                       <span className="block text-xs font-bold text-amber-700">
                         {size ? formatCurrency(size.price) : getDisplayPrice(product)}
                       </span>
-                    </motion.button>
+                    </m.button>
                   ))}
                 </div>
               </div>
@@ -2360,97 +2511,19 @@ export default function POSClient({
                     pantallas grandes sí caben 6 columnas, donde antes el
                     grid-cols-4 fijo desperdiciaba el ancho. */}
                 <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(9rem,1fr))]">
-                  {items.map((product) => {
-                    const accent = colorClasses(categoryColor[product.category])?.accent
-                    return (
-                      <div key={product.id} className="relative">
-                        {/* La "i" va FUERA del botón del producto —un botón
-                            dentro de otro no es HTML válido— y encima de él con
-                            z-10, así que tocarla no agrega el producto. */}
-                        {product.description && (
-                          <button
-                            type="button"
-                            onClick={() => setInfoProduct(product)}
-                            aria-label={`Qué lleva ${product.name}`}
-                            title={`Qué lleva ${product.name}`}
-                            className="absolute right-0 top-0 z-10 rounded-full p-2 text-stone-300 transition-colors hover:bg-amber-50 hover:text-amber-700"
-                          >
-                            <Info className="h-4 w-4" />
-                          </button>
-                        )}
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          onClick={(e) => {
-                            markFlyOrigin(e)
-                            handleProductClick(product)
-                          }}
-                          className={`w-full text-left rounded-xl border transition-all duration-150 overflow-hidden ${
-                            sizePickerFor === product.id
-                              ? "border-amber-400 bg-amber-50 shadow-md"
-                              : "border-stone-200 bg-white hover:border-amber-300 hover:shadow-sm"
-                          }`}
-                        >
-                          <div className="p-3 relative">
-                            {accent && (
-                              <span aria-hidden className={`absolute left-0 top-0 bottom-0 w-1 ${accent}`} />
-                            )}
-                            <p
-                              className={`text-sm font-semibold leading-tight text-stone-800 line-clamp-2 ${
-                                product.description ? "pr-5" : ""
-                              }`}
-                            >
-                              {product.name}
-                            </p>
-                            {product.description && product.description !== subcategory && (
-                              <p className="text-xs text-stone-400 mt-0.5 truncate">{product.description}</p>
-                            )}
-                            <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
-                              {getDisplayPrice(product)}
-                              {product.modifierGroups && (
-                                <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
-                              )}
-                            </p>
-                          </div>
-                        </motion.button>
-
-                        {/* Size picker – inline below the card */}
-                        <AnimatePresence>
-                          {sizePickerFor === product.id && product.sizes && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.15 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="flex gap-1.5 mt-1.5">
-                                {product.sizes.map((size, index) => (
-                                  <motion.button
-                                    key={size.label}
-                                    whileTap={{ scale: 0.92 }}
-                                    onClick={(e) => {
-                                      markFlyOrigin(e)
-                                      chooseProduct(product, size)
-                                    }}
-                                    className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
-                                  >
-                                    {index < 9 && (
-                                      <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
-                                        {index + 1}
-                                      </Kbd>
-                                    )}
-                                    <span className="block text-xs font-bold">{size.label}</span>
-                                    <span className="block text-[10px] opacity-80">{size.oz}</span>
-                                    <span className="block text-xs font-bold mt-0.5">${size.price}</span>
-                                  </motion.button>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    )
-                  })}
+                  {items.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      accent={colorClasses(categoryColor[product.category])?.accent}
+                      subcategory={subcategory}
+                      abierto={sizePickerFor === product.id}
+                      onInfo={setInfoProduct}
+                      onMarcarOrigen={markFlyOrigin}
+                      onElegir={handleProductClick}
+                      onElegirTamano={chooseProduct}
+                    />
+                  ))}
                 </div>
               </div>
             ))}
@@ -2470,7 +2543,7 @@ export default function POSClient({
       {/* ───── Barra inferior + hoja del carrito — móvil ───── */}
       {isMobile && (
         <>
-          <motion.div
+          <m.div
             animate={barDip}
             className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
           >
@@ -2539,7 +2612,7 @@ export default function POSClient({
                 )}
               </div>
             )}
-          </motion.div>
+          </m.div>
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             {/* El hueco de arriba es deliberado y se decidió DOS veces: se
                 probó a pantalla completa y el usuario lo regresó — la rendija
@@ -2589,7 +2662,7 @@ export default function POSClient({
         // La estela nace invisible: con delay de framer el elemento ya existe
         // en el DOM, y sin esto se verían tres puntos apilados en el origen.
         return FLIGHT_PATH_SUPPORTED ? (
-          <motion.span
+          <m.span
             key={flight.id}
             {...common}
             // offset-anchor por defecto centra la caja sobre el trazo: sin
@@ -2602,7 +2675,7 @@ export default function POSClient({
             animate={{ offsetDistance: "100%", scale: 0.4, opacity: trail ? 0.35 : 0.9 }}
           />
         ) : (
-          <motion.span
+          <m.span
             key={flight.id}
             {...common}
             // Centrado con márgenes y no con translate de Tailwind: framer
@@ -2623,14 +2696,14 @@ export default function POSClient({
           par se retira cuando termina el «+1», que es el que dura más. */}
       {landings.map((landing) => (
         <span key={landing.id} className="pointer-events-none">
-          <motion.span
+          <m.span
             className="pointer-events-none fixed z-[60] h-11 w-11 rounded-full border-[3px] border-amber-600"
             style={{ left: landing.x - 22, top: landing.y - 22 }}
             initial={{ scale: 0.25, opacity: 0.8 }}
             animate={{ scale: 1, opacity: 0 }}
             transition={{ duration: 0.42, ease: "easeOut" }}
           />
-          <motion.span
+          <m.span
             className="pointer-events-none fixed z-[61] flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-700 px-1 text-[11px] font-bold text-white"
             style={{ left: landing.x - 10, top: landing.y - 40 }}
             initial={{ scale: 0.4, opacity: 0 }}
@@ -2639,7 +2712,7 @@ export default function POSClient({
             onAnimationComplete={() => setLandings((cur) => cur.filter((x) => x.id !== landing.id))}
           >
             +1
-          </motion.span>
+          </m.span>
         </span>
       ))}
 
@@ -2774,5 +2847,6 @@ export default function POSClient({
       </Dialog>
       </div>
     </div>
+    </LazyMotion>
   )
 }
