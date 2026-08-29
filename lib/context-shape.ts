@@ -149,6 +149,12 @@ export function homePathFor(ctx: AppContext | null): string {
     return ctx.memberships.length === 0 && ctx.isPlatformAdmin ? "/super" : "/seleccionar-negocio"
   }
   if (ctx.business.status === "suspended") return "/suspendido"
-  if (ctx.business.isTemplate) return "/admin"
+  // Una plantilla no vende, así que su sitio es el panel. Pero al panel solo
+  // entra un dueño o administrador, y un cajero dentro de una plantilla no
+  // tenía a dónde ir: se le mandaba a /admin, el panel lo rebotaba por no ser
+  // encargado, y de vuelta — un bucle infinito que el navegador acababa
+  // cortando con una pantalla de error. El selector de cafetería es la salida
+  // honesta: ahí puede cambiarse a otra o cerrar sesión.
+  if (ctx.business.isTemplate) return isManager(ctx.role) ? "/admin" : "/seleccionar-negocio"
   return isManager(ctx.role) ? "/admin" : "/pos"
 }
