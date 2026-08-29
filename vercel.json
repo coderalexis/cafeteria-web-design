@@ -8,5 +8,8 @@
       "path": "/api/pruebas",
       "schedule": "0 15 * * *"
     }
+  ],
+  "regions": [
+    "pdx1"
   ]
 }

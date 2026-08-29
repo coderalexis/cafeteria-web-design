@@ -80,26 +80,37 @@ export async function login(formData: FormData): Promise<ActionResult> {
     return { error: LOGIN_ERROR }
   }
 
+  // Cada consulta a Supabase es un viaje de ida y vuelta por la red, y este
+  // punto es el más caro del sistema: entre el middleware y esta action se
+  // encadenaban seis. Con arranque en frío eso rebasaba el límite de tiempo
+  // de la función y devolvía 504 (le pasó a una cafetería real). Por eso
+  // ahora se REUTILIZA lo que cada llamada ya devuelve en vez de volver a
+  // preguntar: set_active_business responde el contexto completo, igual que
+  // my_context.
+  let ctx = null as ReturnType<typeof parseContext>
+
   // Si entró por café, ese pasa a ser el negocio activo. Si entró por correo
   // e indicó un café al que pertenece, también.
   if (!businessId && wantedSlug) {
     const { data: ctx0 } = await supabase.rpc("my_context")
-    const membership = parseContext(ctx0)?.memberships.find((m) => m.slug === wantedSlug)
-    businessId = membership?.id ?? null
-  }
-  if (businessId) {
-    await supabase.rpc("set_active_business", { p_business_id: businessId })
+    ctx = parseContext(ctx0)
+    businessId = ctx?.memberships.find((m) => m.slug === wantedSlug)?.id ?? null
   }
 
-  let { data: ctxJson } = await supabase.rpc("my_context")
-  let ctx = parseContext(ctxJson)
+  if (businessId) {
+    const { data } = await supabase.rpc("set_active_business", { p_business_id: businessId })
+    ctx = parseContext(data)
+  } else if (!ctx) {
+    const { data } = await supabase.rpc("my_context")
+    ctx = parseContext(data)
+  }
 
   // Sin negocio activo pero con una sola membresía → se activa sola.
   if (ctx && !ctx.business && ctx.memberships.length === 1) {
-    ;({ data: ctxJson } = await supabase.rpc("set_active_business", {
+    const { data } = await supabase.rpc("set_active_business", {
       p_business_id: ctx.memberships[0].id,
-    }))
-    ctx = parseContext(ctxJson)
+    })
+    ctx = parseContext(data)
   }
 
   redirect(landingPathFor(ctx))
