@@ -45,12 +45,37 @@ export default async function AdminDashboard() {
   const monthStart = startOfMonth(today)
   const settings = parseBusinessSettings(ctx.business.settings)
 
+  // Checklist de arranque: solo se consulta si no está oculta. Se arma aquí
+  // —antes del await— para que salga en la MISMA tanda que todo lo demás.
+  const checklistCounts = settings.hideChecklist
+    ? Promise.resolve(null)
+    : Promise.all([
+        supabase
+          .from("business_members")
+          .select("*", { count: "exact", head: true })
+          .eq("role", "cajero")
+          .eq("is_active", true),
+        supabase.from("tickets").select("*", { count: "exact", head: true }),
+        supabase.from("cash_sessions").select("*", { count: "exact", head: true }).eq("status", "cerrada"),
+      ])
+
+  // Todo el tablero en UNA sola tanda.
+  //
+  // Antes eran tres esperas encadenadas —conteos, luego comparativos, luego
+  // checklist— aunque ninguna necesitaba el resultado de la anterior: todas
+  // salen del contexto y de las fechas, que ya están en mano. En serie se
+  // pagaba el viaje de ida y vuelta a la base TRES veces seguidas; juntas se
+  // paga una. Es la misma lección del 504: los eslabones en serie se suman.
   const [
     { count: categoryCount },
     { count: productCount },
     { count: variantCount },
     { data: reportData },
     { data: recentTickets },
+    { data: yData },
+    { data: wData },
+    { data: mData },
+    checklistData,
   ] = await Promise.all([
     supabase
       .from("menu_categories")
@@ -67,30 +92,19 @@ export default async function AdminDashboard() {
       .select("id, folio, total, payment_method, created_at, status")
       .order("created_at", { ascending: false })
       .limit(5),
-  ])
-
-  // Comparativo y meta mensual: 3 reportes más, en paralelo.
-  const [{ data: yData }, { data: wData }, { data: mData }] = await Promise.all([
     supabase.rpc("sales_report", { p_from: yesterday, p_to: yesterday }),
     supabase.rpc("sales_report", { p_from: lastWeekDay, p_to: lastWeekDay }),
     supabase.rpc("sales_report", { p_from: monthStart, p_to: today }),
+    checklistCounts,
   ])
+
   const yReport = (yData as unknown as SalesReport | null) ?? null
   const wReport = (wData as unknown as SalesReport | null) ?? null
   const monthRevenue = (mData as unknown as SalesReport | null)?.totals.revenue ?? 0
 
-  // Checklist de arranque: solo consulta si no está oculta.
   let checklist: Array<{ label: string; hint: string; done: boolean; href: string }> | null = null
-  if (!settings.hideChecklist) {
-    const [{ count: cashierCount }, { count: ticketEver }, { count: closedSessions }] = await Promise.all([
-      supabase
-        .from("business_members")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "cajero")
-        .eq("is_active", true),
-      supabase.from("tickets").select("*", { count: "exact", head: true }),
-      supabase.from("cash_sessions").select("*", { count: "exact", head: true }).eq("status", "cerrada"),
-    ])
+  if (checklistData) {
+    const [{ count: cashierCount }, { count: ticketEver }, { count: closedSessions }] = checklistData
     const biz = ctx.business
     checklist = [
       {

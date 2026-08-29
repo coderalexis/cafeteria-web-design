@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation"
+import { cache } from "react"
+import { unstable_cache } from "next/cache"
 import type { Metadata } from "next"
-import { createClient } from "@/lib/supabase/server"
+import { createPublicClient } from "@/lib/supabase/public"
 import { colorClasses } from "@/lib/category-colors"
 import { priceRange, type PublicMenu } from "@/lib/public-menu"
 import { Coffee, MapPin, Phone } from "lucide-react"
@@ -8,15 +10,37 @@ import { Coffee, MapPin, Phone } from "lucide-react"
 /**
  * Menú público para el QR de las mesas. Sin sesión: todo sale del RPC
  * `public_menu`, que solo responde si el dueño activó el menú público.
- * Se regenera cada 5 minutos para no consultar la base en cada escaneo.
+ *
+ * Quien escanea el QR es un cliente en la mesa, no un usuario: no hay nada que
+ * personalizar, así que la carta se guarda un minuto y se sirve a todos.
+ *
+ * Costó dos intentos que el cacheo de verdad ocurriera, y vale documentarlo:
+ *   1. El cliente de Supabase con sesión LEE COOKIES, y en Next eso obliga a
+ *      renderizar en cada visita. Por eso este `revalidate` llevaba tiempo
+ *      escrito sin surtir efecto. De ahí `createPublicClient` (sin cookies).
+ *   2. Aun así seguía consultando la base cada vez: en Next 15 las llamadas
+ *      `fetch` NO se cachean por omisión, y el caché de `fetch` nunca guarda
+ *      peticiones POST —que es lo que manda un RPC—. La solución es cachear
+ *      el DATO (`unstable_cache`), no la petición.
+ *
+ * El precio: un cambio de precio tarda hasta un minuto en verse en la carta
+ * pública. Aceptable para un menú de pared; no lo sería para el POS, que por
+ * eso sigue leyendo la base en vivo.
  */
 export const revalidate = 60
 
-async function getMenu(slug: string): Promise<PublicMenu | null> {
-  const supabase = await createClient()
-  const { data } = await supabase.rpc("public_menu", { p_slug: slug })
-  return (data as unknown as PublicMenu | null) ?? null
-}
+const menuCacheado = unstable_cache(
+  async (slug: string): Promise<PublicMenu | null> => {
+    const supabase = createPublicClient()
+    const { data } = await supabase.rpc("public_menu", { p_slug: slug })
+    return (data as unknown as PublicMenu | null) ?? null
+  },
+  ["menu-publico"],
+  { revalidate: 60 },
+)
+
+/** `cache` de React: el menú se pide dos veces por render (el título y la página). */
+const getMenu = cache((slug: string) => menuCacheado(slug))
 
 export async function generateMetadata({
   params,
