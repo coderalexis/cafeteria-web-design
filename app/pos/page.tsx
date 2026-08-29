@@ -14,8 +14,18 @@ export default async function POSPage() {
   const supabase = await createClient()
 
   /* ── Contexto (negocio activo + rol) ────────────────────────────── */
+  /**
+   * La guardia completa vive AQUÍ, no en el middleware.
+   *
+   * Antes el middleware comprobaba negocio suspendido y plantilla, y esta
+   * página solo miraba que hubiera negocio. Al quitarle esa consulta al
+   * middleware —costaba un viaje a la base en cada petición del sistema— las
+   * tres condiciones se juntaron donde corresponde: junto a los datos que
+   * protegen. `homePathFor` ya sabe a dónde mandar cada caso (sin negocio al
+   * selector, suspendido al aviso, plantilla al panel).
+   */
   const ctx = await getContext()
-  if (!ctx?.business) {
+  if (!ctx?.business || ctx.business.status !== "active" || ctx.business.isTemplate) {
     redirect(homePathFor(ctx))
   }
   const isAdmin = isManager(ctx.role)

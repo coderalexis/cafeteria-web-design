@@ -11,14 +11,23 @@ import {
 /**
  * Contexto de la sesión actual (usuario + negocio activo + rol + membresías),
  * resuelto una sola vez por request gracias a `cache`.
+ *
+ * Un solo viaje a la base. Antes eran dos: primero `getUser()` para confirmar
+ * que había sesión y luego `my_context`. El primero sobraba, y no por
+ * descuido de seguridad sino al revés —quien manda aquí es la BASE—:
+ *
+ *   · Sin sesión, `my_context` responde «permission denied» (solo está
+ *     otorgada a usuarios autenticados) → `data` viene null → esto devuelve
+ *     null, igual que antes.
+ *   · Con un token falsificado, PostgREST lo rechaza al verificar la firma
+ *     («No suitable key or wrong key type») antes de ejecutar nada.
+ *
+ * Las dos rutas están comprobadas contra el proyecto real. Confirmar la sesión
+ * por separado solo agregaba un viaje de ida y vuelta a la respuesta que ya
+ * traía la verdad.
  */
 export const getContext = cache(async (): Promise<AppContext | null> => {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
   const { data } = await supabase.rpc("my_context")
   return parseContext(data)
 })

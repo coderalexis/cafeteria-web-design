@@ -2,6 +2,15 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import type { Database } from "./database.types"
 
+/**
+ * Cliente de Supabase para el middleware, con las cookies conectadas a la
+ * petición y a la respuesta.
+ *
+ * Ya NO comprueba la sesión aquí: de eso se encarga `getClaims()` en
+ * `middleware.ts`, que además refresca el token si venció. Antes esta función
+ * llamaba a `getUser()`, y esa llamada viajaba al servidor de autenticación en
+ * CADA petición del sistema.
+ */
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({ request })
 
@@ -22,8 +31,6 @@ export async function updateSession(request: NextRequest) {
       },
     },
   )
-
-  await supabase.auth.getUser()
 
   return { supabase, response }
 }
