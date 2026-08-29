@@ -87,7 +87,7 @@ export default async function CategoriasPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={createCategory} className="flex flex-wrap items-center gap-3">
+          <ActionForm action={createCategory} className="flex flex-wrap items-center gap-3" successMessage="Categoría creada" resetOnSuccess>
             <Input
               name="name"
               placeholder="Nombre (ej: Bebidas calientes)"

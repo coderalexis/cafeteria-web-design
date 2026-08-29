@@ -476,7 +476,7 @@ function EditProductSheet({
       <ScrollArea className="flex-1">
         <div className="px-6 py-5 space-y-6">
           {/* ── Product info form ── */}
-          <ActionForm action={updateProduct} className="space-y-4">
+          <ActionForm action={updateProduct} className="space-y-4" successMessage="Cambios guardados">
             <input type="hidden" name="id" value={product.id} />
 
             <div className="space-y-2">
@@ -689,6 +689,8 @@ function EditProductSheet({
               <ActionForm
                 action={createVariant}
                 className="grid grid-cols-3 gap-2"
+                successMessage="Variante agregada"
+                resetOnSuccess
               >
                 <input
                   type="hidden"
@@ -856,7 +858,7 @@ function CreateProductSheet({
 
       <ScrollArea className="flex-1">
         <div className="px-6 py-5 space-y-6">
-          <ActionForm action={createProduct} className="space-y-4">
+          <ActionForm action={createProduct} className="space-y-4" successMessage="Producto creado">
             <div className="space-y-2">
               <label className="text-sm font-medium text-stone-700">
                 Nombre *

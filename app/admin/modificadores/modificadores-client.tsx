@@ -61,7 +61,7 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
             <CardTitle className="text-base">Nuevo grupo de opciones</CardTitle>
           </CardHeader>
           <CardContent>
-            <ActionForm action={createModifierGroup} className="grid gap-4 sm:grid-cols-2">
+            <ActionForm action={createModifierGroup} className="grid gap-4 sm:grid-cols-2" successMessage="Grupo creado" resetOnSuccess>
               <div className="space-y-1.5">
                 <label htmlFor="nuevo-grupo" className="text-xs font-medium text-stone-500">
                   ¿Qué se le pregunta al cajero?
@@ -93,7 +93,7 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
       {groups.map((g) => (
         <Card key={g.id} className={g.isActive ? "" : "border-amber-200 bg-amber-50/30"}>
           <CardHeader className="pb-3">
-            <ActionForm action={updateModifierGroup} className="grid gap-4 sm:grid-cols-2">
+            <ActionForm action={updateModifierGroup} className="grid gap-4 sm:grid-cols-2" successMessage="Cambios guardados">
               <input type="hidden" name="id" value={g.id} />
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-stone-500">¿Qué se le pregunta al cajero?</label>
@@ -198,7 +198,7 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
             ))}
 
             {/* Nueva opción */}
-            <ActionForm action={createModifier} className="grid grid-cols-12 gap-2 items-center rounded-lg border border-dashed border-stone-300 bg-stone-50/50 p-2.5">
+            <ActionForm action={createModifier} className="grid grid-cols-12 gap-2 items-center rounded-lg border border-dashed border-stone-300 bg-stone-50/50 p-2.5" successMessage="Opción agregada" resetOnSuccess>
               <input type="hidden" name="group_id" value={g.id} />
               <div className="col-span-6">
                 <Input name="name" placeholder="Nueva opción (ej. Leche de coco)" required className="text-sm h-9 bg-white" />
