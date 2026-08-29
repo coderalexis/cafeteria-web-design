@@ -4,7 +4,7 @@ import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
 import { parseBusinessSettings } from "@/lib/settings"
 import { businessDayRange } from "@/lib/dates"
-import { closeStaleSessionFor } from "@/lib/stale-cash"
+import { sweepStaleSession } from "@/lib/stale-cash"
 import POSClient from "./pos-client"
 
 /* ------------------------------------------------------------------ */
@@ -21,14 +21,35 @@ export default async function POSPage() {
   const isAdmin = isManager(ctx.role)
   const businessId = ctx.business.id
 
-  // Antes de leer la caja: si la del turno pasado quedó abierta y ya venció,
-  // se cierra sola. Aquí y no solo en el cron porque este es el momento en que
-  // importa — quien llega a abrir su turno la encuentra limpia y puede
-  // registrar su fondo inicial.
-  await closeStaleSessionFor(businessId)
+  /* ── Todo lo que el POS necesita, en UNA sola tanda ──────────────── */
+  /**
+   * Esta es la pantalla que más se abre en todo el sistema, y se abría en
+   * escalones: barrer la caja vencida, luego el menú, luego las ventas del
+   * día. Cada escalón esperaba a que terminara el anterior sin necesitarlo,
+   * y en un celular con mala señal esas esperas se suman y se sienten.
+   *
+   * Ahora sale todo junto. El barrido de caja va en la misma tanda porque
+   * es independiente del menú, y devuelve él mismo la caja que queda abierta
+   * —antes se consultaba dos veces: una para decidir si vencía y otra para
+   * mostrarla—.
+   *
+   * El rango del día se calcula ANTES de la tanda porque solo depende de la
+   * zona horaria del negocio, que ya viene en el contexto.
+   */
+  const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
 
-  /* ── Fetch menu data ────────────────────────────────────────────── */
-  const [{ data: dbCategories }, { data: dbProducts }] = await Promise.all([
+  const [
+    barrido,
+    { data: dbCategories },
+    { data: dbProducts },
+    { data: todayTickets },
+    { data: pinSet },
+    { data: topVariants },
+  ] = await Promise.all([
+    // Si la caja del turno pasado quedó abierta y ya venció, se cierra sola.
+    // Aquí y no solo en el cron porque este es el momento en que importa:
+    // quien llega a abrir su turno la encuentra limpia y registra su fondo.
+    sweepStaleSession(ctx.business),
     supabase
       .from("menu_categories")
       .select("id, name, slug, sort_order, color")
@@ -47,7 +68,19 @@ export default async function POSPage() {
       )
       .eq("is_active", true)
       .order("sort_order"),
+    // Ventas de hoy (día de operación del negocio, solo completadas)
+    supabase
+      .from("tickets")
+      .select("total")
+      .eq("status", "completado")
+      .gte("created_at", fromIso)
+      .lt("created_at", toIso),
+    supabase.rpc("my_pin_set"),
+    // Más vendidos del último mes → fila de favoritos del POS
+    supabase.rpc("top_variants", { p_days: 30, p_limit: 8 }),
   ])
+
+  const session = barrido.session
 
   /* ── Transform categories ───────────────────────────────────────── */
   const categories = [
@@ -151,26 +184,6 @@ export default async function POSPage() {
       })),
     }
   })
-
-  /* ── Today's sales (día de operación CDMX, solo completadas) + caja ── */
-  const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
-
-  const [{ data: todayTickets }, { data: session }, { data: pinSet }, { data: topVariants }] = await Promise.all([
-    supabase
-      .from("tickets")
-      .select("total")
-      .eq("status", "completado")
-      .gte("created_at", fromIso)
-      .lt("created_at", toIso),
-    supabase
-      .from("cash_sessions")
-      .select("id, opened_at, opening_float")
-      .eq("status", "abierta")
-      .maybeSingle(),
-    supabase.rpc("my_pin_set"),
-    // Más vendidos del último mes → fila de favoritos del POS
-    supabase.rpc("top_variants", { p_days: 30, p_limit: 8 }),
-  ])
 
   const settings = parseBusinessSettings(ctx.business.settings)
 
