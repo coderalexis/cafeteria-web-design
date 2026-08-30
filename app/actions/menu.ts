@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
 import { dbErrorMessage } from "@/lib/db-errors"
 import { isCategoryColor } from "@/lib/category-colors"
+import { slugify } from "@/lib/accounts"
 import { CATEGORY_NOTE_MAX } from "@/lib/settings"
 import { computeBulkPrice, type BulkPricesInput } from "@/lib/pricing"
 
@@ -15,9 +16,25 @@ function revalidateAll() {
   revalidatePath("/pos")
 }
 
-// El POS filtra por slug en la URL/estado; un slug con espacios o "/" rompe
-// ese filtro silenciosamente.
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+/**
+ * Identificador interno de una categoría, derivado del nombre.
+ *
+ * Se guarda porque el POS y la carta pública filtran por él, pero ya NO se le
+ * pide al usuario: quien arma el menú de su cafetería no tiene por qué saber
+ * qué es un «slug», y el sistema le respondía con un error de programador
+ * («solo minúsculas, números y guiones») cuando escribía cualquier otra cosa.
+ *
+ * Si el nombre se repite se numera («postres», «postres-2»), porque la base
+ * exige que sea único dentro de cada cafetería.
+ */
+function slugDisponible(nombre: string, tomados: Set<string>): string | null {
+  const raiz = slugify(nombre) || "categoria"
+  for (let i = 1; i <= 50; i++) {
+    const intento = i === 1 ? raiz : `${raiz}-${i}`
+    if (!tomados.has(intento)) return intento
+  }
+  return null
+}
 
 /** Costo del formulario: vacío = 0. Devuelve null si el valor es inválido. */
 function parseCost(raw: FormDataEntryValue | null): number | null {
@@ -32,22 +49,33 @@ export async function createCategory(formData: FormData) {
   const { error: authError } = await requireAdmin()
   if (authError) return { error: authError }
 
-  const name = String(formData.get("name") ?? "")
-  const slug = String(formData.get("slug") ?? "")
+  const name = String(formData.get("name") ?? "").trim()
   const colorRaw = String(formData.get("color") ?? "")
   const color = isCategoryColor(colorRaw) ? colorRaw : null
   const note = String(formData.get("note") ?? "").trim().slice(0, CATEGORY_NOTE_MAX) || null
 
-  if (!name || !slug) {
-    return { error: "Nombre y slug son obligatorios." }
-  }
-
-  if (!SLUG_PATTERN.test(slug)) {
-    return { error: "El slug solo puede llevar minúsculas, números y guiones (ej. crepas-dulces)." }
+  if (!name) {
+    return { error: "El nombre es obligatorio." }
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("menu_categories").insert({ name, slug, color, note })
+
+  // El identificador se deriva del nombre; RLS limita la lectura a la
+  // cafetería activa, así que los «tomados» son solo los suyos.
+  const { data: existentes } = await supabase.from("menu_categories").select("slug, sort_order")
+  const slug = slugDisponible(name, new Set((existentes ?? []).map((c) => c.slug)))
+  if (!slug) {
+    return { error: "Ya tienes demasiadas categorías con ese nombre. Ponle uno que las distinga." }
+  }
+
+  // Al final de la lista, no al principio. Sin esto la categoría nueva nacía
+  // con orden 0 y se colaba ANTES que todas en las pestañas del POS: uno
+  // agregaba «Postres» y de pronto era lo primero que veía el cajero.
+  const sortOrder = Math.max(0, ...(existentes ?? []).map((c) => c.sort_order ?? 0)) + 1
+
+  const { error } = await supabase
+    .from("menu_categories")
+    .insert({ name, slug, color, note, sort_order: sortOrder })
 
   if (error) return { error: dbErrorMessage(error) }
 
@@ -61,22 +89,21 @@ export async function updateCategory(formData: FormData) {
   if (authError) return { error: authError }
 
   const id = String(formData.get("id") ?? "")
-  const name = String(formData.get("name") ?? "")
-  const slug = String(formData.get("slug") ?? "")
+  const name = String(formData.get("name") ?? "").trim()
   const colorRaw = String(formData.get("color") ?? "")
   const color = isCategoryColor(colorRaw) ? colorRaw : null
   const note = String(formData.get("note") ?? "").trim().slice(0, CATEGORY_NOTE_MAX) || null
 
-  if (!id || !name || !slug) {
-    return { error: "ID, nombre y slug son obligatorios." }
-  }
-
-  if (!SLUG_PATTERN.test(slug)) {
-    return { error: "El slug solo puede llevar minúsculas, números y guiones (ej. crepas-dulces)." }
+  if (!id || !name) {
+    return { error: "El nombre es obligatorio." }
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from("menu_categories").update({ name, slug, color, note }).eq("id", id)
+  // El identificador NO se regenera al renombrar, a propósito: es la llave con
+  // la que el POS agrupa y con la que la carta pública arma sus anclas. Cambiarlo
+  // porque alguien corrigió una falta de ortografía no le daría nada al usuario
+  // —nunca lo ve— y sí movería referencias por debajo.
+  const { error } = await supabase.from("menu_categories").update({ name, color, note }).eq("id", id)
 
   if (error) return { error: dbErrorMessage(error) }
 

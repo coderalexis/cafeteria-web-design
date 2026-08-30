@@ -43,12 +43,17 @@ export function ActionForm({
   successMessage,
   /** Vaciar los campos al guardar: lo correcto en un «agregar otro». */
   resetOnSuccess = false,
+  /** Se llama SOLO cuando el servidor confirmó que guardó. Para cerrar la hoja
+   *  de edición y cosas así; nunca se dispara si hubo error o si no llegó
+   *  respuesta, que es justo cuando cerrar sería mentirle al usuario. */
+  onSuccess,
 }: {
   action: FormAction
   className?: string
   children: ReactNode
   successMessage?: string
   resetOnSuccess?: boolean
+  onSuccess?: () => void
 }) {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
@@ -92,6 +97,7 @@ export function ActionForm({
         }
         if (successMessage) toast.success(successMessage)
         if (resetOnSuccess) formRef.current?.reset()
+        onSuccess?.()
         router.refresh()
       }}
     >
