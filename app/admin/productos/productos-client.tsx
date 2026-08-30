@@ -764,7 +764,7 @@ function EditProductSheet({
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-amber-600" />
-                Modificadores
+                Opciones y extras
               </h3>
               <span className="text-xs text-stone-400">
                 {product.modifierGroupIds.length === 0
@@ -774,7 +774,7 @@ function EditProductSheet({
             </div>
             {modifierGroups.length === 0 ? (
               <p className="text-xs text-stone-400">
-                No hay grupos de modificadores. Créalos en <strong>Modificadores</strong> y aparecerán aquí.
+                Todavía no creas opciones. Hazlo en <strong>Opciones y extras</strong> y aparecerán aquí.
               </p>
             ) : (
               <div className={`space-y-1.5 ${savingGroups ? "opacity-60 pointer-events-none" : ""}`}>

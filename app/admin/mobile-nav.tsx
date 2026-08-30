@@ -10,16 +10,18 @@ import { BusinessSwitcher } from "@/components/business-switcher"
 import type { Membership } from "@/lib/context-shape"
 import { AdminNav } from "./admin-nav"
 
+/** Mismos nombres que en `admin-nav.tsx`; si cambias uno, cambia el otro. */
 const SECTION_LABELS: Record<string, string> = {
   categorias: "Categorías",
   productos: "Productos",
-  modificadores: "Modificadores",
+  modificadores: "Opciones y extras",
   ventas: "Ventas",
   analisis: "Análisis",
   cortes: "Cortes de caja",
+  lealtad: "Lealtad",
   equipo: "Equipo",
   actividad: "Actividad",
-  negocio: "Negocio",
+  negocio: "Datos y ajustes",
 }
 
 /**

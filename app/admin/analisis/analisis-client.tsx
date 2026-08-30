@@ -660,7 +660,7 @@ export default function AnalisisClient({ insights, margin, error, from, to, toda
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <SlidersHorizontal className="h-4 w-4 text-stone-500" />
-                  Modificadores más pedidos
+                  Opciones y extras más pedidos
                 </CardTitle>
                 <CardDescription>Para compras e inventario (leches, extras).</CardDescription>
               </CardHeader>

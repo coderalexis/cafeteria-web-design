@@ -261,7 +261,7 @@ export default async function AdminDashboard() {
     <div className="p-6 max-w-6xl mx-auto space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-stone-800">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-stone-800">Resumen</h1>
         <p className="text-sm text-stone-500 mt-1">
           Resumen general de tu menú y ventas
         </p>
@@ -628,7 +628,7 @@ export default async function AdminDashboard() {
               <SlidersHorizontal className="h-5 w-5 text-purple-600" />
               <div>
                 <p className="text-sm font-medium text-stone-800">
-                  Modificadores
+                  Opciones y extras
                 </p>
                 <p className="text-xs text-stone-400">
                   Tipo de leche, extras…

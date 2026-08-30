@@ -44,7 +44,7 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
         <div>
           <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
             <SlidersHorizontal className="h-6 w-6 text-amber-600" />
-            Modificadores
+            Opciones y extras
           </h1>
           <p className="text-sm text-stone-500 mt-1">
             Preguntas que el POS le hace al cajero al vender un producto: «¿tipo de leche?», «¿con pollo o huevo?».

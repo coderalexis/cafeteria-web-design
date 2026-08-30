@@ -697,8 +697,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "admin-modificadores",
       grupo: "admin",
       icon: SlidersHorizontal,
-      titulo: "Modificadores (opciones al vender)",
-      palabras: "leche extras opciones grupos minimo maximo precio adicional obligatorio elegir cuantas",
+      titulo: "Opciones y extras (al vender)",
+      palabras: "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas",
       href: "/admin/modificadores",
       nodo: (
         <>
