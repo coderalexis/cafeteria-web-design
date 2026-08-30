@@ -881,6 +881,7 @@ export type Database = {
           loyalty_delta: number
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          prepared_at: string | null
           session_id: string
           status: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
@@ -907,6 +908,7 @@ export type Database = {
           loyalty_delta?: number
           notes?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          prepared_at: string | null
           session_id: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
@@ -933,6 +935,7 @@ export type Database = {
           loyalty_delta?: number
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          prepared_at?: string | null
           session_id?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal?: number
@@ -1055,6 +1058,10 @@ export type Database = {
       my_context: { Args: never; Returns: Json }
       my_pin_set: { Args: never; Returns: boolean }
       set_my_pin: { Args: { p_pin: string }; Returns: undefined }
+      set_ticket_prepared: {
+        Args: { p_prepared?: boolean; p_ticket_id: string }
+        Returns: string
+      }
       verify_my_pin: { Args: { p_pin: string }; Returns: boolean }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }

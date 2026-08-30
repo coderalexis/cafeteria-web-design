@@ -2348,6 +2348,15 @@ export default function POSClient({
                         Pedidos en espera ({parked.orders.length})
                       </DropdownMenuItem>
                     )}
+                    {/* La comanda en pantalla, para quien no tiene impresora.
+                        Se abre en otra pestaña a propósito: lo normal es
+                        dejarla puesta —en un segundo aparato o en otra
+                        pestaña— y volver aquí a cobrar. */}
+                    <DropdownMenuItem asChild>
+                      <Link href="/pos/preparar" target="_blank">
+                        <ChefHat className="h-4 w-4 mr-2" /> Por preparar
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setShowTickets(true)}>
                       <Receipt className="h-4 w-4 mr-2" /> Tickets del día
                     </DropdownMenuItem>
