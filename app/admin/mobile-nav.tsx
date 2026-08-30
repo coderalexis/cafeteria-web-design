@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Coffee, Menu, Store } from "lucide-react"
+import { BookOpen, Coffee, Menu, Store } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { BusinessSwitcher } from "@/components/business-switcher"
@@ -65,10 +65,20 @@ export function AdminMobileNav({
           <div className="px-5 py-5 border-b border-stone-200">
             <div className="flex items-center gap-2">
               <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-lg font-bold text-stone-800 leading-tight truncate">{businessName}</p>
                 {isTemplate && <p className="text-xs text-stone-400">Plantilla de menú</p>}
               </div>
+              {/* Igual que en escritorio: la guía arriba, a la vista. */}
+              <Link
+                href="/ayuda"
+                target="_blank"
+                title="Guía de uso"
+                aria-label="Guía de uso"
+                className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+              >
+                <BookOpen className="h-[1.125rem] w-[1.125rem]" />
+              </Link>
             </div>
             {memberships.length > 1 && (
               <div className="mt-3">

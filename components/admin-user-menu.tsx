@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useTransition } from "react"
-import { BookOpen, ChevronsUpDown, Loader2, LogOut, ShieldCheck, UserCircle } from "lucide-react"
+import { ChevronsUpDown, Loader2, LogOut, ShieldCheck, UserCircle } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,12 +82,8 @@ export function AdminUserMenu({
         </div>
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem asChild onSelect={onNavigate}>
-          <Link href="/ayuda" target="_blank" className="gap-2">
-            <BookOpen className="h-4 w-4 text-stone-400" />
-            Guía de uso
-          </Link>
-        </DropdownMenuItem>
+        {/* La guía ya no vive aquí: se subió junto al nombre de la cafetería.
+            Aquí uno viene por su cuenta, no por ayuda. */}
         <DropdownMenuItem asChild onSelect={onNavigate}>
           <Link href="/cuenta" className="gap-2">
             <UserCircle className="h-4 w-4 text-stone-400" />

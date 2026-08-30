@@ -1,7 +1,7 @@
 import type React from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Coffee, Store } from "lucide-react"
+import { BookOpen, Coffee, Store } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager, ROLE_LABELS } from "@/lib/context-shape"
@@ -40,7 +40,7 @@ export default async function AdminLayout({
           <div className="px-5 py-5 border-b border-stone-200">
             <div className="flex items-center gap-2">
               <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h1 className="text-lg font-bold text-stone-800 leading-tight truncate">{business.name}</h1>
                 {/* «Panel de Administración» se cayó: ya se sabe dónde está uno,
                     y ese renglón costaba altura que el menú necesita. La
@@ -48,6 +48,19 @@ export default async function AdminLayout({
                     no es evidente. */}
                 {isTemplate && <p className="text-xs text-stone-400">Plantilla de menú</p>}
               </div>
+              {/* La guía, arriba y a la vista. Estaba enterrada en el menú de
+                  usuario, que es donde uno busca su cuenta, no ayuda. Va en el
+                  mismo renglón del nombre para no costar ni un píxel de alto:
+                  el menú está ajustado para caber entero en 768 px. */}
+              <Link
+                href="/ayuda"
+                target="_blank"
+                title="Guía de uso"
+                aria-label="Guía de uso"
+                className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+              >
+                <BookOpen className="h-[1.125rem] w-[1.125rem]" />
+              </Link>
             </div>
             {ctx.memberships.length > 1 && (
               <div className="mt-3">
