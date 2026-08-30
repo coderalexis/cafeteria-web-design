@@ -69,15 +69,15 @@ export function AdminMobileNav({
                 <p className="text-lg font-bold text-stone-800 leading-tight truncate">{businessName}</p>
                 {isTemplate && <p className="text-xs text-stone-400">Plantilla de menú</p>}
               </div>
-              {/* Igual que en escritorio: la guía arriba, a la vista. */}
+              {/* Igual que en escritorio: la guía arriba, con su nombre. */}
               <Link
                 href="/ayuda"
                 target="_blank"
-                title="Guía"
-                aria-label="Guía"
-                className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                title="Abrir la guía de uso"
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs font-medium text-stone-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
               >
-                <BookOpen className="h-[1.125rem] w-[1.125rem]" />
+                <BookOpen className="h-3.5 w-3.5" />
+                Guía
               </Link>
             </div>
             {memberships.length > 1 && (

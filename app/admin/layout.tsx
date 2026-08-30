@@ -1,7 +1,7 @@
 import type React from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { BookOpen, Coffee, Store } from "lucide-react"
+import { BookOpen, Store } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager, ROLE_LABELS } from "@/lib/context-shape"
@@ -37,29 +37,36 @@ export default async function AdminLayout({
         {/* ───── Sidebar (escritorio) ───── */}
         <aside className="hidden lg:flex w-64 bg-white border-r border-stone-200 flex-col shrink-0">
           {/* Logo */}
-          <div className="px-5 py-5 border-b border-stone-200">
+          {/* Sin la taza decorativa: al lado del nombre de la cafetería no
+              informaba nada y se comía 32 px que el nombre sí necesita. Con
+              ella, «Cafecito Jaral» se recortaba a «Cafecito Jar…». La marca
+              sigue en la barra del teléfono y en la portada. */}
+          <div className="px-4 py-5 border-b border-stone-200">
             <div className="flex items-center gap-2">
-              <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg font-bold text-stone-800 leading-tight truncate">{business.name}</h1>
+                <h1 title={business.name} className="text-lg font-bold text-stone-800 leading-tight truncate">
+                  {business.name}
+                </h1>
                 {/* «Panel de Administración» se cayó: ya se sabe dónde está uno,
                     y ese renglón costaba altura que el menú necesita. La
                     etiqueta de plantilla SÍ se queda — esa sí informa algo que
                     no es evidente. */}
                 {isTemplate && <p className="text-xs text-stone-400">Plantilla de menú</p>}
               </div>
-              {/* La guía, arriba y a la vista. Estaba enterrada en el menú de
-                  usuario, que es donde uno busca su cuenta, no ayuda. Va en el
-                  mismo renglón del nombre para no costar ni un píxel de alto:
-                  el menú está ajustado para caber entero en 768 px. */}
+              {/* La guía, arriba y a la vista, CON su nombre: solo el icono
+                  se perdía —hay que saber qué es un libro abierto para
+                  buscarlo—. Va en el mismo renglón del nombre para no costar
+                  ni un píxel de alto: el menú está ajustado para caber entero
+                  en 768 px. El nombre de la cafetería se recorta si hace
+                  falta; la guía no, porque un «Gu…» no serviría de nada. */}
               <Link
                 href="/ayuda"
                 target="_blank"
-                title="Guía"
-                aria-label="Guía"
-                className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                title="Abrir la guía de uso"
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-stone-200 px-2 py-1 text-xs font-medium text-stone-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
               >
-                <BookOpen className="h-[1.125rem] w-[1.125rem]" />
+                <BookOpen className="h-3.5 w-3.5" />
+                Guía
               </Link>
             </div>
             {ctx.memberships.length > 1 && (
