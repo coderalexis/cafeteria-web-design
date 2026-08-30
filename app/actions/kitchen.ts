@@ -30,6 +30,8 @@ export interface KitchenOrder {
   /** El ticket llevaba cargo por llevar: hay que empacarlo, no servirlo. */
   takeout: boolean
   items: KitchenItem[]
+  /** Ya se marcó como hecho. Solo lo usa la consulta de «Últimos pedidos». */
+  prepared?: boolean
 }
 
 interface FilaTicket {
@@ -38,6 +40,7 @@ interface FilaTicket {
   created_at: string
   notes: string | null
   takeout_fee: number | null
+  prepared_at?: string | null
   ticket_items: Array<{
     quantity: number
     product_name: string
@@ -45,6 +48,31 @@ interface FilaTicket {
     notes: string | null
     ticket_item_modifiers: Array<{ modifier_name: string }> | null
   }> | null
+}
+
+/** Lo que se pide de un ticket para verlo como comanda. */
+const COMANDA_SELECT = `id, folio, created_at, notes, takeout_fee, prepared_at,
+  ticket_items(quantity, product_name, variant_name, notes,
+    ticket_item_modifiers(modifier_name))` as const
+
+function aComanda(t: FilaTicket): KitchenOrder {
+  return {
+    id: t.id,
+    folio: t.folio,
+    createdAt: t.created_at,
+    notes: t.notes?.trim() || null,
+    takeout: (t.takeout_fee ?? 0) > 0,
+    prepared: t.prepared_at != null,
+    items: (t.ticket_items ?? []).map((i) => ({
+      label:
+        i.variant_name && i.variant_name !== "Único"
+          ? `${i.product_name} (${i.variant_name})`
+          : i.product_name,
+      quantity: i.quantity,
+      notes: i.notes?.trim() || null,
+      modifiers: (i.ticket_item_modifiers ?? []).map((m) => m.modifier_name),
+    })),
+  }
 }
 
 /**
@@ -64,11 +92,7 @@ export async function getPendingOrders(): Promise<ActionResult<{ orders: Kitchen
 
   const { data, error } = await supabase
     .from("tickets")
-    .select(
-      `id, folio, created_at, notes, takeout_fee,
-       ticket_items(quantity, product_name, variant_name, notes,
-         ticket_item_modifiers(modifier_name))`,
-    )
+    .select(COMANDA_SELECT)
     .eq("status", "completado")
     .is("prepared_at", null)
     .gte("created_at", fromIso)
@@ -78,24 +102,39 @@ export async function getPendingOrders(): Promise<ActionResult<{ orders: Kitchen
 
   if (error) return { error: dbErrorMessage(error) }
 
-  const orders: KitchenOrder[] = ((data ?? []) as FilaTicket[]).map((t) => ({
-    id: t.id,
-    folio: t.folio,
-    createdAt: t.created_at,
-    notes: t.notes?.trim() || null,
-    takeout: (t.takeout_fee ?? 0) > 0,
-    items: (t.ticket_items ?? []).map((i) => ({
-      label:
-        i.variant_name && i.variant_name !== "Único"
-          ? `${i.product_name} (${i.variant_name})`
-          : i.product_name,
-      quantity: i.quantity,
-      notes: i.notes?.trim() || null,
-      modifiers: (i.ticket_item_modifiers ?? []).map((m) => m.modifier_name),
-    })),
-  }))
+  return { success: true, orders: ((data ?? []) as FilaTicket[]).map(aComanda) }
+}
 
-  return { success: true, orders }
+/**
+ * Los últimos pedidos del día, del más nuevo al más viejo, HECHOS O NO.
+ *
+ * Es para consultar, no para trabajar: «¿qué acabo de preparar?», «¿el del
+ * folio 7 llevaba leche de avena?». Por eso no se marca nada desde aquí — eso
+ * se hace en «Por preparar», y tener dos lugares donde marcar sería tener dos
+ * lugares donde equivocarse.
+ *
+ * Distinto de «Tickets del día», que es la vista del DINERO (totales, forma de
+ * pago, reimprimir, cancelar). Esta responde qué se pidió.
+ */
+export async function getRecentOrders(): Promise<ActionResult<{ orders: KitchenOrder[] }>> {
+  const { ctx, error: ctxError } = await requireContext()
+  if (ctxError !== null) return { error: ctxError }
+
+  const supabase = await createClient()
+  const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
+
+  const { data, error } = await supabase
+    .from("tickets")
+    .select(COMANDA_SELECT)
+    .eq("status", "completado")
+    .gte("created_at", fromIso)
+    .lt("created_at", toIso)
+    .order("created_at", { ascending: false })
+    .limit(10)
+
+  if (error) return { error: dbErrorMessage(error) }
+
+  return { success: true, orders: ((data ?? []) as FilaTicket[]).map(aComanda) }
 }
 
 const marcarSchema = z.object({

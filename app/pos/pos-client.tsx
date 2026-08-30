@@ -30,6 +30,7 @@ import {
   SlidersHorizontal,
   StickyNote,
   ChefHat,
+  History,
   Keyboard,
   AArrowUp,
   Gift,
@@ -93,6 +94,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
+import { RecentOrdersDialog } from "./recent-orders-dialog"
 import { ModifierSheet } from "./modifier-sheet"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
 import { useParkedOrders } from "./use-parked-orders"
@@ -686,6 +688,7 @@ export default function POSClient({
   const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [showTickets, setShowTickets] = useState(false)
+  const [showRecent, setShowRecent] = useState(false)
   const [showCashDialog, setShowCashDialog] = useState(false)
   const [showDiscount, setShowDiscount] = useState(false)
   // La propina se elige al cobrar y NO se guarda con el carrito: una propina
@@ -2357,6 +2360,12 @@ export default function POSClient({
                         <ChefHat className="h-4 w-4 mr-2" /> Por preparar
                       </Link>
                     </DropdownMenuItem>
+                    {/* Solo para consultar: qué se pidió, sin precios ni
+                        acciones. Marcar se hace en «Por preparar» — dos
+                        lugares donde marcar serían dos donde equivocarse. */}
+                    <DropdownMenuItem onSelect={() => setShowRecent(true)}>
+                      <History className="h-4 w-4 mr-2" /> Últimos pedidos
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setShowTickets(true)}>
                       <Receipt className="h-4 w-4 mr-2" /> Tickets del día
                     </DropdownMenuItem>
@@ -2751,6 +2760,7 @@ export default function POSClient({
         pendingUploads={cola.pendientes + cola.porRevisar}
       />
       <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
+      <RecentOrdersDialog open={showRecent} onOpenChange={setShowRecent} />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />
       <CartLineDialog line={infoLine} onClose={() => setInfoLine(null)} />
       <LoyaltyDialog
