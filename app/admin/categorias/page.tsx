@@ -63,7 +63,7 @@ export default async function CategoriasPage() {
   })
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -88,17 +88,20 @@ export default async function CategoriasPage() {
         </CardHeader>
         <CardContent>
           <ActionForm action={createCategory} className="flex flex-wrap items-center gap-3" successMessage="Categoría creada" resetOnSuccess>
+            {/* Ancho completo en el teléfono; a partir de `sm` vuelven a
+                compartir renglón. El `min-w` de antes obligaba a 12rem incluso
+                cuando no había 12rem que repartir. */}
             <Input
               name="name"
               placeholder="Nombre (ej: Bebidas calientes)"
               required
-              className="flex-1 min-w-[12rem]"
+              className="w-full sm:w-auto sm:flex-1 sm:min-w-[12rem]"
             />
             <Input
               name="slug"
               placeholder="Slug (ej: bebidas-calientes)"
               required
-              className="flex-1 min-w-[12rem]"
+              className="w-full sm:w-auto sm:flex-1 sm:min-w-[12rem]"
             />
             <ColorPicker />
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700 shrink-0">
@@ -129,12 +132,25 @@ export default async function CategoriasPage() {
             </p>
           )}
           {categories?.map((category, index) => (
+            /**
+             * Una fila por categoría, que en el teléfono se parte en dos.
+             *
+             * Era una sola línea horizontal con dos campos de 10rem MÍNIMO,
+             * flechas, número, colores, botón, contador y papelera: pedía unos
+             * 375 px donde había 277, así que en un celular se salía del
+             * recuadro. Ahora la línea envuelve y el orden se recoloca con
+             * `order`, sin duplicar nada del marcado:
+             *
+             *   · Teléfono → arriba la barra de contexto (orden, posición,
+             *     cuántos productos y borrar) y debajo el formulario completo.
+             *   · Pantalla ancha → exactamente el mismo renglón de siempre.
+             */
             <div
               key={category.id}
-              className="flex items-center gap-3 rounded-lg border border-stone-200 p-3 hover:border-stone-300 transition-colors"
+              className="flex flex-wrap items-center gap-3 rounded-lg border border-stone-200 p-3 hover:border-stone-300 transition-colors"
             >
               {/* Orden: subir / bajar (es el orden de las pestañas del POS) */}
-              <div className="flex flex-col shrink-0">
+              <div className="order-1 flex flex-col shrink-0">
                 <ActionForm action={moveCategory}>
                   <input type="hidden" name="id" value={category.id} />
                   <input type="hidden" name="direction" value="up" />
@@ -160,51 +176,26 @@ export default async function CategoriasPage() {
                   </button>
                 </ActionForm>
               </div>
-              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-stone-100 text-xs font-bold text-stone-500 shrink-0">
+              <span className="order-2 flex items-center justify-center h-8 w-8 rounded-lg bg-stone-100 text-xs font-bold text-stone-500 shrink-0">
                 {index + 1}
               </span>
 
-              {/* Edit form */}
-              <ActionForm
-                action={updateCategory}
-                className="flex flex-wrap items-center gap-3 flex-1"
-              >
-                <input type="hidden" name="id" value={category.id} />
-                <Input
-                  name="name"
-                  defaultValue={category.name}
-                  required
-                  className="flex-1 min-w-[10rem]"
-                />
-                <Input
-                  name="slug"
-                  defaultValue={category.slug}
-                  required
-                  className="flex-1 min-w-[10rem] font-mono text-sm"
-                />
-                <ColorPicker value={category.color} />
-                <Button type="submit" variant="secondary" size="sm" className="shrink-0">
-                  Guardar
-                </Button>
-                <Input
-                  name="note"
-                  defaultValue={category.note ?? ""}
-                  maxLength={CATEGORY_NOTE_MAX}
-                  placeholder="Nota para el menú público (opcional)"
-                  className="w-full text-sm"
-                />
-              </ActionForm>
+              {/* Nombre en el teléfono: la barra de contexto queda arriba y sin
+                  esto no se sabría de qué categoría es hasta bajar la vista. */}
+              <span className="order-3 min-w-0 flex-1 truncate text-sm font-medium text-stone-700 sm:hidden">
+                {category.name}
+              </span>
 
               {/* Product count */}
               <Badge
                 variant="outline"
-                className="shrink-0 border-stone-300 text-stone-500"
+                className="order-4 shrink-0 border-stone-300 text-stone-500 sm:order-6"
               >
                 {countMap[category.id] || 0} prod.
               </Badge>
 
               {/* Delete button (separate form) */}
-              <ActionForm action={deleteCategory}>
+              <ActionForm action={deleteCategory} className="order-5 shrink-0 sm:order-7">
                 <input type="hidden" name="id" value={category.id} />
                 <Button
                   type="submit"
@@ -220,6 +211,37 @@ export default async function CategoriasPage() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
+              </ActionForm>
+
+              {/* Edit form */}
+              <ActionForm
+                action={updateCategory}
+                className="order-6 flex w-full min-w-0 flex-wrap items-center gap-3 sm:order-5 sm:w-auto sm:flex-1"
+              >
+                <input type="hidden" name="id" value={category.id} />
+                <Input
+                  name="name"
+                  defaultValue={category.name}
+                  required
+                  className="w-full sm:w-auto sm:flex-1 sm:min-w-[10rem]"
+                />
+                <Input
+                  name="slug"
+                  defaultValue={category.slug}
+                  required
+                  className="w-full font-mono text-sm sm:w-auto sm:flex-1 sm:min-w-[10rem]"
+                />
+                <ColorPicker value={category.color} />
+                <Button type="submit" variant="secondary" size="sm" className="shrink-0">
+                  Guardar
+                </Button>
+                <Input
+                  name="note"
+                  defaultValue={category.note ?? ""}
+                  maxLength={CATEGORY_NOTE_MAX}
+                  placeholder="Nota para el menú público (opcional)"
+                  className="w-full text-sm"
+                />
               </ActionForm>
             </div>
           ))}

@@ -35,9 +35,12 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
   const [showNew, setShowNew] = useState(groups.length === 0)
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      {/* El botón baja bajo el título en el teléfono: al lado del texto se
+          salía del recuadro, porque el `shrink-0` le impedía encogerse y la
+          explicación de arriba es larga a propósito. */}
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
             <SlidersHorizontal className="h-6 w-6 text-amber-600" />
@@ -152,10 +155,14 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
                 <div className="grid grid-cols-12 gap-2 items-center">
                   <ActionForm action={updateModifier} className="contents">
                     <input type="hidden" name="id" value={opt.id} />
-                    <div className="col-span-6 sm:col-span-6">
+                    {/* El nombre ocupa el renglón completo en el teléfono: a
+                        media rejilla se quedaba en 122 px y «Leche
+                        deslactosada» no cabía —había que desplazar dentro del
+                        campo para leer lo que uno mismo escribió—. */}
+                    <div className="col-span-12 sm:col-span-6">
                       <Input name="name" defaultValue={opt.name} required className="text-sm h-9" />
                     </div>
-                    <div className="col-span-3 sm:col-span-3 relative">
+                    <div className="col-span-6 sm:col-span-3 relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">+$</span>
                       <Input
                         name="price_delta"
@@ -166,7 +173,7 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
                         className="text-sm h-9 pl-7 font-semibold"
                       />
                     </div>
-                    <div className="col-span-3 sm:col-span-1">
+                    <div className="col-span-6 sm:col-span-1">
                       <Button type="submit" variant="secondary" size="sm" className="w-full h-9">
                         Guardar
                       </Button>
@@ -200,14 +207,17 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
             {/* Nueva opción */}
             <ActionForm action={createModifier} className="grid grid-cols-12 gap-2 items-center rounded-lg border border-dashed border-stone-300 bg-stone-50/50 p-2.5" successMessage="Opción agregada" resetOnSuccess>
               <input type="hidden" name="group_id" value={g.id} />
-              <div className="col-span-6">
+              {/* Mismo reparto que las opciones de arriba: en el teléfono el
+                  nombre va solo en su renglón, y precio y botón se reparten el
+                  siguiente. */}
+              <div className="col-span-12 sm:col-span-6">
                 <Input name="name" placeholder="Nueva opción (ej. Leche de coco)" required className="text-sm h-9 bg-white" />
               </div>
-              <div className="col-span-3 relative">
+              <div className="col-span-6 sm:col-span-3 relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">+$</span>
                 <Input name="price_delta" type="number" step="0.01" defaultValue={0} required className="text-sm h-9 pl-7 bg-white" />
               </div>
-              <div className="col-span-3">
+              <div className="col-span-6 sm:col-span-3">
                 <Button type="submit" variant="outline" size="sm" className="w-full h-9 border-dashed gap-1">
                   <Plus className="h-3.5 w-3.5" /> Agregar
                 </Button>

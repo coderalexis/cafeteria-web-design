@@ -196,8 +196,12 @@ export default function ProductosClient({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 px-6 pt-6 pb-4 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="shrink-0 px-4 pt-4 pb-4 space-y-4 sm:px-6 sm:pt-6">
+        {/* Los tres botones se apilan bajo el título en el teléfono. Antes
+            compartían renglón con él pase lo que pase: en 375 px se salían
+            332 px del recuadro, o sea que «Nuevo producto» quedaba fuera de
+            la pantalla y no había forma de tocarlo. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
               <Package className="h-6 w-6 text-emerald-600" />
@@ -207,7 +211,7 @@ export default function ProductosClient({
               {products.length} productos · Clic en un producto para editarlo
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <MenuPackDialog />
             <BulkPricesButton
               categories={categories.map((c) => ({ id: c.id, name: c.name }))}
