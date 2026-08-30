@@ -3,10 +3,11 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Coffee, Menu, Store, BookOpen, LogOut, UserCircle, ShieldCheck } from "lucide-react"
+import { Coffee, Menu, Store } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { BusinessSwitcher } from "@/components/business-switcher"
+import { AdminUserMenu } from "@/components/admin-user-menu"
 import type { Membership } from "@/lib/context-shape"
 import { AdminNav } from "./admin-nav"
 
@@ -78,10 +79,12 @@ export function AdminMobileNav({
               </div>
             )}
           </div>
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" onClick={() => setOpen(false)}>
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3 space-y-1" onClick={() => setOpen(false)}>
             <AdminNav />
           </nav>
-          <div className="px-3 pb-4 space-y-1 border-t border-stone-200 pt-4">
+          {/* Mismo pie que en escritorio, con el mismo componente: eran dos
+              copias de la misma lista y se desincronizaban al tocar una. */}
+          <div className="shrink-0 border-t border-stone-200 px-3 py-3 space-y-1">
             {!isTemplate && (
               <Link
                 href="/pos"
@@ -92,46 +95,13 @@ export function AdminMobileNav({
                 Ir al POS
               </Link>
             )}
-            <Link
-              href="/ayuda"
-              target="_blank"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100"
-            >
-              <BookOpen className="h-4 w-4" />
-              Guía de uso
-            </Link>
-            <Link
-              href="/cuenta"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100"
-              onClick={() => setOpen(false)}
-            >
-              <UserCircle className="h-4 w-4" />
-              Mi cuenta
-            </Link>
-            {isPlatformAdmin && (
-              <Link
-                href="/super"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100"
-                onClick={() => setOpen(false)}
-              >
-                <ShieldCheck className="h-4 w-4" />
-                Panel del operador
-              </Link>
-            )}
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar sesión
-              </button>
-            </form>
-            <div className="px-3 pt-3 border-t border-stone-100">
-              <p className="text-xs text-stone-400">Conectado como</p>
-              <p className="text-sm font-medium text-stone-700 truncate">{userName}</p>
-              <p className="text-xs text-stone-400">{roleLabel}</p>
-            </div>
+            <AdminUserMenu
+              userName={userName}
+              roleLabel={roleLabel}
+              isPlatformAdmin={isPlatformAdmin}
+              logoutAction={logoutAction}
+              onNavigate={() => setOpen(false)}
+            />
           </div>
         </SheetContent>
       </Sheet>

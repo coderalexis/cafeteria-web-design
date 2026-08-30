@@ -60,13 +60,15 @@ export function AdminNav() {
   return (
     <>
       {navGroups.map((grupo, i) => (
-        <div key={grupo.titulo ?? "inicio"} className={i > 0 ? "pt-4" : undefined}>
+        <div key={grupo.titulo ?? "inicio"} className={i > 0 ? "pt-1" : undefined}>
+          {/* El título ya separa por sí solo; el espacio extra que llevaba
+              arriba costaba 30 px que hacían que el menú no cupiera entero. */}
           {grupo.titulo && (
-            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+            <p className="px-3 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
               {grupo.titulo}
             </p>
           )}
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {grupo.items.map((item) => {
               const isActive =
                 item.href === "/admin"
@@ -79,7 +81,11 @@ export function AdminNav() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    // `py-2` y no `py-2.5`: el menú tiene que caber ENTERO en
+                    // una laptop de 768 px de alto. Cuatro píxeles por opción,
+                    // por once opciones, son 44 px — la diferencia entre verlo
+                    // completo y creer que faltan opciones.
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
                       ? "bg-amber-50 text-amber-800 border border-amber-200"
                       : "text-stone-600 hover:bg-stone-50 hover:text-stone-800"

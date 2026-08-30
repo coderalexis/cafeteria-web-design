@@ -1,12 +1,13 @@
 import type React from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Coffee, Store, LogOut, BookOpen, UserCircle, ShieldCheck } from "lucide-react"
+import { Coffee, Store } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager, ROLE_LABELS } from "@/lib/context-shape"
 import { BusinessProvider } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
+import { AdminUserMenu } from "@/components/admin-user-menu"
 import { TrialBanner } from "@/components/trial-banner"
 import { AdminNav } from "./admin-nav"
 import { AdminMobileNav } from "./mobile-nav"
@@ -38,9 +39,11 @@ export default async function AdminLayout({
               <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-lg font-bold text-stone-800 leading-tight truncate">{business.name}</h1>
-                <p className="text-xs text-stone-400">
-                  {isTemplate ? "Plantilla de menú" : "Panel de Administración"}
-                </p>
+                {/* «Panel de Administración» se cayó: ya se sabe dónde está uno,
+                    y ese renglón costaba altura que el menú necesita. La
+                    etiqueta de plantilla SÍ se queda — esa sí informa algo que
+                    no es evidente. */}
+                {isTemplate && <p className="text-xs text-stone-400">Plantilla de menú</p>}
               </div>
             </div>
             {ctx.memberships.length > 1 && (
@@ -51,12 +54,18 @@ export default async function AdminLayout({
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1">
+          {/* `min-h-0` + `overflow-y-auto` son la red de seguridad: sin ellos,
+              cuando el menú no cabe NO se desplaza —se sale del recuadro y las
+              opciones de abajo simplemente dejan de existir para quien mira—.
+              Con esto, en una pantalla muy chica se puede llegar a todo. Pero
+              la red no es la solución: el menú está dimensionado para caber
+              entero en una laptop de 768 px, que es lo que de verdad importa. */}
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
             <AdminNav />
           </nav>
 
           {/* Bottom actions */}
-          <div className="px-3 pb-4 space-y-1 border-t border-stone-200 pt-4">
+          <div className="shrink-0 border-t border-stone-200 px-3 py-3 space-y-1">
             {!isTemplate && (
               <Link
                 href="/pos"
@@ -66,46 +75,12 @@ export default async function AdminLayout({
                 Ir al POS
               </Link>
             )}
-            <Link
-              href="/ayuda"
-              target="_blank"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100 transition-colors"
-            >
-              <BookOpen className="h-4 w-4" />
-              Guía de uso
-            </Link>
-            <Link
-              href="/cuenta"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100 transition-colors"
-            >
-              <UserCircle className="h-4 w-4" />
-              Mi cuenta
-            </Link>
-            {ctx.isPlatformAdmin && (
-              <Link
-                href="/super"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100 transition-colors"
-              >
-                <ShieldCheck className="h-4 w-4" />
-                Panel del operador
-              </Link>
-            )}
-            <form action={logout}>
-              <button
-                type="submit"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-100 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar sesión
-              </button>
-            </form>
-
-            {/* User info */}
-            <div className="px-3 pt-3 border-t border-stone-100">
-              <p className="text-xs text-stone-400">Conectado como</p>
-              <p className="text-sm font-medium text-stone-700 truncate">{userName}</p>
-              <p className="text-xs text-stone-400">{roleLabel}</p>
-            </div>
+            <AdminUserMenu
+              userName={userName}
+              roleLabel={roleLabel}
+              isPlatformAdmin={ctx.isPlatformAdmin}
+              logoutAction={logout}
+            />
           </div>
         </aside>
 
