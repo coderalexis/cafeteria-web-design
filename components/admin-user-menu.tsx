@@ -7,9 +7,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { TextSizeControl } from "@/components/text-size-control"
+import { useTextSize } from "@/components/text-size-provider"
 
 /**
  * Quién eres y lo que se hace de vez en cuando, en un solo renglón.
@@ -38,6 +41,7 @@ export function AdminUserMenu({
   onNavigate?: () => void
 }) {
   const [saliendo, empezarSalida] = useTransition()
+  const { size, setSize } = useTextSize()
 
   const iniciales =
     userName
@@ -65,7 +69,19 @@ export function AdminUserMenu({
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" side="top" className="w-56">
+      <DropdownMenuContent align="start" side="top" className="w-60">
+        {/* Tamaño de letra, el mismo A− / A+ del POS. `onSelect` cancelado a
+            propósito: sin eso el menú se cerraría al primer toque y habría que
+            volver a abrirlo para cada paso —ajustar la letra es probar hasta
+            que se ve bien, no elegir una opción—. */}
+        <DropdownMenuLabel className="pb-1 text-xs font-normal text-stone-400">
+          Tamaño de letra
+        </DropdownMenuLabel>
+        <div className="px-2 pb-1.5" onSelect={(e) => e.preventDefault()}>
+          <TextSizeControl size={size} setSize={setSize} block />
+        </div>
+        <DropdownMenuSeparator />
+
         <DropdownMenuItem asChild onSelect={onNavigate}>
           <Link href="/ayuda" target="_blank" className="gap-2">
             <BookOpen className="h-4 w-4 text-stone-400" />

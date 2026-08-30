@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { BusinessSwitcher } from "@/components/business-switcher"
 import { AdminUserMenu } from "@/components/admin-user-menu"
+import { NavScrollArea } from "@/components/nav-scroll-area"
 import type { Membership } from "@/lib/context-shape"
 import { AdminNav } from "./admin-nav"
 
@@ -51,7 +52,7 @@ export function AdminMobileNav({
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const section = pathname.split("/")[2] ?? ""
-  const sectionLabel = pathname === "/admin" ? "Dashboard" : SECTION_LABELS[section] ?? section
+  const sectionLabel = pathname === "/admin" ? "Resumen" : SECTION_LABELS[section] ?? section
 
   return (
     <div className="lg:hidden sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-stone-200 bg-white px-3 py-2">
@@ -66,7 +67,7 @@ export function AdminMobileNav({
               <Coffee className="h-6 w-6 text-amber-700 shrink-0" />
               <div className="min-w-0">
                 <p className="text-lg font-bold text-stone-800 leading-tight truncate">{businessName}</p>
-                <p className="text-xs text-stone-400">{isTemplate ? "Plantilla de menú" : "Panel de Administración"}</p>
+                {isTemplate && <p className="text-xs text-stone-400">Plantilla de menú</p>}
               </div>
             </div>
             {memberships.length > 1 && (
@@ -79,9 +80,11 @@ export function AdminMobileNav({
               </div>
             )}
           </div>
-          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3 space-y-1" onClick={() => setOpen(false)}>
-            <AdminNav />
-          </nav>
+          <div onClick={() => setOpen(false)} className="contents">
+            <NavScrollArea className="px-3 py-2 space-y-0.5">
+              <AdminNav />
+            </NavScrollArea>
+          </div>
           {/* Mismo pie que en escritorio, con el mismo componente: eran dos
               copias de la misma lista y se desincronizaban al tocar una. */}
           <div className="shrink-0 border-t border-stone-200 px-3 py-3 space-y-1">

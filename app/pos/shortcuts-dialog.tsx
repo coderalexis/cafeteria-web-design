@@ -11,8 +11,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { POS_SHORTCUTS } from "./shortcuts"
-import { TextSizeControl } from "./text-size-control"
-import type { TextSizeKey } from "./text-size"
+import { TextSizeControl } from "@/components/text-size-control"
+import type { TextSizeKey } from "@/lib/text-size"
 
 export function ShortcutsDialog({
   open,

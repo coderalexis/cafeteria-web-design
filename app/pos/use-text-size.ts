@@ -7,7 +7,7 @@ import {
   storeTextSize,
   textSizePx,
   type TextSizeKey,
-} from "./text-size"
+} from "@/lib/text-size"
 
 /**
  * Aplica el tamaño de letra guardado mientras el POS está montado.

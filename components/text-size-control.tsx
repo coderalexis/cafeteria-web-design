@@ -1,7 +1,7 @@
 "use client"
 
 import { AArrowDown, AArrowUp } from "lucide-react"
-import { stepTextSize, TEXT_SIZES, type TextSizeKey } from "./text-size"
+import { stepTextSize, TEXT_SIZES, type TextSizeKey } from "@/lib/text-size"
 import { Button } from "@/components/ui/button"
 
 /**

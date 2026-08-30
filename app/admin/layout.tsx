@@ -8,6 +8,8 @@ import { homePathFor, isManager, ROLE_LABELS } from "@/lib/context-shape"
 import { BusinessProvider } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
 import { AdminUserMenu } from "@/components/admin-user-menu"
+import { TextSizeProvider } from "@/components/text-size-provider"
+import { NavScrollArea } from "@/components/nav-scroll-area"
 import { TrialBanner } from "@/components/trial-banner"
 import { AdminNav } from "./admin-nav"
 import { AdminMobileNav } from "./mobile-nav"
@@ -30,6 +32,7 @@ export default async function AdminLayout({
 
   return (
     <BusinessProvider value={ctx}>
+      <TextSizeProvider>
       <div className="flex h-[100dvh] bg-stone-100">
         {/* ───── Sidebar (escritorio) ───── */}
         <aside className="hidden lg:flex w-64 bg-white border-r border-stone-200 flex-col shrink-0">
@@ -54,15 +57,13 @@ export default async function AdminLayout({
           </div>
 
           {/* Navigation */}
-          {/* `min-h-0` + `overflow-y-auto` son la red de seguridad: sin ellos,
-              cuando el menú no cabe NO se desplaza —se sale del recuadro y las
-              opciones de abajo simplemente dejan de existir para quien mira—.
-              Con esto, en una pantalla muy chica se puede llegar a todo. Pero
-              la red no es la solución: el menú está dimensionado para caber
-              entero en una laptop de 768 px, que es lo que de verdad importa. */}
-          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+          {/* El menú está dimensionado para caber ENTERO en una laptop de 768
+              px, así que normalmente no se desplaza. `NavScrollArea` es la red
+              para cuando sí —letra en «Muy grande», pantalla muy chica—: antes
+              no había ninguna y lo que no cabía simplemente desaparecía. */}
+          <NavScrollArea className="px-3 py-2 space-y-0.5">
             <AdminNav />
-          </nav>
+          </NavScrollArea>
 
           {/* Bottom actions */}
           <div className="shrink-0 border-t border-stone-200 px-3 py-3 space-y-1">
@@ -100,6 +101,7 @@ export default async function AdminLayout({
           <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>
+      </TextSizeProvider>
     </BusinessProvider>
   )
 }
