@@ -55,8 +55,8 @@ export default async function AdminLayout({
               <Link
                 href="/ayuda"
                 target="_blank"
-                title="Guía de uso"
-                aria-label="Guía de uso"
+                title="Guía"
+                aria-label="Guía"
                 className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
               >
                 <BookOpen className="h-[1.125rem] w-[1.125rem]" />

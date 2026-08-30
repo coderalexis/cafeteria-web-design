@@ -72,6 +72,20 @@ function normalizar(texto: string): string {
   return texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
 }
 
+/**
+ * Palabras que el buscador ignora: artículos, preposiciones y el verbo «ser /
+ * estar». No dicen nada de lo que la persona busca, pero si se exigen tumban
+ * la búsqueda entera —«dónde están las categorías» no encontraba nada por el
+ * «están» y el «las»—. Los interrogativos NO están aquí a propósito: «dónde»
+ * y «cómo» sí dicen algo, y las secciones los usan como pistas.
+ */
+const RELLENO = new Set([
+  "el", "la", "los", "las", "un", "una", "unos", "unas",
+  "de", "del", "al", "a", "en", "con", "por", "para", "sin",
+  "y", "o", "u", "que", "se", "mi", "mis", "tu", "tus", "lo",
+  "es", "son", "esta", "estan", "está", "están", "hay", "esto", "eso",
+])
+
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
@@ -448,7 +462,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Lock,
       titulo: "Cerrar el turno (corte de caja)",
       palabras:
-        "corte cierre esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre",
+        "corte cierre cerrar cierro efectivo dinero caja esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre",
       href: "/pos",
       nodo: (
         <>
@@ -537,7 +551,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: AArrowUp,
       titulo: "Tamaño de letra",
-      palabras: "letra tamano texto grande chico compacto vista ver mejor tablet zoom acercar accesibilidad",
+      palabras: "letra tamano texto grande chico compacto vista ver mejor tablet zoom acercar accesibilidad panel administracion",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -545,6 +559,12 @@ export function AyudaClient({ ticket, corte }: Props) {
             <strong>A−</strong> y <strong>A+</strong>. Van entre cinco tamaños: Muy compacto, Compacto, Normal, Grande
             y Muy grande.
             El menú <strong>no se cierra</strong> mientras ajustas, para que puedas probar uno y otro.
+          </li>
+          <li>
+            <strong>También en la administración</strong>: abajo a la izquierda, toca tu nombre y ahí están los mismos{" "}
+            <strong>A−</strong> y <strong>A+</strong>. Es la <strong>misma preferencia</strong> que el punto de venta:
+            si agrandas la letra en la tablet del mostrador, el panel de esa tablet también la agranda. La ajustas por
+            tus ojos, no por la sección donde estés.
           </li>
           <li>
             Los productos con una <strong>«i»</strong> en la esquina traen descripción: tócala y se abre lo que lleva,
@@ -567,7 +587,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             Se recuerda <strong>en ese dispositivo</strong>, no en tu cuenta: la tablet del mostrador puede estar en
-            Compacto y la computadora del dueño en Normal. Solo aplica al punto de venta.
+            Compacto y la computadora del dueño en Normal.
           </li>
         </ul>
       ),
@@ -607,18 +627,75 @@ export function AyudaClient({ ticket, corte }: Props) {
       ),
     },
     {
+      id: "admin-orientacion",
+      grupo: "admin",
+      icon: Settings,
+      titulo: "Cómo está organizado el panel",
+      palabras:
+        "menu lateral secciones donde esta como llego navegar perdido no encuentro tu menu tu dinero tu negocio resumen cuenta salir guia",
+      href: "/admin",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            El menú de la izquierda está agrupado por lo que quieres hacer, no por el nombre de la pantalla. En el
+            teléfono es el mismo menú, detrás del botón ☰ de arriba.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Resumen</strong>: cómo va el día, comparado con ayer y con el mismo día de la semana pasada. Es
+              lo primero que ves al entrar.
+            </li>
+            <li>
+              <strong>Tu menú</strong> — lo que vendes: <strong>Categorías</strong> (las pestañas del POS),{" "}
+              <strong>Productos</strong> (con sus precios) y <strong>Opciones y extras</strong> (las preguntas que el
+              POS le hace al cajero: tipo de leche, extras…).
+            </li>
+            <li>
+              <strong>Tu dinero</strong> — lo que entró: <strong>Ventas</strong> (cada ticket, para reimprimir o
+              cancelar), <strong>Cortes de caja</strong> (los turnos, esperado contra contado) y{" "}
+              <strong>Análisis</strong> (patrones, márgenes, qué se vende junto).
+            </li>
+            <li>
+              <strong>Tu negocio</strong> — cómo opera: <strong>Equipo</strong>, <strong>Lealtad</strong>,{" "}
+              <strong>Actividad</strong> (quién cambió qué) y <strong>Datos y ajustes</strong>.
+            </li>
+          </ul>
+          <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>
+              Esta <strong>guía</strong> está arriba del todo, junto al nombre de tu cafetería. Se abre en otra
+              pestaña, para que no pierdas lo que estabas haciendo.
+            </li>
+            <li>
+              Abajo, tu <strong>nombre</strong> abre lo tuyo: el <strong>tamaño de letra</strong>, <em>Mi cuenta</em>{" "}
+              (para cambiar tu contraseña) y <em>Cerrar sesión</em>.
+            </li>
+            <li>
+              Si perteneces a <strong>más de una cafetería</strong>, arriba aparece el selector para cambiarte. Lo que
+              veas y edites siempre es de la cafetería activa.
+            </li>
+          </ul>
+        </>
+      ),
+    },
+    {
       id: "admin-menu",
       grupo: "admin",
       icon: Coffee,
       titulo: "Menú: categorías, productos y precios",
-      palabras: "categorias colores slug variantes tamanos costo margen precios lote orden desactivar sin precio no aparece",
+      palabras: "categorias colores variantes tamanos costo margen precios lote orden desactivar sin precio no aparece nota carta publica",
       href: "/admin/productos",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Categorías</strong>: son las pestañas del POS. Puedes darle un <strong>color</strong> a cada una:
-            pinta su pestaña y una franja en sus productos, para ubicarlos más rápido (arriba lo viste en la demo del
-            POS).
+            <strong>Categorías</strong>: son las pestañas del POS. La pantalla es una lista; <strong>toca una</strong>{" "}
+            para editarla y <strong>Nueva categoría</strong> para agregar. De cada una puedes cambiar su nombre, su{" "}
+            <strong>color</strong> —que pinta su pestaña y una franja en sus productos, para ubicarlos más rápido— y
+            una <strong>nota</strong> que sale bajo el título en la carta del QR («Incluyen café del día y fruta»).
+          </li>
+          <li>
+            Solo se borra una categoría <strong>sin productos</strong>; si tiene, la pantalla te dice cuántos hay que
+            mover o quitar primero. Las categorías nuevas se agregan <strong>al final</strong> de las pestañas del POS;
+            acomódalas con las flechas ↑↓.
           </li>
           <li>
             <strong>Productos</strong>: cada uno tiene una o más <strong>variantes</strong> (tamaños con precio). Un
@@ -698,7 +775,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: SlidersHorizontal,
       titulo: "Opciones y extras (al vender)",
-      palabras: "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas",
+      palabras:
+        "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas productos vincular asignar en que productos va no aparece en el pos",
       href: "/admin/modificadores",
       nodo: (
         <>
@@ -710,9 +788,25 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               Se arma en tres pasos: <strong>1)</strong> creas el grupo y dices cuántas puede elegir el cajero,{" "}
-              <strong>2)</strong> le agregas sus opciones con su precio, <strong>3)</strong> en el editor de cada{" "}
-              <strong>producto</strong> marcas qué grupos le aplican. Hasta el paso 3 no aparece en el POS —es el
-              olvido más común.
+              <strong>2)</strong> le agregas sus opciones con su precio, <strong>3)</strong> dices{" "}
+              <strong>en qué productos va</strong>. Hasta el paso 3 no aparece en el POS —es el olvido más común, y por
+              eso el grupo te avisa con un botón que dice <em>«Elegir en qué productos va»</em> mientras no tenga
+              ninguno.
+            </li>
+            <li>
+              El paso 3 se puede hacer <strong>desde los dos lados</strong>, el que te quede más a la mano:
+              <ul className="mt-1.5 ml-4 list-disc space-y-1">
+                <li>
+                  Desde <strong>Opciones y extras</strong>, con ese botón: se abre la lista de todo tu menú por
+                  categoría, con buscador, y marcas todos los productos de un jalón. Conviene cuando un mismo extra va
+                  en varios («esto va en chilaquiles y en enchiladas»).
+                </li>
+                <li>
+                  Desde <strong>Productos</strong>, entrando a un producto y marcando qué grupos le aplican. Conviene
+                  cuando estás armando ese producto en particular.
+                </li>
+              </ul>
+              Es la misma información vista al revés, así que da igual por dónde lo hagas.
             </li>
           </ul>
 
@@ -791,7 +885,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             con motivos y quién los aplicó.
           </li>
           <li>
-            <strong>Productos sin movimiento</strong>, <strong>modificadores más pedidos</strong> y{" "}
+            <strong>Productos sin movimiento</strong>, <strong>opciones y extras más pedidos</strong> y{" "}
             <strong>parejas que se compran juntas</strong> (ideas de combos).
           </li>
         </ul>
@@ -801,7 +895,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "admin-negocio",
       grupo: "admin",
       icon: Store,
-      titulo: "Datos del negocio, metas y menú con QR",
+      titulo: "Datos y ajustes: negocio, metas y menú con QR",
       palabras:
         "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto",
       href: "/admin/negocio",
@@ -809,7 +903,7 @@ export function AyudaClient({ ticket, corte }: Props) {
         <>
           <ul className="space-y-2 text-sm text-stone-600">
             <li>
-              <strong>Metas de venta</strong>: define una meta diaria y/o mensual; el Dashboard muestra el avance con
+              <strong>Metas de venta</strong>: define una meta diaria y/o mensual; el <strong>Resumen</strong> muestra el avance con
               una barra, y <strong>¿Cómo va el día?</strong> compara hoy contra ayer y contra el mismo día de la semana
               pasada, a la misma hora.
             </li>
@@ -1001,9 +1095,37 @@ export function AyudaClient({ ticket, corte }: Props) {
   ]
 
   /* ── Buscador: filtra secciones por título y sinónimos ──────────── */
+  /**
+   * Se muestra lo que coincide, y primero lo que coincide MÁS.
+   *
+   * Costó tres intentos llegar aquí, y cada uno enseñó algo:
+   *   1. Buscar la frase tal cual: «vincular productos» no encontraba nada
+   *      aunque las dos palabras estuvieran, solo por venir en otro orden.
+   *   2. Exigir todas las palabras: se caía con «dónde están las categorías»
+   *      por el «están» y el «las» — de ahí la lista de relleno.
+   *   3. Exigir todas menos el relleno: seguía fallando con preguntas
+   *      completas («la letra es muy chica») por una sola palabra que no
+   *      estaba en la lista de sinónimos.
+   *
+   * La lección: quien busca ayuda escribe una PREGUNTA, no palabras clave.
+   * Así que basta con que algo coincida, y manda arriba lo que coincide en
+   * más palabras. Los interrogativos se conservan a propósito: «dónde» y
+   * «cómo» sí dicen algo, y las secciones los usan como pistas.
+   */
   const q = normalizar(busqueda.trim())
   const visibles = useMemo(
-    () => (q === "" ? SECCIONES : SECCIONES.filter((s) => normalizar(`${s.titulo} ${s.palabras}`).includes(q))),
+    () => {
+      if (q === "") return SECCIONES
+      const terminos = q.split(/\s+/).filter((t) => t.length > 0 && !RELLENO.has(t))
+      if (terminos.length === 0) return SECCIONES
+      return SECCIONES.map((s) => {
+        const texto = normalizar(`${s.titulo} ${s.palabras}`)
+        return { s, aciertos: terminos.filter((t) => texto.includes(t)).length }
+      })
+        .filter((r) => r.aciertos > 0)
+        .sort((a, b) => b.aciertos - a.aciertos)
+        .map((r) => r.s)
+    },
     // El arreglo se rearma cada render pero su contenido es estable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [q],
