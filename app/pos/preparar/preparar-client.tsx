@@ -9,8 +9,19 @@ import { getPendingOrders, setOrderPrepared, type KitchenOrder } from "@/app/act
 import { formatTime } from "@/lib/format"
 import { useBusiness } from "@/components/business-provider"
 
-/** Cada cuánto se vuelve a preguntar por pedidos nuevos. */
+/** Cada cuánto se pregunta con la pantalla a la vista. */
 const REFRESCO_MS = 4_000
+/**
+ * Y cada cuánto cuando el navegador dice que está oculta.
+ *
+ * Se sigue preguntando —más lento— en vez de callar del todo. Parece un
+ * detalle y no lo es: al probar en producción, el navegador reportó la
+ * pestaña como «oculta» aunque estuviera al frente, y con la versión que
+ * paraba por completo la pantalla se quedó muda. Confiar en que ese dato
+ * siempre es correcto reintroduce justo el fallo silencioso que se quiso
+ * evitar al no usar websockets.
+ */
+const REFRESCO_OCULTA_MS = 30_000
 /** Después de este rato sin respuesta, la pantalla admite que está ciega. */
 const SIN_NOTICIAS_MS = 20_000
 
@@ -29,8 +40,9 @@ const SIN_NOTICIAS_MS = 20_000
  * vez que se supo algo. Si esos segundos alguna vez estorban, se cambia; lo
  * que no se vale es fingir que está al día cuando no lo está.
  *
- * Solo pregunta con la pestaña a la vista: nadie prepara mirando otra cosa, y
- * así no se gasta batería ni datos de balde.
+ * Con la pestaña oculta pregunta más espaciado, pero NO deja de preguntar:
+ * ahorrar batería no vale quedarse mudo si el navegador se equivoca al decir
+ * qué está a la vista —cosa que pasó al probar esto—.
  */
 export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] }) {
   const { timezone } = useBusiness()
@@ -59,9 +71,14 @@ export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] })
   }, [])
 
   useEffect(() => {
+    let ultimaConsulta = 0
     const tic = setInterval(() => {
       setAhora(Date.now())
-      if (document.visibilityState === "visible") void refrescar()
+      const cada = document.visibilityState === "visible" ? REFRESCO_MS : REFRESCO_OCULTA_MS
+      if (Date.now() - ultimaConsulta >= cada) {
+        ultimaConsulta = Date.now()
+        void refrescar()
+      }
     }, REFRESCO_MS)
 
     // Al volver a la pestaña no se espera al siguiente turno: se pregunta ya.
