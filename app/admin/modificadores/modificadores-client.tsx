@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Eye, EyeOff, Plus, SlidersHorizontal, Trash2 } from "lucide-react"
+import { Eye, EyeOff, Package, Plus, SlidersHorizontal, Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/modifiers"
 import { formatCurrency } from "@/lib/format"
 import { ChoiceRuleField } from "./choice-rule-field"
+import { GroupProductsDialog } from "./group-products-dialog"
 
 export interface ModifierGroupRecord {
   id: string
@@ -31,8 +32,24 @@ export interface ModifierGroupRecord {
   products: Array<{ id: string; name: string }>
 }
 
-export default function ModificadoresClient({ groups }: { groups: ModifierGroupRecord[] }) {
+/** Un producto del menú, para elegir en qué va cada grupo de opciones. */
+export interface ProductChoice {
+  id: string
+  name: string
+  category: string
+}
+
+export default function ModificadoresClient({
+  groups,
+  catalogo,
+}: {
+  groups: ModifierGroupRecord[]
+  catalogo: ProductChoice[]
+}) {
   const [showNew, setShowNew] = useState(groups.length === 0)
+  /** Grupo cuyo selector de productos está abierto. */
+  const [eligiendo, setEligiendo] = useState<string | null>(null)
+  const grupoEligiendo = groups.find((g) => g.id === eligiendo) ?? null
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
@@ -115,16 +132,28 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
               </div>
             </ActionForm>
 
-            <div className="flex items-center justify-between pt-3">
-              <div className="flex items-center gap-2 flex-wrap text-xs text-stone-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-stone-500">
                 {!g.isActive && (
                   <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">Inactivo</Badge>
                 )}
-                <span>
-                  {g.products.length === 0
-                    ? "Sin productos asignados"
-                    : `En: ${g.products.map((p) => p.name).join(", ")}`}
-                </span>
+                {/* Esto era texto muerto: decía «Sin productos asignados» y no
+                    había nada que tocar para arreglarlo. Ahora es el botón que
+                    lo arregla, en la pantalla donde uno se da cuenta. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEligiendo(g.id)}
+                  className="h-8 max-w-full gap-1.5 border-stone-300 text-xs font-normal text-stone-600"
+                >
+                  <Package className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                  <span className="min-w-0 truncate">
+                    {g.products.length === 0
+                      ? "Elegir en qué productos va"
+                      : `En: ${g.products.map((p) => p.name).join(", ")}`}
+                  </span>
+                </Button>
               </div>
               <div className="flex items-center gap-1">
                 <ActionForm action={toggleModifierGroupActive}>
@@ -229,6 +258,20 @@ export default function ModificadoresClient({ groups }: { groups: ModifierGroupR
           </CardContent>
         </Card>
       ))}
+
+      {/* `key` con el id: cada grupo estrena su propio estado de selección en
+          vez de heredar el del grupo que se miró antes. */}
+      {grupoEligiendo && (
+        <GroupProductsDialog
+          key={grupoEligiendo.id}
+          open
+          onOpenChange={(v) => !v && setEligiendo(null)}
+          groupId={grupoEligiendo.id}
+          groupName={grupoEligiendo.name}
+          catalogo={catalogo}
+          seleccionInicial={grupoEligiendo.products.map((p) => p.id)}
+        />
+      )}
     </div>
   )
 }

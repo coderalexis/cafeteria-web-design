@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
-import ModificadoresClient, { type ModifierGroupRecord } from "./modificadores-client"
+import ModificadoresClient, { type ModifierGroupRecord, type ProductChoice } from "./modificadores-client"
 
 export default async function ModificadoresPage() {
   const supabase = await createClient()
 
-  const [{ data: groups }, { data: links }] = await Promise.all([
+  const [{ data: groups }, { data: links }, { data: allProducts }] = await Promise.all([
     supabase
       .from("modifier_groups")
       .select("id, name, min_select, max_select, is_required, sort_order, is_active, modifiers(id, name, price_delta, sort_order, is_active)")
@@ -14,6 +14,12 @@ export default async function ModificadoresPage() {
       .from("product_modifier_groups")
       .select("group_id, menu_products(id, name)")
       .order("group_id"),
+    // Todo el menú, para poder elegir desde el grupo en qué productos va.
+    supabase
+      .from("menu_products")
+      .select("id, name, menu_categories(name)")
+      .eq("is_active", true)
+      .order("name"),
   ])
 
   const productsByGroup: Record<string, Array<{ id: string; name: string }>> = {}
@@ -36,5 +42,11 @@ export default async function ModificadoresPage() {
     products: (productsByGroup[g.id] ?? []).sort((a, b) => a.name.localeCompare(b.name)),
   }))
 
-  return <ModificadoresClient groups={serialized} />
+  const catalogo: ProductChoice[] = (allProducts ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.menu_categories?.name ?? "Sin categoría",
+  }))
+
+  return <ModificadoresClient groups={serialized} catalogo={catalogo} />
 }

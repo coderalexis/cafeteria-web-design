@@ -248,6 +248,20 @@ export async function deleteModifier(formData: FormData): Promise<ActionResult> 
 
 /* ── Asignación grupos ↔ producto ─────────────────────────────────── */
 
+/**
+ * El vínculo se puede armar desde los DOS lados, y no por simetría bonita.
+ *
+ * Antes solo se podía desde el editor de Productos: entrabas producto por
+ * producto y marcabas el grupo. Pero uno no piensa así — piensa «este extra va
+ * en los chilaquiles y en las enchiladas» y quiere decirlo de una vez. A una
+ * dueña real le pasó: creó su grupo de extras, la pantalla del grupo le decía
+ * «Sin productos asignados» y ahí no había nada que tocar para arreglarlo.
+ *
+ * `setProductModifierGroups` responde «qué opciones lleva este producto».
+ * `setGroupProducts` responde «en qué productos va esta opción». Las dos
+ * escriben la misma tabla.
+ */
+
 const assignSchema = z.object({
   productId: z.string().uuid(),
   groupIds: z.array(z.string().uuid()).max(50),
@@ -294,6 +308,65 @@ export async function setProductModifierGroups(
   if (toAdd.length > 0 || toRemove.length > 0) {
     const { data: p } = await supabase.from("menu_products").select("name").eq("id", productId).maybeSingle()
     await logAudit("producto.modificadores", p?.name ?? productId, {
+      agregados: toAdd.length,
+      quitados: toRemove.length,
+      total: want.size,
+    })
+  }
+  revalidateAll()
+  return { success: true }
+}
+
+const assignGroupSchema = z.object({
+  groupId: z.string().uuid(),
+  productIds: z.array(z.string().uuid()).max(500),
+})
+
+/** «¿En qué productos va esta opción?» — el espejo de setProductModifierGroups. */
+export async function setGroupProducts(
+  input: z.infer<typeof assignGroupSchema>,
+): Promise<ActionResult> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const parsed = assignGroupSchema.safeParse(input)
+  if (!parsed.success) return { error: "Datos inválidos." }
+  const { groupId, productIds } = parsed.data
+
+  const supabase = await createClient()
+
+  const { data: current, error: readError } = await supabase
+    .from("product_modifier_groups")
+    .select("product_id")
+    .eq("group_id", groupId)
+  if (readError) return { error: dbErrorMessage(readError) }
+
+  // Se calcula la diferencia en vez de borrar todo y reinsertar: así un
+  // producto que ya estaba no pierde su vínculo ni por un instante, y el
+  // registro de actividad puede decir cuántos entraron y cuántos salieron.
+  const have = new Set((current ?? []).map((r) => r.product_id))
+  const want = new Set(productIds)
+  const toAdd = productIds.filter((p) => !have.has(p))
+  const toRemove = [...have].filter((p) => !want.has(p))
+
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from("product_modifier_groups")
+      .delete()
+      .eq("group_id", groupId)
+      .in("product_id", toRemove)
+    if (error) return { error: dbErrorMessage(error) }
+  }
+  if (toAdd.length > 0) {
+    const { error } = await supabase
+      .from("product_modifier_groups")
+      .insert(toAdd.map((product_id) => ({ product_id, group_id: groupId })))
+    if (error) return { error: dbErrorMessage(error) }
+  }
+
+  if (toAdd.length > 0 || toRemove.length > 0) {
+    const { data: g } = await supabase.from("modifier_groups").select("name").eq("id", groupId).maybeSingle()
+    await logAudit("modificadores.productos", g?.name ?? groupId, {
       agregados: toAdd.length,
       quitados: toRemove.length,
       total: want.size,
