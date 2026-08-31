@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/context"
 import { businessDayRange } from "@/lib/dates"
 import { dbErrorMessage } from "@/lib/db-errors"
+import { lineKey } from "@/app/pos/parked"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -179,7 +180,7 @@ async function cuentasPorPreparar(
     const items: KitchenItem[] = []
 
     for (const l of lineas) {
-      const pendiente = Math.max(0, (Number(l.quantity) || 0) - (Number(foto[l.lineId ?? ""]) || 0))
+      const pendiente = Math.max(0, (Number(l.quantity) || 0) - (Number(foto[lineKey(l)]) || 0))
       if (pendiente <= 0) continue
       const label = l.sizeLabel
         ? etiqueta.get(`${l.productId}|${l.sizeLabel}`)
@@ -231,9 +232,13 @@ export async function setAccountPrepared(input: z.infer<typeof cuentaPreparadaSc
     .maybeSingle()
   if (!fila) return { error: "Esa cuenta ya no existe." }
 
+  // La foto va por CONTENIDO y no por `lineId`: ese identificador se
+  // regenera al abrir la cuenta en el carrito, asi que una foto guardada con
+  // el quedaba apuntando a renglones inexistentes y TODO volvia a salir como
+  // pendiente en la ronda siguiente. Fue justo el fallo que se reporto.
   const foto: Record<string, number> = {}
   for (const l of ((fila.cart as { lines?: LineaCarrito[] } | null)?.lines ?? []) as LineaCarrito[]) {
-    if (l.lineId) foto[l.lineId] = Number(l.quantity) || 0
+    foto[lineKey(l)] = (foto[lineKey(l)] ?? 0) + (Number(l.quantity) || 0)
   }
 
   // NO se toca `updated_at`: es el sello del candado entre aparatos, y

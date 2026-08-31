@@ -233,20 +233,43 @@ export function conflictName(name: string, existentes: string[]): string {
  * Renglones idénticos (producto, tamaño, opciones y nota) se juntan sumando
  * cantidades, para no acabar con tres líneas de «1× Capuchino».
  */
-export function mergeParkedCarts(base: PersistedCart, extra: PersistedCart): PersistedCart {
-  const llave = (l: PersistedCart["lines"][number]) =>
-    [l.productId, l.sizeLabel ?? "", [...(l.modifierIds ?? [])].sort().join("+"), (l.notes ?? "").trim()].join("|")
+/**
+ * Identidad de un renglon por su CONTENIDO: producto, tamano, opciones y nota.
+ *
+ * No se usa `lineId` a proposito. Ese identificador NO sobrevive el viaje al
+ * carrito: `restoreLines` lo regenera al abrir una cuenta, asi que cualquier
+ * cosa que quiera reconocer «el mismo renglon» entre rondas —fusionar, o
+ * saber que ya se preparo— tiene que mirar el contenido.
+ *
+ * Y es lo correcto tambien conceptualmente: para la barra, dos capuchinos
+ * iguales son lo mismo aunque el sistema les haya puesto numeros distintos,
+ * y uno «sin azucar» es otra cosa aunque sea el mismo producto.
+ */
+export function lineKey(l: {
+  productId?: string
+  sizeLabel?: string | null
+  modifierIds?: string[]
+  notes?: string | null
+}): string {
+  return [
+    l.productId ?? "",
+    l.sizeLabel ?? "",
+    [...(l.modifierIds ?? [])].sort().join("+"),
+    (l.notes ?? "").trim(),
+  ].join("|")
+}
 
+export function mergeParkedCarts(base: PersistedCart, extra: PersistedCart): PersistedCart {
   const lines = base.lines.map((l) => ({ ...l }))
-  const porLlave = new Map(lines.map((l) => [llave(l), l]))
+  const porLlave = new Map(lines.map((l) => [lineKey(l), l]))
   for (const l of extra.lines) {
-    const ya = porLlave.get(llave(l))
+    const ya = porLlave.get(lineKey(l))
     if (ya && ya.quantity + l.quantity <= 99) {
       ya.quantity += l.quantity
     } else {
       const copia = { ...l }
       lines.push(copia)
-      porLlave.set(llave(copia), copia)
+      porLlave.set(lineKey(copia), copia)
     }
   }
 
