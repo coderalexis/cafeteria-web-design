@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ArrowLeft, Check, ChefHat, RefreshCw, ShoppingBag, Undo2 } from "lucide-react"
+import { ArrowLeft, Check, ChefHat, RefreshCw, ShoppingBag, Undo2, PauseCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getPendingOrders, setOrderPrepared, type KitchenOrder } from "@/app/actions/kitchen"
+import { getPendingOrders, setAccountPrepared, setOrderPrepared, type KitchenOrder } from "@/app/actions/kitchen"
 import { formatTime } from "@/lib/format"
 import { useBusiness } from "@/components/business-provider"
 
@@ -102,7 +102,11 @@ export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] })
     // Se quita de la lista al instante: quien cocina ya lo dio por hecho y
     // esperar a que el servidor conteste se siente lento.
     if (listo) setOrders((prev) => prev.filter((o) => o.id !== order.id))
-    const r = await setOrderPrepared({ ticketId: order.id, prepared: listo })
+    // Una cuenta abierta no tiene ticket que marcar: se guarda la foto de lo
+    // servido, para que la ronda siguiente salga sola y sin repetir.
+    const r = order.accountName
+      ? await setAccountPrepared({ id: order.id })
+      : await setOrderPrepared({ ticketId: order.id, prepared: listo })
     setMarcando(null)
     if (r?.error) {
       toast.error(r.error)
@@ -182,9 +186,21 @@ export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] })
                 }`}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xl font-bold text-stone-800">#{o.folio}</span>
-                  <span className="text-sm text-stone-500">{formatTime(o.createdAt, timezone)}</span>
+                  {/* Una cuenta se conoce por su mesa, no por folio: todavía
+                      no existe la venta. Con nombre a la vista, quien prepara
+                      sabe a dónde llevarlo sin preguntar. */}
+                  <span className="min-w-0 truncate text-xl font-bold text-stone-800">
+                    {o.accountName ?? `#${o.folio}`}
+                  </span>
+                  <span className="shrink-0 text-sm text-stone-500">{formatTime(o.createdAt, timezone)}</span>
                 </div>
+
+                {o.accountName && (
+                  <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    <PauseCircle className="h-3 w-3" />
+                    Cuenta abierta · sin cobrar
+                  </span>
+                )}
 
                 {o.takeout && (
                   <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-stone-800 px-2 py-0.5 text-xs font-semibold text-white">

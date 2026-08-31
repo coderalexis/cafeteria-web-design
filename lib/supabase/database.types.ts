@@ -671,6 +671,7 @@ export type Database = {
           name: string
           owed_contact: string | null
           owed_since: string | null
+          prepared_lines: Json
           updated_at: string
         }
         Insert: {
@@ -682,6 +683,7 @@ export type Database = {
           name?: string
           owed_contact?: string | null
           owed_since?: string | null
+          prepared_lines?: Json
           updated_at?: string
         }
         Update: {
@@ -693,6 +695,7 @@ export type Database = {
           name?: string
           owed_contact?: string | null
           owed_since?: string | null
+          prepared_lines?: Json
           updated_at?: string
         }
         Relationships: [

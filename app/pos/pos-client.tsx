@@ -2459,7 +2459,23 @@ export default function POSClient({
             )}
           </div>
 
-          {/* Cobrar button / gate de caja */}
+          {/* Cobrar button / gate de caja.
+
+              En escritorio la bifurcación va abajo igual que en el celular:
+              el botón de arriba del carrito existe desde antes, pero la
+              decisión —¿cobra o se sienta?— se toma mirando el total, y ahí
+              es donde está la mano. Tenerla en los dos lados y en el mismo
+              orden evita aprender dos POS distintos según el aparato. */}
+          {parkedEnabled && lines.length > 0 && openSession && (
+            <Button
+              variant="outline"
+              className="mb-2 w-full gap-2 rounded-xl border-amber-300 py-5 text-base font-bold text-amber-800 hover:bg-amber-50"
+              onClick={() => (openAccount ? void saveToOpenAccount() : setShowPark(true))}
+            >
+              <PauseCircle className="h-4 w-4" />
+              {openAccount ? `Guardar en ${openAccount.name}` : "Abrir cuenta"}
+            </Button>
+          )}
           {openSession ? (
             <Button
               className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${

@@ -430,9 +430,15 @@ export function AyudaClient({ ticket, corte }: Props) {
           </ol>
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
-              Solo muestra lo <strong>ya cobrado</strong>. En una cafetería con mesas, donde se sirve antes de
-              cobrar, lo que falta preparar son las <strong>cuentas abiertas</strong>: tócalas en la lista y verás
-              qué lleva cada una, también sin precios.
+              Salen <strong>las dos cosas</strong>: los pedidos ya cobrados (con su folio) y las{" "}
+              <strong>cuentas abiertas</strong> que todavía no se cobran, marcadas como tales y con el nombre de la
+              mesa en vez de folio. En una cafetería con mesas se sirve antes de cobrar, así que eso último es
+              justamente lo que falta hacer.
+            </li>
+            <li>
+              Cuando una mesa pide <strong>otra ronda</strong>, su tarjeta vuelve a aparecer con{" "}
+              <em>solo lo nuevo</em> — nunca con lo que ya serviste. Si pidió otro café igual, verás solo el que
+              falta.
             </li>
             <li>
               ¿Solo quieres consultar qué se pidió hace rato? <strong>⋮ → Últimos pedidos</strong> muestra los 10
