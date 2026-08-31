@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
 import { homePathFor, parseContext } from "@/lib/context-shape"
 import { isValidTimeZone } from "@/lib/dates"
-import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings, MENU_NOTE_MAX, TABLE_COUNT_MAX, parseAccountLabels } from "@/lib/settings"
+import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings, MENU_NOTE_MAX, TABLE_COUNT_MAX, parseAccountLabels, KITCHEN_POLL_MIN, KITCHEN_POLL_MAX, KITCHEN_POLL_HIDDEN_MIN, KITCHEN_POLL_HIDDEN_MAX } from "@/lib/settings"
 import { normalizeClosingTime } from "@/lib/cash-session"
 import type { ActionResult } from "./types"
 
@@ -76,6 +76,8 @@ const settingsSchema = z.object({
   parkedOrders: z.enum(["on", "off"]).transform((v) => v === "on"),
   tableCount: z.coerce.number().int().min(0).max(TABLE_COUNT_MAX),
   accountLabels: z.string().max(200).transform(parseAccountLabels),
+  kitchenPollSeconds: z.coerce.number().int().min(KITCHEN_POLL_MIN).max(KITCHEN_POLL_MAX),
+  kitchenPollHiddenSeconds: z.coerce.number().int().min(KITCHEN_POLL_HIDDEN_MIN).max(KITCHEN_POLL_HIDDEN_MAX),
   discountMaxCashier: z.number().int().min(0).max(100),
   menuNote: z.string().trim().max(MENU_NOTE_MAX, "La nota del menú es demasiado larga."),
   closingTime: z.string().trim().max(5),
@@ -108,6 +110,10 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     // nombre) y no un «usa el valor por omisión».
     tableCount: String(formData.get("table_count") ?? "").trim() || "0",
     accountLabels: formData.get("account_labels") ?? "",
+    // Campo vacio = el valor por omision, no un cero que dejaria la pantalla
+    // preguntando sin parar.
+    kitchenPollSeconds: String(formData.get("kitchen_poll_seconds") ?? "").trim() || "4",
+    kitchenPollHiddenSeconds: String(formData.get("kitchen_poll_hidden_seconds") ?? "").trim() || "30",
     discountMaxCashier: Number(formData.get("discount_max_cashier") ?? 100),
     menuNote: formData.get("menu_note") ?? "",
     closingTime: formData.get("closing_time") ?? "",
@@ -141,6 +147,8 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       parkedOrders: v.parkedOrders,
       tableCount: v.tableCount,
       accountLabels: v.accountLabels,
+      kitchenPollSeconds: v.kitchenPollSeconds,
+      kitchenPollHiddenSeconds: v.kitchenPollHiddenSeconds,
       discountMaxCashier: v.discountMaxCashier,
       menuNote: v.menuNote,
       closingTime: normalizeClosingTime(v.closingTime),
@@ -199,6 +207,12 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     prevSettings.accountLabels.join("|") !== v.accountLabels.join("|")
   ) {
     cambios.push("botones para abrir cuenta")
+  }
+  if (
+    prevSettings.kitchenPollSeconds !== v.kitchenPollSeconds ||
+    prevSettings.kitchenPollHiddenSeconds !== v.kitchenPollHiddenSeconds
+  ) {
+    cambios.push("ritmo de «Por preparar»")
   }
   if (prevSettings.discountMaxCashier !== v.discountMaxCashier) cambios.push("límite de descuento en caja")
   if (cambios.length > 0) {

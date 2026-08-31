@@ -204,7 +204,7 @@ export function Landing() {
               "Propinas de 5, 10, 15 % o monto libre, siempre aparte de tu venta.",
               "Descuentos que piden motivo, para saber después por qué se dieron.",
               "Si se va el internet, la venta en curso se guarda y la cobras al volver.",
-              "¿Sin impresora térmica? Una pantalla te dice qué falta preparar, y se actualiza sola.",
+              "¿Sin impresora térmica? Una pantalla te dice qué falta preparar y se actualiza sola —también lo de las mesas que aún no pagan, y nunca repite lo que ya serviste.",
             ]}
           />
           <Bloque
@@ -219,6 +219,7 @@ export function Landing() {
               "«¿Me trae la cuenta?»: le enseñas el desglose con total, o lo imprimes, o se lo mandas.",
               "Se fue sin pagar: pasa a «Por cobrar» con su teléfono, y ahí sabes quién te debe y cuánto.",
               "Nada cuenta como venta hasta que te pagan — tu corte de esa noche cuadra igual.",
+              "Los botones de mesa son tuyos: dices cuántas tienes y agregas «Barra» o «Terraza».",
             ]}
           />
           <Bloque

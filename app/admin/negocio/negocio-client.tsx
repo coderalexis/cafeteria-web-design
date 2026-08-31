@@ -19,7 +19,15 @@ import {
 } from "lucide-react"
 import { updateBusinessSettings } from "@/app/actions/business"
 import type { BusinessInfo } from "@/lib/context-shape"
-import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, MENU_NOTE_MAX } from "@/lib/settings"
+import {
+  LOCK_MINUTES_OPTIONS,
+  parseBusinessSettings,
+  MENU_NOTE_MAX,
+  KITCHEN_POLL_MIN,
+  KITCHEN_POLL_MAX,
+  KITCHEN_POLL_HIDDEN_MIN,
+  KITCHEN_POLL_HIDDEN_MAX,
+} from "@/lib/settings"
 import { trialState } from "@/lib/signup"
 import { GRACIA_HORAS, HORAS_SIN_HORARIO } from "@/lib/cash-session"
 import { MEXICO_TIMEZONES, dateStringInTz } from "@/lib/dates"
@@ -388,6 +396,58 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                   <p className="mt-1 text-xs text-stone-400">
                     Separados por comas, hasta 8. Aparecen después de las mesas. Siempre puedes escribir cualquier
                     otro nombre a mano.
+                  </p>
+                </div>
+              </div>
+
+              {/* Ritmo de «Por preparar». Configurable porque no hay un numero
+                  bueno para todos: una barra con fila quiere 2 s, y un cafe
+                  con datos moviles caros prefiere 10. */}
+              <div className="mt-3 grid gap-3 rounded-lg border border-stone-100 bg-stone-50/60 p-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <p className="text-sm font-medium text-stone-700">Cada cuánto se actualiza «Por preparar»</p>
+                  <p className="mt-0.5 text-xs text-stone-400">
+                    La pantalla de la comanda pregunta por pedidos nuevos cada tantos segundos. Más seguido es más
+                    inmediato; menos seguido gasta menos batería y datos.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="kitchen_poll_seconds" className="text-sm font-medium text-stone-700">
+                    Con la pantalla a la vista
+                  </label>
+                  <input
+                    id="kitchen_poll_seconds"
+                    name="kitchen_poll_seconds"
+                    type="number"
+                    inputMode="numeric"
+                    min={KITCHEN_POLL_MIN}
+                    max={KITCHEN_POLL_MAX}
+                    step={1}
+                    defaultValue={String(currentSettings.kitchenPollSeconds)}
+                    className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-stone-400">
+                    Segundos ({KITCHEN_POLL_MIN}–{KITCHEN_POLL_MAX}). Por omisión 4.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="kitchen_poll_hidden_seconds" className="text-sm font-medium text-stone-700">
+                    Con la pantalla en segundo plano
+                  </label>
+                  <input
+                    id="kitchen_poll_hidden_seconds"
+                    name="kitchen_poll_hidden_seconds"
+                    type="number"
+                    inputMode="numeric"
+                    min={KITCHEN_POLL_HIDDEN_MIN}
+                    max={KITCHEN_POLL_HIDDEN_MAX}
+                    step={1}
+                    defaultValue={String(currentSettings.kitchenPollHiddenSeconds)}
+                    className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-stone-400">
+                    Segundos ({KITCHEN_POLL_HIDDEN_MIN}–{KITCHEN_POLL_HIDDEN_MAX}). Por omisión 30. Nunca más
+                    rápido que el de arriba.
                   </p>
                 </div>
               </div>

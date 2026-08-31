@@ -70,6 +70,30 @@ export interface BusinessSettings {
    * Eran fijas en código («Para llevar», «Mostrador») e iguales para todos.
    */
   accountLabels: string[]
+  /** Cada cuantos segundos «Por preparar» pregunta con la pantalla a la vista. */
+  kitchenPollSeconds: number
+  /** Y cada cuantos con la pantalla oculta (siempre >= la de arriba). */
+  kitchenPollHiddenSeconds: number
+}
+
+/* Topes del ritmo de «Por preparar». Abajo del minimo se martillea el
+   servidor sin ganar nada; arriba del maximo la pantalla deja de servir
+   para lo que existe. */
+export const KITCHEN_POLL_MIN = 2
+export const KITCHEN_POLL_MAX = 60
+export const KITCHEN_POLL_HIDDEN_MIN = 5
+export const KITCHEN_POLL_HIDDEN_MAX = 600
+
+/**
+ * Cuanto silencio antes de que la pantalla admita que esta ciega.
+ *
+ * NO es un numero fijo: se deriva del ritmo. Con el aviso clavado en 20 s,
+ * poner el refresco en 30 lo dejaria encendido para siempre y la senal
+ * dejaria de significar algo — que es exactamente como muere una alarma.
+ * Tres consultas perdidas es la regla, con 20 s de piso.
+ */
+export function sinNoticiasMs(intervaloSegundos: number): number {
+  return Math.max(20_000, intervaloSegundos * 3 * 1000)
 }
 
 /** Tope de mesas: más que esto y los chips dejan de ser un atajo. */
@@ -133,6 +157,8 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   // en código, para que ninguna cafetería vea cambiar lo que ya conocía.
   tableCount: 4,
   accountLabels: ["Para llevar", "Mostrador"],
+  kitchenPollSeconds: 4,
+  kitchenPollHiddenSeconds: 30,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -175,6 +201,21 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     // nombre), no un campo vacío que deba caer al valor por omisión.
     if (Number.isFinite(mesas) && mesas >= 0 && mesas <= TABLE_COUNT_MAX) out.tableCount = Math.round(mesas)
     if (Array.isArray(r.account_labels)) out.accountLabels = parseAccountLabels(r.account_labels.join(","))
+    const ritmo = Number(r.kitchen_poll_seconds)
+    if (Number.isFinite(ritmo) && ritmo >= KITCHEN_POLL_MIN && ritmo <= KITCHEN_POLL_MAX) {
+      out.kitchenPollSeconds = Math.round(ritmo)
+    }
+    const ritmoOculta = Number(r.kitchen_poll_hidden_seconds)
+    if (
+      Number.isFinite(ritmoOculta) &&
+      ritmoOculta >= KITCHEN_POLL_HIDDEN_MIN &&
+      ritmoOculta <= KITCHEN_POLL_HIDDEN_MAX
+    ) {
+      out.kitchenPollHiddenSeconds = Math.round(ritmoOculta)
+    }
+    // Oculta mas rapido que a la vista no tiene sentido: el ritmo lento es
+    // para ahorrar bateria cuando nadie mira.
+    out.kitchenPollHiddenSeconds = Math.max(out.kitchenPollHiddenSeconds, out.kitchenPollSeconds)
     if (typeof r.closing_time === "string") out.closingTime = normalizeClosingTime(r.closing_time)
     const cargo = Number(r.takeout_fee)
     if (Number.isFinite(cargo) && cargo > 0) out.takeoutFee = Math.min(Math.round(cargo * 100) / 100, 100)
@@ -207,6 +248,8 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     menu_note: s.menuNote,
     table_count: s.tableCount,
     account_labels: s.accountLabels,
+    kitchen_poll_seconds: s.kitchenPollSeconds,
+    kitchen_poll_hidden_seconds: s.kitchenPollHiddenSeconds,
     closing_time: s.closingTime,
     takeout_fee: s.takeoutFee,
     card_fee_pct: s.cardFeePct,

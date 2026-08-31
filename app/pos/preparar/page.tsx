@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getContext } from "@/lib/context"
 import { homePathFor } from "@/lib/context-shape"
 import { getPendingOrders } from "@/app/actions/kitchen"
+import { parseBusinessSettings } from "@/lib/settings"
 import PrepararClient from "./preparar-client"
 
 /**
@@ -17,5 +18,12 @@ export default async function PrepararPage() {
   }
 
   const r = await getPendingOrders()
-  return <PrepararClient inicial={r.success ? r.orders : []} />
+  const settings = parseBusinessSettings(ctx.business.settings)
+  return (
+    <PrepararClient
+      inicial={r.success ? r.orders : []}
+      pollSeconds={settings.kitchenPollSeconds}
+      pollHiddenSeconds={settings.kitchenPollHiddenSeconds}
+    />
+  )
 }

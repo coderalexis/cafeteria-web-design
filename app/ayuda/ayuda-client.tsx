@@ -422,10 +422,13 @@ export function AyudaClient({ ticket, corte }: Props) {
               aparato — si marcas desde la tablet, también se quita del celular. Dos personas nunca preparan lo
               mismo.
             </Step>
-            <Step n={3} title="Se actualiza sola">
-              Pregunta por pedidos nuevos cada pocos segundos. Si se corta el internet te avisa{" "}
+            <Step n={3} title="Se actualiza sola, al ritmo que tú elijas">
+              Pregunta por pedidos nuevos cada pocos segundos: <strong>4</strong> con la pantalla a la vista y{" "}
+              <strong>30</strong> cuando queda en segundo plano (para no gastar batería ni datos). Los dos números
+              se cambian en <strong>Datos y ajustes → Módulos del POS</strong>: una barra con fila puede querer 2
+              segundos, y un café con datos móviles caros, 10. Si se corta el internet te avisa{" "}
               <em>«Sin contacto desde hace N segundos»</em>, para que no te quedes viendo una pantalla congelada
-              creyendo que no hay pedidos.
+              creyendo que no hay pedidos — y ese aviso se ajusta solo al ritmo que pongas.
             </Step>
           </ol>
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
@@ -1028,8 +1031,10 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
-              <strong>Cuentas abiertas</strong>, y define el <strong>descuento máximo en caja</strong> (dueños y
-              administradores no tienen tope). Ese límite se aplica en el servidor, no solo en la pantalla.
+              <strong>Cuentas abiertas</strong>; define cuántas <strong>mesas</strong> tienes y qué otros botones
+              salen al abrir una cuenta; ajusta cada cuánto se actualiza <strong>«Por preparar»</strong>; y pone el{" "}
+              <strong>descuento máximo en caja</strong> (dueños y administradores no tienen tope). Ese límite se
+              aplica en el servidor, no solo en la pantalla.
             </li>
             <li>
               <strong>Impresión al cobrar</strong>: elige qué imprimir en automático al registrar cada venta (ticket,

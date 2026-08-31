@@ -8,22 +8,18 @@ import { Button } from "@/components/ui/button"
 import { getPendingOrders, setAccountPrepared, setOrderPrepared, type KitchenOrder } from "@/app/actions/kitchen"
 import { formatTime } from "@/lib/format"
 import { useBusiness } from "@/components/business-provider"
+import { sinNoticiasMs } from "@/lib/settings"
 
-/** Cada cuánto se pregunta con la pantalla a la vista. */
-const REFRESCO_MS = 4_000
 /**
- * Y cada cuánto cuando el navegador dice que está oculta.
+ * El ritmo lo decide cada cafeteria en Datos y ajustes; aqui solo se aplica.
  *
- * Se sigue preguntando —más lento— en vez de callar del todo. Parece un
- * detalle y no lo es: al probar en producción, el navegador reportó la
- * pestaña como «oculta» aunque estuviera al frente, y con la versión que
- * paraba por completo la pantalla se quedó muda. Confiar en que ese dato
- * siempre es correcto reintroduce justo el fallo silencioso que se quiso
- * evitar al no usar websockets.
+ * Con la pantalla oculta se pregunta mas espaciado pero NO se deja de
+ * preguntar. Parece un detalle y no lo es: al probar en produccion el
+ * navegador reporto la pestana como «oculta» aunque estuviera al frente, y
+ * la version que paraba del todo se quedo muda. Confiar en que ese dato
+ * siempre es correcto reintroduce justo el fallo silencioso que se evito al
+ * no usar websockets.
  */
-const REFRESCO_OCULTA_MS = 30_000
-/** Después de este rato sin respuesta, la pantalla admite que está ciega. */
-const SIN_NOTICIAS_MS = 20_000
 
 /**
  * «Por preparar»: la comanda, pero en pantalla.
@@ -44,7 +40,15 @@ const SIN_NOTICIAS_MS = 20_000
  * ahorrar batería no vale quedarse mudo si el navegador se equivoca al decir
  * qué está a la vista —cosa que pasó al probar esto—.
  */
-export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] }) {
+export default function PrepararClient({
+  inicial,
+  pollSeconds,
+  pollHiddenSeconds,
+}: {
+  inicial: KitchenOrder[]
+  pollSeconds: number
+  pollHiddenSeconds: number
+}) {
   const { timezone } = useBusiness()
   const [orders, setOrders] = useState<KitchenOrder[]>(inicial)
   const [ultimoOk, setUltimoOk] = useState<number>(() => Date.now())
@@ -72,14 +76,18 @@ export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] })
 
   useEffect(() => {
     let ultimaConsulta = 0
+    const visibleMs = pollSeconds * 1000
+    const ocultaMs = pollHiddenSeconds * 1000
     const tic = setInterval(() => {
       setAhora(Date.now())
-      const cada = document.visibilityState === "visible" ? REFRESCO_MS : REFRESCO_OCULTA_MS
+      const cada = document.visibilityState === "visible" ? visibleMs : ocultaMs
       if (Date.now() - ultimaConsulta >= cada) {
         ultimaConsulta = Date.now()
         void refrescar()
       }
-    }, REFRESCO_MS)
+      // El tic no baja de 1 s ni sube del ritmo elegido: mueve el contador de
+      // «sin contacto» y decide cuando toca preguntar.
+    }, Math.min(visibleMs, 4_000))
 
     // Al volver a la pestaña no se espera al siguiente turno: se pregunta ya.
     const alVolver = () => {
@@ -95,7 +103,7 @@ export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] })
       window.removeEventListener("focus", alVolver)
       window.removeEventListener("online", alVolver)
     }
-  }, [refrescar])
+  }, [refrescar, pollSeconds, pollHiddenSeconds])
 
   const marcar = async (order: KitchenOrder, listo: boolean) => {
     setMarcando(order.id)
@@ -117,7 +125,10 @@ export default function PrepararClient({ inicial }: { inicial: KitchenOrder[] })
     void refrescar()
   }
 
-  const sinNoticias = ahora - ultimoOk > SIN_NOTICIAS_MS
+  // Se calcula con el ritmo que esta corriendo: con 30 s de refresco, un
+  // aviso clavado en 20 s estaria encendido siempre y dejaria de avisar nada.
+  const umbral = sinNoticiasMs(typeof document !== "undefined" && document.visibilityState === "visible" ? pollSeconds : pollHiddenSeconds)
+  const sinNoticias = ahora - ultimoOk > umbral
   const segundos = Math.round((ahora - ultimoOk) / 1000)
 
   return (
