@@ -179,8 +179,20 @@ async function cuentasPorPreparar(
     const lineas = ((c.cart as { lines?: LineaCarrito[] } | null)?.lines ?? []) as LineaCarrito[]
     const items: KitchenItem[] = []
 
+    // Se suma POR CONTENIDO antes de restar, no renglón por renglón. Dos
+    // renglones pueden compartir contenido —duplicar una línea con nota crea
+    // justo eso— y restarle a cada uno la foto entera daría cero en los dos:
+    // el segundo café nunca se prepararía.
+    const porContenido = new Map<string, { l: LineaCarrito; total: number }>()
     for (const l of lineas) {
-      const pendiente = Math.max(0, (Number(l.quantity) || 0) - (Number(foto[lineKey(l)]) || 0))
+      const k = lineKey(l)
+      const ya = porContenido.get(k)
+      if (ya) ya.total += Number(l.quantity) || 0
+      else porContenido.set(k, { l, total: Number(l.quantity) || 0 })
+    }
+
+    for (const [k, { l, total }] of porContenido) {
+      const pendiente = Math.max(0, total - (Number(foto[k]) || 0))
       if (pendiente <= 0) continue
       const label = l.sizeLabel
         ? etiqueta.get(`${l.productId}|${l.sizeLabel}`)
