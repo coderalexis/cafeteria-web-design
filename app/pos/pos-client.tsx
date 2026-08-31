@@ -2964,15 +2964,26 @@ export default function POSClient({
                   )}
                   <ChevronUp className="h-4 w-4 shrink-0 opacity-70" />
                 </Button>
-                {/* Con una cuenta abierta, guardar la ronda es tan común como
-                    cobrar — y obligaba a abrir la hoja solo para ese toque. */}
-                {openAccount && (
+                {/* La bifurcación real de una cafetería con mesas: tomado el
+                    pedido, o se cobra o se va a una cuenta. Las dos salidas al
+                    alcance del pulgar, en la misma ranura.
+
+                    Abrir la cuenta obligaba antes a abrir la hoja del carrito
+                    primero — dos toques para algo que pasa una vez por mesa.
+                    Cobrar sigue siendo el botón grande y a la derecha porque
+                    es, de lejos, lo más frecuente: degradarlo para acelerar lo
+                    ocasional saldría carísimo. */}
+                {parkedEnabled && (
                   <Button
                     className="h-12 shrink-0 rounded-xl bg-amber-600 px-3 text-base font-bold text-white hover:bg-amber-700"
-                    onClick={() => void saveToOpenAccount()}
-                    title={`Guardar esta ronda en «${openAccount.name}»`}
+                    onClick={() => (openAccount ? void saveToOpenAccount() : setShowPark(true))}
+                    title={
+                      openAccount
+                        ? `Guardar esta ronda en «${openAccount.name}»`
+                        : "Abrir una cuenta con esto para cobrarla al final"
+                    }
                   >
-                    Guardar
+                    {openAccount ? "Guardar" : "Cuenta"}
                   </Button>
                 )}
                 {openSession ? (

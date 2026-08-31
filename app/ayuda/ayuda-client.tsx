@@ -315,7 +315,8 @@ export function AyudaClient({ ticket, corte }: Props) {
           </p>
           <ol className="mt-3 space-y-3">
             <Step n={1} title="Abre la cuenta">
-              Con artículos en el carrito, toca <strong>Abrir cuenta</strong> arriba. Ponle nombre con los botones
+              Con artículos en el carrito, toca <strong>Cuenta</strong> —en el celular está en la barra de abajo,
+              junto a Cobrar; en tablet o computadora, arriba del carrito—. Ponle nombre con los botones
               rápidos (<em>Mesa 1</em>, <em>Barra</em>…) o escríbelo (<em>«Sra. suéter rojo»</em>). Si lo dejas vacío
               se llama con la hora. El carrito queda libre para atender al siguiente. Las mesas que ya tienen cuenta
               <strong> salen primero</strong>, para no buscarlas entre las vacías.
