@@ -30,11 +30,12 @@ import {
   Users,
   Wallet,
   X,
+  HandCoins,
 } from "lucide-react"
 import { POS_SHORTCUTS } from "@/app/pos/shortcuts"
 import { TRIAL_DAYS } from "@/lib/signup"
 import { GRACIA_HORAS, HORAS_SIN_HORARIO } from "@/lib/cash-session"
-import { DemoDiferencia, DemoEfectivo, DemoGestos, DemoPOS, DemoPropina, DemoQR, TicketImpreso } from "./demos"
+import { DemoDiferencia, DemoEfectivo, DemoGestos, DemoPOS, DemoPropina, DemoQR, TicketImpreso, DemoCuenta } from "./demos"
 
 /**
  * Guía de uso. La misma página sirve en pantalla (con navegación fija,
@@ -333,6 +334,7 @@ export function AyudaClient({ ticket, corte }: Props) {
               folio, se cierra la cuenta y sale de la lista.
             </Step>
           </ol>
+          <DemoCuenta />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
               Las cuentas son <strong>de la cafetería</strong>, no del aparato: puedes tomar el pedido en el celular y
@@ -375,6 +377,54 @@ export function AyudaClient({ ticket, corte }: Props) {
               ¿No lo usas? El dueño puede apagar el módulo en <strong>Datos y ajustes → Módulos del POS</strong> y los
               botones desaparecen.
             </li>
+          </ul>
+        </>
+      ),
+    },
+    {
+      id: "preparar",
+      grupo: "cajero",
+      icon: ChefHat,
+      titulo: "Por preparar: la comanda en pantalla",
+      palabras:
+        "comanda cocina barra preparar pendientes impresora termica sin impresora pantalla listo marcar ultimos pedidos consultar que pidio",
+      href: "/pos/preparar",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            Si atiendes tú solo y no tienes impresora térmica, esta pantalla es tu comanda. Abre el menú{" "}
+            <strong>⋮ → Por preparar</strong>: sale en otra pestaña, para dejarla puesta en una tablet, en el
+            celular viejo, o en la misma pantalla en otra ventana.
+          </p>
+          <ol className="mt-3 space-y-3">
+            <Step n={1} title="Muestra lo que falta hacer">
+              Cada pedido cobrado aparece con su folio, la hora, si es <em>para llevar</em>, y qué lleva:
+              cantidades, tamaños, opciones y las notas en mayúsculas. <strong>Cero precios</strong>: aquí no se
+              cobra, se prepara.
+            </Step>
+            <Step n={2} title="Marca «Listo» y desaparece">
+              Al marcarlo se va de la lista. Lo importante: eso se guarda <strong>en el servidor</strong>, no en el
+              aparato — si marcas desde la tablet, también se quita del celular. Dos personas nunca preparan lo
+              mismo.
+            </Step>
+            <Step n={3} title="Se actualiza sola">
+              Pregunta por pedidos nuevos cada pocos segundos. Si se corta el internet te avisa{" "}
+              <em>«Sin contacto desde hace N segundos»</em>, para que no te quedes viendo una pantalla congelada
+              creyendo que no hay pedidos.
+            </Step>
+          </ol>
+          <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              Solo muestra lo <strong>ya cobrado</strong>. En una cafetería con mesas, donde se sirve antes de
+              cobrar, lo que falta preparar son las <strong>cuentas abiertas</strong>: tócalas en la lista y verás
+              qué lleva cada una, también sin precios.
+            </li>
+            <li>
+              ¿Solo quieres consultar qué se pidió hace rato? <strong>⋮ → Últimos pedidos</strong> muestra los 10
+              más recientes con su detalle. Es <em>de solo lectura</em>: ahí no se marca nada, para que no haya dos
+              lugares donde equivocarse.
+            </li>
+            <li>Se filtra por tu día de operación y las ventas canceladas no aparecen.</li>
           </ul>
         </>
       ),
@@ -684,8 +734,9 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               <strong>Tu dinero</strong> — lo que entró: <strong>Ventas</strong> (cada ticket, para reimprimir o
-              cancelar), <strong>Cortes de caja</strong> (los turnos, esperado contra contado) y{" "}
-              <strong>Análisis</strong> (patrones, márgenes, qué se vende junto).
+              cancelar), <strong>Cortes de caja</strong> (los turnos, esperado contra contado),{" "}
+              <strong>Por cobrar</strong> (quién se fue sin pagar y cuánto debe) y <strong>Análisis</strong>{" "}
+              (patrones, márgenes, qué se vende junto).
             </li>
             <li>
               <strong>Tu negocio</strong> — cómo opera: <strong>Equipo</strong>, <strong>Lealtad</strong>,{" "}
@@ -1122,6 +1173,54 @@ export function AyudaClient({ ticket, corte }: Props) {
             <strong>hora de cierre</strong> en Negocio y recuérdale al equipo cerrar la caja.
           </li>
         </ul>
+      ),
+    },
+    {
+      id: "admin-por-cobrar",
+      grupo: "admin",
+      icon: HandCoins,
+      titulo: "Por cobrar (lo que te deben)",
+      palabras:
+        "fiado deuda deben por cobrar sin pagar condonar perdonar cliente moroso telefono cuanto me deben",
+      href: "/admin/por-cobrar",
+      nodo: (
+        <>
+          <p className="text-sm text-stone-600">
+            Cuando alguien se va sin pagar, en el POS se marca la cuenta con <strong>«Se fue sin pagar»</strong>.
+            Aquí las ves todas juntas: <strong>quién te debe, cuánto y desde cuándo</strong>.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>
+              Arriba, el <strong>total que te deben</strong>. Abajo cada persona con los días que lleva y su
+              teléfono, que puedes tocar para marcarle directo.
+            </li>
+            <li>
+              <strong>Esto no son ventas.</strong> No cuentan en tus reportes, ni en Análisis, ni en ningún corte.
+              La venta se registra el día que te pagan, porque es cuando entra el dinero a la caja. Si contara el
+              día que serviste, tu arqueo de esa noche saldría corto y parecería un faltante.
+            </li>
+            <li>
+              El total se calcula con los <strong>precios de hoy</strong> — los mismos con los que se va a cobrar.
+              Si algún producto de esa cuenta ya no está en tu menú, no suma y te lo dice: es justo lo que la caja
+              tampoco podrá cobrar hasta que lo reactives.
+            </li>
+            <li>
+              <strong>Para cobrar</strong> no se hace nada desde aquí: se abre en el POS, en{" "}
+              <strong>Cuentas → Por cobrar</strong>, y se cobra como cualquier venta, con su método de pago y su
+              propina.
+            </li>
+            <li>
+              <strong>Condonar</strong> es perdonar la deuda: la cuenta se borra y ya no se podrá cobrar. Solo
+              dueño o administrador, pide motivo obligatorio y queda registrado en <strong>Actividad</strong> —
+              igual que cancelar una venta, porque es la única forma de que algo servido desaparezca sin entrar a
+              la caja.
+            </li>
+            <li>
+              Una cuenta marcada como fiado <strong>no caduca nunca</strong>. Las cuentas normales sin cobrar sí:
+              se borran solas después de una semana.
+            </li>
+          </ul>
+        </>
       ),
     },
   ]

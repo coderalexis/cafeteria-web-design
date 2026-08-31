@@ -425,3 +425,345 @@ export function DemoGestos() {
     </MarcoDemo>
   )
 }
+
+/* ── Cuentas: abrir, sumar rondas, cobrar (o fiar) ────────────────── */
+
+interface DemoItem {
+  nombre: string
+  precio: number
+}
+interface DemoCuentaFila {
+  id: number
+  nombre: string
+  items: DemoItem[]
+  fiado: boolean
+}
+
+const CARTA: DemoItem[] = [
+  { nombre: "Capuchino", precio: 45 },
+  { nombre: "Croissant", precio: 35 },
+]
+
+/**
+ * El ciclo completo de una cuenta, tocable.
+ *
+ * Es el concepto que más cuesta explicar por escrito —que el carrito deja de
+ * ser «una venta» y pasa a ser «lo que lleva la mesa 3»—, y la parte que de
+ * verdad se entiende al hacerla es que el nombre se escribe UNA vez: en la
+ * segunda ronda el botón ya dice «Guardar en Mesa 1».
+ *
+ * El contador de «Vendido hoy» está a propósito: enseña, sin una línea de
+ * texto, que abrir una cuenta o fiarla no mueve la venta, y que cobrar sí.
+ */
+export function DemoCuenta() {
+  const [cuentas, setCuentas] = useState<DemoCuentaFila[]>([])
+  const [carrito, setCarrito] = useState<DemoItem[]>([])
+  /** Cuál cuenta está abierta EN el carrito (lo que le da continuidad). */
+  const [abierta, setAbierta] = useState<number | null>(null)
+  const [nombrando, setNombrando] = useState(false)
+  const [verCuenta, setVerCuenta] = useState<number | null>(null)
+  const [fiando, setFiando] = useState<number | null>(null)
+  const [vendido, setVendido] = useState(0)
+  const [narrador, setNarrador] = useState("Agrega algo y abre una cuenta a nombre de la mesa.")
+  const siguienteId = useRef(1)
+
+  const suma = (items: DemoItem[]) => items.reduce((s, i) => s + i.precio, 0)
+  const cuentaAbierta = cuentas.find((c) => c.id === abierta) ?? null
+  const enPantalla = cuentas.filter((c) => c.id !== abierta)
+  const delDia = enPantalla.filter((c) => !c.fiado)
+  const porCobrar = enPantalla.filter((c) => c.fiado)
+
+  const reiniciar = () => {
+    setCuentas([])
+    setCarrito([])
+    setAbierta(null)
+    setNombrando(false)
+    setVerCuenta(null)
+    setFiando(null)
+    setVendido(0)
+    setNarrador("Agrega algo y abre una cuenta a nombre de la mesa.")
+    siguienteId.current = 1
+  }
+
+  const abrirCuenta = (nombre: string) => {
+    const id = siguienteId.current++
+    setCuentas((cs) => [...cs, { id, nombre, items: carrito, fiado: false }])
+    setCarrito([])
+    setNombrando(false)
+    setNarrador(`«${nombre}» quedó abierta y el carrito está libre. Nadie ha pagado nada.`)
+  }
+
+  const guardarRonda = () => {
+    if (!cuentaAbierta) return
+    setCuentas((cs) => cs.map((c) => (c.id === cuentaAbierta.id ? { ...c, items: carrito } : c)))
+    setCarrito([])
+    setAbierta(null)
+    setNarrador(`Se guardó en «${cuentaAbierta.nombre}» — fíjate que no te volvió a pedir el nombre.`)
+  }
+
+  const abrir = (c: DemoCuentaFila) => {
+    setAbierta(c.id)
+    setCarrito(c.items)
+    setVerCuenta(null)
+    setNarrador(
+      c.fiado
+        ? `Volvió a pagar: «${c.nombre}» está en el carrito. Cóbrala como cualquier venta.`
+        : `«${c.nombre}» está en el carrito. Agrégale otra ronda y guárdala.`,
+    )
+  }
+
+  /** Sirve igual con cuenta abierta que para una venta suelta de mostrador. */
+  const cobrar = () => {
+    if (carrito.length === 0) return
+    setVendido((v) => v + suma(carrito))
+    if (cuentaAbierta) setCuentas((cs) => cs.filter((c) => c.id !== cuentaAbierta.id))
+    setCarrito([])
+    setAbierta(null)
+    setNarrador(
+      cuentaAbierta
+        ? "Cobrada. AHORA sí subió «Vendido hoy»: la venta se registra el día que te pagan."
+        : "Venta de mostrador: se cobra y se acabó, sin abrir ninguna cuenta.",
+    )
+  }
+
+  const marcarFiado = (id: number) => {
+    const c = cuentas.find((x) => x.id === id)
+    setCuentas((cs) => cs.map((x) => (x.id === id ? { ...x, fiado: true } : x)))
+    setFiando(null)
+    setNarrador(`«${c?.nombre}» pasó a Por cobrar. «Vendido hoy» NO se movió: todavía nadie pagó.`)
+  }
+
+  const chip = "rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
+
+  return (
+    <MarcoDemo titulo="Pruébalo — así funciona una mesa que paga al final">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Carrito */}
+        <div className="rounded-lg border border-stone-200 bg-white p-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="truncate text-sm font-bold text-stone-800">
+              {cuentaAbierta ? cuentaAbierta.nombre : "Venta Actual"}
+            </p>
+            <span className="shrink-0 text-[11px] text-stone-400">Vendido hoy {formatCurrency(vendido)}</span>
+          </div>
+
+          <div className="mt-2 space-y-1">
+            {carrito.length === 0 ? (
+              <p className="py-2 text-xs text-stone-400">Carrito vacío.</p>
+            ) : (
+              carrito.map((i, k) => (
+                <div key={k} className="flex justify-between text-sm text-stone-700">
+                  <span>1× {i.nombre}</span>
+                  <span className="font-semibold">{formatCurrency(i.precio)}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-1.5 border-t border-stone-100 pt-2">
+            {CARTA.map((p) => (
+              <button
+                key={p.nombre}
+                type="button"
+                onClick={() => setCarrito((c) => [...c, p])}
+                className={`${chip} border-stone-200 bg-white text-stone-600 hover:border-amber-400 hover:text-amber-700`}
+              >
+                + {p.nombre}
+              </button>
+            ))}
+          </div>
+
+          {carrito.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {cuentaAbierta ? (
+                <button
+                  type="button"
+                  onClick={guardarRonda}
+                  className={`${chip} border-amber-600 bg-amber-600 text-white`}
+                >
+                  Guardar en {cuentaAbierta.nombre}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNombrando(true)}
+                  className={`${chip} border-amber-600 bg-amber-600 text-white`}
+                >
+                  Abrir cuenta
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={cobrar}
+                className={`${chip} border-emerald-600 bg-emerald-600 text-white`}
+              >
+                Cobrar {formatCurrency(suma(carrito))}
+              </button>
+            </div>
+          )}
+
+          {nombrando && (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+              <p className="text-[11px] font-semibold text-amber-900">¿A nombre de quién?</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {["Mesa 1", "Mesa 2", "Juan"].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => abrirCuenta(n)}
+                    className={`${chip} border-stone-200 bg-white text-stone-600 hover:border-amber-400`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lista de cuentas */}
+        <div className="rounded-lg border border-stone-200 bg-white p-3">
+          <p className="text-sm font-bold text-stone-800">Cuentas abiertas ({delDia.length})</p>
+
+          {delDia.length === 0 && porCobrar.length === 0 ? (
+            <p className="py-3 text-xs text-stone-400">Ninguna todavía.</p>
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              {delDia.map((c) => (
+                <FilaCuenta
+                  key={c.id}
+                  c={c}
+                  total={suma(c.items)}
+                  onAbrir={() => abrir(c)}
+                  onVer={() => setVerCuenta(verCuenta === c.id ? null : c.id)}
+                  onFiar={() => setFiando(c.id)}
+                  viendo={verCuenta === c.id}
+                />
+              ))}
+
+              {porCobrar.length > 0 && (
+                <>
+                  <p className="pt-2 text-xs font-bold text-red-700">Por cobrar ({porCobrar.length})</p>
+                  {porCobrar.map((c) => (
+                    <FilaCuenta
+                      key={c.id}
+                      c={c}
+                      total={suma(c.items)}
+                      onAbrir={() => abrir(c)}
+                      onVer={() => setVerCuenta(verCuenta === c.id ? null : c.id)}
+                      onFiar={null}
+                      viendo={verCuenta === c.id}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {fiando !== null && (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2">
+              <p className="text-[11px] text-red-900">
+                Pasa a <strong>Por cobrar</strong> y deja de caducar. No se registra ninguna venta.
+              </p>
+              <div className="mt-1.5 flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => marcarFiado(fiando)}
+                  className={`${chip} border-red-600 bg-red-600 text-white`}
+                >
+                  Pasar a Por cobrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiando(null)}
+                  className={`${chip} border-stone-200 bg-white text-stone-500`}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs font-medium text-amber-800">{narrador}</p>
+      {(cuentas.length > 0 || vendido > 0) && (
+        <button
+          type="button"
+          onClick={reiniciar}
+          className="mt-1 text-[11px] text-stone-400 underline underline-offset-2 hover:text-stone-600"
+        >
+          reiniciar la demo
+        </button>
+      )}
+    </MarcoDemo>
+  )
+}
+
+function FilaCuenta({
+  c,
+  total,
+  onAbrir,
+  onVer,
+  onFiar,
+  viendo,
+}: {
+  c: DemoCuentaFila
+  total: number
+  onAbrir: () => void
+  onVer: () => void
+  onFiar: (() => void) | null
+  viendo: boolean
+}) {
+  const chip = "rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors"
+  return (
+    <div className={`rounded-lg border p-2 ${c.fiado ? "border-red-200 bg-red-50/60" : "border-stone-200"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={onVer} className="min-w-0 flex-1 text-left">
+          <p className="truncate text-sm font-semibold text-stone-800">{c.nombre}</p>
+          <p className="text-[11px] text-stone-500">
+            <span className={c.fiado ? "font-semibold text-red-700" : ""}>
+              {c.fiado ? "debe desde hoy" : "abierta recién"}
+            </span>{" "}
+            · {c.items.length} artículo{c.items.length === 1 ? "" : "s"} · {formatCurrency(total)}
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={onAbrir}
+          className={`${chip} shrink-0 border-amber-600 bg-amber-600 text-white`}
+        >
+          {c.fiado ? "Cobrar" : "Abrir"}
+        </button>
+      </div>
+
+      {viendo && (
+        <div className="mt-2 rounded-md border border-stone-200 bg-stone-50 p-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">La cuenta</p>
+          {c.items.map((i, k) => (
+            <div key={k} className="flex justify-between text-xs text-stone-600">
+              <span>1× {i.nombre}</span>
+              <span>{formatCurrency(i.precio)}</span>
+            </div>
+          ))}
+          <div className="mt-1 flex justify-between border-t border-stone-200 pt-1 text-xs font-bold text-stone-800">
+            <span>Total</span>
+            <span>{formatCurrency(total)}</span>
+          </div>
+          <p className="mt-1 text-center text-[10px] font-semibold text-amber-800">
+            Pendiente de pago · no es comprobante
+          </p>
+          {onFiar && (
+            <button
+              type="button"
+              onClick={onFiar}
+              className="mt-1.5 w-full rounded-md border border-stone-200 bg-white py-1 text-[11px] font-semibold text-stone-500 hover:border-red-300 hover:text-red-700"
+            >
+              Se fue sin pagar
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

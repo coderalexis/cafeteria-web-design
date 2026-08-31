@@ -16,6 +16,7 @@ import {
   Stamp,
   Hammer,
   Check,
+  HandCoins,
 } from "lucide-react"
 import { buildTicketLines } from "@/lib/receipt"
 import { TRIAL_DAYS } from "@/lib/signup"
@@ -36,6 +37,8 @@ const TONOS = {
   indigo: { chip: "bg-indigo-100 text-indigo-700", borde: "hover:border-indigo-300", punto: "bg-indigo-500" },
   rose: { chip: "bg-rose-100 text-rose-700", borde: "hover:border-rose-300", punto: "bg-rose-500" },
   teal: { chip: "bg-teal-100 text-teal-700", borde: "hover:border-teal-300", punto: "bg-teal-500" },
+  orange: { chip: "bg-orange-100 text-orange-700", borde: "hover:border-orange-300", punto: "bg-orange-500" },
+  violet: { chip: "bg-violet-100 text-violet-700", borde: "hover:border-violet-300", punto: "bg-violet-500" },
 } as const
 
 type Tono = keyof typeof TONOS
@@ -201,6 +204,21 @@ export function Landing() {
               "Propinas de 5, 10, 15 % o monto libre, siempre aparte de tu venta.",
               "Descuentos que piden motivo, para saber después por qué se dieron.",
               "Si se va el internet, la venta en curso se guarda y la cobras al volver.",
+              "¿Sin impresora térmica? Una pantalla te dice qué falta preparar, y se actualiza sola.",
+            ]}
+          />
+          <Bloque
+            icon={HandCoins}
+            tono="orange"
+            titulo="Mesas que pagan al final"
+            entrada="Para cuando el cliente pide, se sienta, y paga cuando termina."
+            puntos={[
+              "Abres una cuenta a nombre de la mesa y le vas sumando cada ronda.",
+              "El nombre se escribe una sola vez: después el botón ya dice «Guardar en Mesa 1».",
+              "Las cuentas viven en el servidor: tomas el pedido en el celular y cobras en la tablet.",
+              "«¿Me trae la cuenta?»: le enseñas el desglose con total, o lo imprimes, o se lo mandas.",
+              "Se fue sin pagar: pasa a «Por cobrar» con su teléfono, y ahí sabes quién te debe y cuánto.",
+              "Nada cuenta como venta hasta que te pagan — tu corte de esa noche cuadra igual.",
             ]}
           />
           <Bloque
@@ -237,6 +255,18 @@ export function Landing() {
               "Publicas tu carta con un clic y el sistema te da el QR para imprimir.",
               "Cambias un precio y el menú se actualiza solo: el QR nunca se reemplaza.",
               "Muestra lo que verían en una carta impresa; tus costos jamás salen de ahí.",
+            ]}
+          />
+          <Bloque
+            icon={Stamp}
+            tono="violet"
+            titulo="Que vuelvan: tarjeta de sellos"
+            entrada="Sin cartoncitos que se pierden en la cartera."
+            puntos={[
+              "El cliente se identifica con su teléfono y junta un sello por visita.",
+              "Al llegar a la meta que tú pongas, el premio se descuenta al cobrar.",
+              "El avance sale impreso en su ticket, para que sepa cuánto le falta.",
+              "Tú decides cuántos sellos y cuál es el premio; se puede apagar cuando quieras.",
             ]}
           />
           <Bloque
@@ -337,19 +367,13 @@ export function Landing() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-5 md:grid-cols-2">
+          <div className="mt-6 grid gap-5">
             {[
               {
                 icon: Boxes,
                 titulo: "Inventario",
                 texto:
                   "Existencias de lo que se cuenta por pieza —pan, pasteles, botellas—, con descuento automático al vender, alertas de que se está acabando y registro de mermas.",
-              },
-              {
-                icon: Stamp,
-                titulo: "Lealtad de clientes",
-                texto:
-                  "Tarjeta de sellos digital: el cliente se identifica con su teléfono, junta sellos y a la décima va por cuenta de la casa. Sin plásticos que se pierden.",
               },
             ].map(({ icon: Icon, titulo, texto }) => (
               <div key={titulo} className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6">
