@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ChevronRight, PauseCircle, Play, Receipt, Trash2, TriangleAlert } from "lucide-react"
 import { formatCurrency } from "@/lib/format"
-import { parkedDetail, parkedSummary, waitingLabel, type ParkedOrder } from "./parked"
+import { isVieja, parkedDetail, parkedSummary, waitingLabel, type ParkedOrder } from "./parked"
 import type { Product } from "./cart"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -179,7 +179,14 @@ export function ParkedTrayDialog({
                       <p className="truncate font-semibold text-stone-800">{o.name}</p>
                       {/* Desde que llegó la mesa, no desde la última ronda: es
                           lo que dice si ya llevan mucho esperando la cuenta. */}
-                      <span className="shrink-0 text-xs text-stone-400">
+                      {/* Una cuenta de hace horas o de otro día se pinta
+                          distinto: es la señal de que alguien se fue sin
+                          pagar, no de que la mesa sigue comiendo. */}
+                      <span
+                        className={`shrink-0 text-xs ${
+                          isVieja(o.savedAt, ahora) ? "font-semibold text-amber-700" : "text-stone-400"
+                        }`}
+                      >
                         abierta {waitingLabel(o.savedAt, ahora)}
                       </span>
                       {r.ok && (
@@ -191,13 +198,37 @@ export function ParkedTrayDialog({
                       )}
                     </div>
                     {r.ok ? (
-                      <p className="truncate text-xs text-stone-500">
-                        {r.count} artículo{r.count === 1 ? "" : "s"} · {formatCurrency(r.total)} · {r.label}
-                      </p>
+                      <>
+                        <p className="truncate text-xs text-stone-500">
+                          {r.count} artículo{r.count === 1 ? "" : "s"} · {formatCurrency(r.total)} · {r.label}
+                        </p>
+                        {/* Se cayeron renglones: el total de aquí YA no los
+                            incluye. Hay que decirlo con el dinero de por
+                            medio, no con un «algo cambió» que nadie relaciona
+                            con cobrar de menos. */}
+                        {r.faltantes > 0 && (
+                          <p className="flex items-start gap-1 text-xs font-medium text-amber-800">
+                            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>
+                              {r.faltantes === 1
+                                ? "1 artículo ya no está en el menú y no se está cobrando."
+                                : `${r.faltantes} artículos ya no están en el menú y no se están cobrando.`}
+                            </span>
+                          </p>
+                        )}
+                      </>
                     ) : (
-                      <p className="flex items-center gap-1 text-xs font-medium text-amber-800">
-                        <TriangleAlert className="h-3.5 w-3.5" />
-                        {r.expired ? "Caducado (más de 12 h)" : "Algún producto ya no está en el menú"}
+                      /* No se puede cobrar lo que ya no está en el menú: el
+                         servidor exige variante ACTIVA y rechazaría la venta.
+                         Pero el café ya se sirvió, así que el aviso tiene que
+                         decir el remedio exacto, no solo que algo falla. */
+                      <p className="flex items-start gap-1 text-xs font-medium text-amber-800">
+                        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {r.expired
+                            ? "Caducada (más de una semana sin cobrar)"
+                            : "Sus productos ya no están en el menú. Reactívalos en Menú → Productos y podrás cobrarla."}
+                        </span>
                       </p>
                     )}
                   </button>

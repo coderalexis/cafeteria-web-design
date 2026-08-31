@@ -100,7 +100,15 @@ import { ModifierSheet } from "./modifier-sheet"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
 import { AccountDialog } from "./account-dialog"
 import { useParkedOrders } from "./use-parked-orders"
-import { autoName, conflictName, parkedAccount, type ParkedOrder } from "./parked"
+import {
+  autoName,
+  conflictName,
+  isVieja,
+  parkedAccount,
+  waitingLabel,
+  PARKED_MAX_AGE_MS,
+  type ParkedOrder,
+} from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -806,6 +814,17 @@ export default function POSClient({
     () => parked.orders.filter((o) => o.id !== openAccount?.id),
     [parked.orders, openAccount],
   )
+  /**
+   * Las que llevan horas o días sin cobrarse, con nombre y edad, para el
+   * aviso del corte. Antes solo se decía cuántas había: quien ve «3 cuentas
+   * abiertas» cada noche deja de leerlo, y ahí se pierde el café del viernes.
+   */
+  const cuentasViejas = useMemo(() => {
+    const ahora = Date.now()
+    return cuentasVisibles
+      .filter((o) => isVieja(o.savedAt, ahora))
+      .map((o) => `«${o.name}» — abierta ${waitingLabel(o.savedAt, ahora)}`)
+  }, [cuentasVisibles])
   // Última venta cobrada, para «Repetir» (sobrevive recargas)
   const [lastSale, setLastSale] = useState<{ folio: number; payload: unknown } | null>(null)
   const lastSaleKey = `pos-last:${businessId}:${cashierId}`
@@ -1163,9 +1182,12 @@ export default function POSClient({
    */
   const resumeParked = useCallback(
     async (order: ParkedOrder) => {
-      const estado = rehydrateCart(order.cart, products, Date.now())
+      const estado = rehydrateCart(order.cart, products, Date.now(), PARKED_MAX_AGE_MS)
       if (!estado || estado.lines.length === 0) {
-        toast.error("Esa cuenta ya no se puede abrir; el menú cambió o caducó.")
+        toast.error(
+          "Esta cuenta no se puede cobrar: sus productos ya no están en el menú. Reactívalos en Menú → Productos.",
+          { duration: 10000 },
+        )
         return
       }
       if (lines.length > 0) {
@@ -1195,8 +1217,16 @@ export default function POSClient({
       clearTip()
       setShowTray(false)
       vibra(12)
-      if (estado.lines.length < order.cart.lines.length) {
-        toast.info("Se abrió, pero algún artículo ya no está en el menú.")
+      const caidos = order.cart.lines.length - estado.lines.length
+      if (caidos > 0) {
+        // Con dinero de por medio no basta «algo cambió»: lo que importa es
+        // que se va a cobrar de menos, y qué hacer para cobrarlo completo.
+        toast.warning(
+          caidos === 1
+            ? "1 artículo de esta cuenta ya no está en el menú y NO se va a cobrar. Reactívalo en Menú → Productos si quieres cobrarlo."
+            : `${caidos} artículos de esta cuenta ya no están en el menú y NO se van a cobrar. Reactívalos en Menú → Productos si quieres cobrarlos.`,
+          { duration: 12000 },
+        )
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2935,6 +2965,7 @@ export default function POSClient({
         onOpenChange={setShowCashDialog}
         session={openSession}
         parkedCount={parkedEnabled ? cuentasVisibles.length : 0}
+        parkedOld={parkedEnabled ? cuentasViejas : []}
         cardFeePct={cardFeePct}
         pendingUploads={cola.pendientes + cola.porRevisar}
       />

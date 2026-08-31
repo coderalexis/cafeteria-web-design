@@ -347,8 +347,18 @@ export function AyudaClient({ ticket, corte }: Props) {
               lo segundo se guarda aparte como <em>«Mesa 1 (2)»</em> y te avisa que las juntes antes de cobrar.
             </li>
             <li>
-              Si el menú cambió mientras tanto (un producto se desactivó o caducó tras 12 horas), la lista lo marca en
-              ámbar y no deja abrirla a ciegas.
+              <strong>Se puede pagar días después.</strong> Alguien pide un café el viernes en la noche, se va a
+              entrenar y regresa el martes: su cuenta sigue ahí. Las que llevan más de 8 horas se marcan en ámbar y
+              se te nombran al cerrar la caja, para que no se te pasen. Se borran solas después de una semana.
+            </li>
+            <li>
+              La venta se registra <strong>el día que cobras</strong>, no el día que serviste. Si el café del viernes
+              se paga el martes, entra en las ventas del martes — es cuando entró el dinero a la caja.
+            </li>
+            <li>
+              Si <strong>desactivaste del menú</strong> algo que estaba en una cuenta, no se puede cobrar (el sistema
+              nunca cobra precios de productos que ya no existen). Te dice cuántos artículos son; reactívalos en{" "}
+              <strong>Menú → Productos</strong> y la cuenta vuelve a cobrarse completa.
             </li>
             <li>
               Cerrar la caja con cuentas abiertas <strong>no</strong> afecta el corte: no son ventas. El sistema te

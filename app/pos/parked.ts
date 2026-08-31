@@ -4,7 +4,6 @@ import {
   getLineLabel,
   getLinePrice,
   rehydrateCart,
-  CART_MAX_AGE_MS,
   type PersistedCart,
   type Product,
 } from "./cart"
@@ -36,6 +35,16 @@ import type { AccountData } from "@/lib/receipt"
  * ahí tumbaba el POS entero con un 500—.
  */
 export const PARKED_MAX = 10
+
+/**
+ * Cuánto puede vivir una cuenta sin cobrar. Debe coincidir con
+ * `CADUCIDAD_HORAS` del servidor: si el carrito caducara antes que la fila,
+ * la cuenta seguiría en la lista pero no se podría abrir ni cobrar.
+ */
+export const PARKED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** A partir de aquí una cuenta ya no es «de ahorita» y hay que señalarla. */
+export const PARKED_VIEJA_MS = 8 * 60 * 60 * 1000
 
 export interface ParkedOrder {
   id: string
@@ -76,7 +85,7 @@ export interface ParkedLine {
  * es lo mismo visto desde la barra: cantidades, tamaños, opciones y notas.
  */
 export function parkedDetail(order: ParkedOrder, products: Product[], now: number): ParkedLine[] {
-  const state = rehydrateCart(order.cart, products, now)
+  const state = rehydrateCart(order.cart, products, now, PARKED_MAX_AGE_MS)
   if (!state) return []
   return state.lines.map((l) => ({
     label: l.size ? `${l.product.name} (${l.size.label})` : l.product.name,
@@ -95,7 +104,7 @@ export function parkedDetail(order: ParkedOrder, products: Product[], now: numbe
  * una comida.
  */
 export function parkedAccount(order: ParkedOrder, products: Product[], now: number): AccountData | null {
-  const state = rehydrateCart(order.cart, products, now)
+  const state = rehydrateCart(order.cart, products, now, PARKED_MAX_AGE_MS)
   if (!state || state.lines.length === 0) return null
   return {
     name: order.name,
@@ -116,11 +125,28 @@ export function parkedSummary(
   order: ParkedOrder,
   products: Product[],
   now: number,
-): { ok: boolean; expired: boolean; count: number; total: number; label: string } {
-  const expired = now - order.savedAt > CART_MAX_AGE_MS
-  const state = expired ? null : rehydrateCart(order.cart, products, now)
+): {
+  ok: boolean
+  expired: boolean
+  count: number
+  total: number
+  label: string
+  /** Renglones que se cayeron porque su producto ya no está en el menú. */
+  faltantes: number
+} {
+  const expired = now - order.savedAt > PARKED_MAX_AGE_MS
+  const state = expired ? null : rehydrateCart(order.cart, products, now, PARKED_MAX_AGE_MS)
+  // Lo que traía guardado vs. lo que sobrevivió al menú de hoy.
+  const faltantes = Math.max(0, (order.cart?.lines?.length ?? 0) - (state?.lines.length ?? 0))
   if (!state || state.lines.length === 0) {
-    return { ok: false, expired, count: 0, total: 0, label: expired ? "Caducado" : "Ya no está en el menú" }
+    return {
+      ok: false,
+      expired,
+      count: 0,
+      total: 0,
+      faltantes,
+      label: expired ? "Caducada" : "Ya no está en el menú",
+    }
   }
   const count = cartItemCount(state.lines)
   const label = state.lines
@@ -131,18 +157,31 @@ export function parkedSummary(
     ok: true,
     expired: false,
     count,
+    faltantes,
     total: cartSubtotal(state.lines),
     label: state.lines.length > 3 ? `${label}…` : label,
   }
 }
 
-/** "hace 4 min" / "hace 2 h" — cuánto lleva abierta. */
+/**
+ * "hace 4 min" / "hace 2 h" / "hace 4 días" — cuánto lleva abierta.
+ *
+ * Llega hasta días a propósito: una cuenta del viernes que se cobra el martes
+ * existe de verdad, y «hace 96 h» no se lee.
+ */
 export function waitingLabel(savedAt: number, now: number): string {
   const min = Math.max(0, Math.floor((now - savedAt) / 60000))
   if (min < 1) return "recién"
   if (min < 60) return `hace ${min} min`
   const h = Math.floor(min / 60)
-  return `hace ${h} h`
+  if (h < 24) return `hace ${h} h`
+  const d = Math.floor(h / 24)
+  return d === 1 ? "desde ayer" : `hace ${d} días`
+}
+
+/** ¿Ya no es una cuenta «de ahorita»? Sirve para pintarla distinto y avisar. */
+export function isVieja(savedAt: number, now: number): boolean {
+  return now - savedAt > PARKED_VIEJA_MS
 }
 
 /**

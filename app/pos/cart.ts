@@ -221,12 +221,21 @@ export const CART_MAX_AGE_MS = 12 * 60 * 60 * 1000
  * Reconstruye el carrito contra el menú actual: descarta líneas cuyo
  * producto, tamaño o modificadores ya no existen (el servidor las
  * rechazaría). Devuelve null si el dato guardado no sirve.
+ *
+ * `maxAgeMs` es parámetro porque el carrito de trabajo y una cuenta abierta
+ * caducan por razones distintas: el primero es basura de un turno anterior a
+ * las 12 h, la segunda es dinero que alguien debe y no puede evaporarse.
  */
-export function rehydrateCart(raw: unknown, products: Product[], now: number): CartState | null {
+export function rehydrateCart(
+  raw: unknown,
+  products: Product[],
+  now: number,
+  maxAgeMs: number = CART_MAX_AGE_MS,
+): CartState | null {
   if (!raw || typeof raw !== "object") return null
   const p = raw as Partial<PersistedCart>
   if (p.v !== CART_STORAGE_VERSION || !Array.isArray(p.lines)) return null
-  if (typeof p.savedAt !== "number" || now - p.savedAt > CART_MAX_AGE_MS) return null
+  if (typeof p.savedAt !== "number" || now - p.savedAt > maxAgeMs) return null
 
   const byId = new Map(products.map((prod) => [prod.id, prod]))
   const lines: CartLine[] = []

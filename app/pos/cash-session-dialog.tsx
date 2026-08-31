@@ -32,6 +32,12 @@ interface Props {
   session: OpenSession | null
   /** Cuentas abiertas sin cobrar, solo para avisar al cerrar. */
   parkedCount?: number
+  /**
+   * Las que ya llevan horas o días. Van por su nombre y no como un número:
+   * «tienes 3 cuentas abiertas» todas las noches se vuelve ruido que nadie
+   * lee, y ahí es donde se pierde el café del viernes que nadie pagó.
+   */
+  parkedOld?: string[]
   /** Comisión de la terminal (%): solo para mostrar el neto de tarjeta. */
   cardFeePct?: number
   /** Ventas capturadas sin internet que aún no llegan al servidor. */
@@ -45,12 +51,12 @@ function parseMoney(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
-export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0, cardFeePct = 0, pendingUploads = 0 }: Props) {
+export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0, parkedOld = [], cardFeePct = 0, pendingUploads = 0 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         {session ? (
-          <CloseSessionForm session={session} parkedCount={parkedCount} cardFeePct={cardFeePct} pendingUploads={pendingUploads} onDone={() => onOpenChange(false)} />
+          <CloseSessionForm session={session} parkedCount={parkedCount} parkedOld={parkedOld} cardFeePct={cardFeePct} pendingUploads={pendingUploads} onDone={() => onOpenChange(false)} />
         ) : (
           <OpenSessionForm onDone={() => onOpenChange(false)} />
         )}
@@ -161,12 +167,14 @@ function OpenSessionForm({ onDone }: { onDone: () => void }) {
 function CloseSessionForm({
   session,
   parkedCount,
+  parkedOld,
   cardFeePct = 0,
   pendingUploads = 0,
   onDone,
 }: {
   session: OpenSession
   parkedCount: number
+  parkedOld: string[]
   cardFeePct?: number
   pendingUploads?: number
   onDone: () => void
@@ -468,11 +476,26 @@ function CloseSessionForm({
           </div>
 
           {parkedCount > 0 && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Tienes {parkedCount} cuenta{parkedCount === 1 ? "" : "s"} abierta{parkedCount === 1 ? "" : "s"} sin
-              cobrar. No son ventas ni afectan este corte: siguen ahí para el turno que entre, en este aparato o en
-              cualquier otro.
-            </p>
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p>
+                Tienes {parkedCount} cuenta{parkedCount === 1 ? "" : "s"} abierta{parkedCount === 1 ? "" : "s"} sin
+                cobrar. No son ventas ni afectan este corte: siguen ahí para el turno que entre, en este aparato o en
+                cualquier otro.
+              </p>
+              {/* Las viejas por su nombre y con su edad. Un conteo genérico
+                  cada noche se vuelve ruido, y es justo ahí donde se pierde
+                  el café que alguien pidió el viernes y nunca pagó. */}
+              {parkedOld.length > 0 && (
+                <div className="font-semibold">
+                  <p>Revisa antes de irte, {parkedOld.length === 1 ? "esta lleva" : "estas llevan"} rato sin cobrarse:</p>
+                  <ul className="mt-1 list-disc pl-5 font-normal">
+                    {parkedOld.map((linea) => (
+                      <li key={linea}>{linea}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Conteo */}

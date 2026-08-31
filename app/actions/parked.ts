@@ -15,8 +15,20 @@ import type { ActionResult } from "./types"
 /*  tabla propia. Guardado en el navegador se perdía al borrar datos.  */
 /* ------------------------------------------------------------------ */
 
-/** Más viejo que esto y ya no es un pedido esperando, es basura del día pasado. */
-const CADUCIDAD_HORAS = 12
+/**
+ * Cuánto sobrevive una cuenta sin cobrar.
+ *
+ * Eran 12 h, pensando en «basura del día anterior». Estaba mal: en la
+ * cafetería del gym alguien pide un café el viernes en la noche, se va a
+ * entrenar, y vuelve a pagar el lunes o el martes. Con 12 h su cuenta se
+ * borraba sola —y en silencio— antes de que regresara: el café servido y sin
+ * cobrar, sin rastro de que alguien debía.
+ *
+ * Una semana cubre ese caso con holgura. NO es un sistema de fiado: es el
+ * plazo tras el cual una cuenta olvidada deja de estorbar. Antes de que se
+ * cumpla, la lista y el corte la señalan por su edad (ver `waitingLabel`).
+ */
+const CADUCIDAD_HORAS = 7 * 24
 
 export interface ParkedRecord {
   id: string
@@ -36,9 +48,9 @@ export interface ParkedRecord {
 /**
  * Los pedidos en espera de la cafetería activa, del más viejo al más nuevo.
  *
- * De paso borra los caducados: son de un día anterior y ya nadie los va a
- * cobrar. Se hace aquí y no en un proceso aparte porque es barato y así la
- * limpieza ocurre justo cuando alguien mira la lista.
+ * De paso borra las caducadas (más de una semana). Se hace aquí y no en un
+ * proceso aparte porque es barato y así la limpieza ocurre justo cuando
+ * alguien mira la lista.
  */
 export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[] }>> {
   const { error: ctxError } = await requireContext()
