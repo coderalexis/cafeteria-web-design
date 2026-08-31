@@ -380,8 +380,9 @@ export function AyudaClient({ ticket, corte }: Props) {
               avisa que se quedan para el siguiente turno.
             </li>
             <li>
-              ¿No lo usas? El dueño puede apagar el módulo en <strong>Datos y ajustes → Módulos del POS</strong> y los
-              botones desaparecen.
+              Viene <strong>encendido</strong> en toda cafetería. ¿No lo usas? El dueño lo apaga en{" "}
+              <strong>Datos y ajustes → Módulos del POS</strong> y los botones desaparecen del POS; lo guardado no se
+              borra, vuelve a aparecer si lo enciendes otra vez.
             </li>
           </ul>
         </>
