@@ -215,3 +215,46 @@ export function conflictName(name: string, existentes: string[]): string {
   }
   return `${base} (+)`.slice(0, 40)
 }
+
+/**
+ * Suma el carrito B a la cuenta A, al nivel del dato guardado (sin pasar por
+ * el menú).
+ *
+ * Existe por la trampa del nombre repetido: tocar el chip «Mesa 1» cuando esa
+ * cuenta ya existe creaba una SEGUNDA «Mesa 1», y no hay herramienta para
+ * juntar dos cuentas. Ahora ese gesto —el más natural del mundo— significa
+ * «súmale esto a la mesa».
+ *
+ * Se opera sobre los renglones crudos y NO sobre el carrito rehidratado a
+ * propósito: rehidratar tira los renglones cuyo producto salió del menú, y
+ * fusionarlos así los borraría de la cuenta en silencio. Aquí no se pierde
+ * nada; los invendibles los sigue señalando `parkedSummary`.
+ *
+ * Renglones idénticos (producto, tamaño, opciones y nota) se juntan sumando
+ * cantidades, para no acabar con tres líneas de «1× Capuchino».
+ */
+export function mergeParkedCarts(base: PersistedCart, extra: PersistedCart): PersistedCart {
+  const llave = (l: PersistedCart["lines"][number]) =>
+    [l.productId, l.sizeLabel ?? "", [...(l.modifierIds ?? [])].sort().join("+"), (l.notes ?? "").trim()].join("|")
+
+  const lines = base.lines.map((l) => ({ ...l }))
+  const porLlave = new Map(lines.map((l) => [llave(l), l]))
+  for (const l of extra.lines) {
+    const ya = porLlave.get(llave(l))
+    if (ya && ya.quantity + l.quantity <= 99) {
+      ya.quantity += l.quantity
+    } else {
+      const copia = { ...l }
+      lines.push(copia)
+      porLlave.set(llave(copia), copia)
+    }
+  }
+
+  return {
+    ...base,
+    lines,
+    // La nota de la cuenta manda; si no tenía, se adopta la del carrito.
+    ticketNotes: base.ticketNotes?.trim() ? base.ticketNotes : extra.ticketNotes,
+    savedAt: extra.savedAt,
+  }
+}

@@ -320,9 +320,10 @@ export function AyudaClient({ ticket, corte }: Props) {
               vacío se llama con la hora. El carrito queda libre para atender al siguiente.
             </Step>
             <Step n={2} title="Súmale las rondas que pidan">
-              El número naranja junto a <strong>Cuentas</strong> dice cuántas hay. Ábrela, agrega lo nuevo y toca{" "}
-              <strong>Guardar en «Mesa 1»</strong> — <em>el nombre ya no hay que volver a escribirlo</em>. Arriba del
-              carrito verás en todo momento de qué mesa es lo que estás anotando.
+              Cada cuenta abierta aparece como un <strong>chip arriba de los productos</strong>, con su total. Toca{" "}
+              <strong>Mesa 1</strong>, agrega lo nuevo y toca <strong>Guardar</strong> — en el celular el botón está
+              en la barra de abajo, y <em>el nombre ya no hay que volver a escribirlo</em>. Arriba del carrito verás
+              en todo momento de qué mesa es lo que estás anotando.
             </Step>
             <Step n={3} title="«¿Me trae la cuenta?»">
               En <strong>Cuentas</strong>, toca la mesa y luego <strong>Ver la cuenta</strong>: sale el desglose con
@@ -336,6 +337,11 @@ export function AyudaClient({ ticket, corte }: Props) {
           </ol>
           <DemoCuenta />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Repetir el nombre no duplica: suma.</strong> Si tocas «Abrir cuenta» y eliges una mesa que ya
+              tiene cuenta (el chip se marca con <strong>+</strong>), lo del carrito <em>se le agrega</em> a esa
+              cuenta en vez de crear otra igual.
+            </li>
             <li>
               Las cuentas son <strong>de la cafetería</strong>, no del aparato: puedes tomar el pedido en el celular y
               cobrarlo en la tablet. La venta se registra a nombre de quien cobra.

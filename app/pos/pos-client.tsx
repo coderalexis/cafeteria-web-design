@@ -30,6 +30,7 @@ import {
   Percent,
   SlidersHorizontal,
   StickyNote,
+  ChevronRight,
   ChefHat,
   History,
   Keyboard,
@@ -105,6 +106,8 @@ import {
   conflictName,
   esFiado,
   isVieja,
+  mergeParkedCarts,
+  parkedSummary,
   parkedAccount,
   waitingLabel,
   PARKED_MAX_AGE_MS,
@@ -827,6 +830,17 @@ export default function POSClient({
       .map((o) => `«${o.name}» — abierta ${waitingLabel(o.savedAt, ahora)}`)
   }, [cuentasVisibles])
 
+  /** Chips de la rejilla: solo cuentas del día, con su total al menú de hoy. */
+  const chipsCuentas = useMemo(() => {
+    const ahora = Date.now()
+    return cuentasVisibles
+      .filter((o) => !esFiado(o))
+      .map((o) => {
+        const r = parkedSummary(o, products, ahora)
+        return { o, total: r.total, vieja: isVieja(o.savedAt, ahora) }
+      })
+  }, [cuentasVisibles, products])
+
   /**
    * Pasa una cuenta a «Por cobrar». Si era la que estaba abierta en este
    * carrito, se suelta el puntero: ya no se le va a seguir agregando.
@@ -1127,7 +1141,48 @@ export default function POSClient({
   const parkCurrent = useCallback(
     (name: string) => {
       if (lines.length === 0) return
-      if (!parked.park(cartStateNow(), name)) {
+      const limpio = name.trim().slice(0, 40)
+
+      /* Nombre repetido = SUMARLE a esa cuenta, no crear otra. Tocar el chip
+         «Mesa 1» cuando la mesa ya tiene cuenta es el gesto más natural para
+         mandarle otra ronda — y antes creaba una segunda «Mesa 1» que nadie
+         sabía juntar. Solo cuentas del día: a un fiado (alguien que YA se
+         fue) no se le suma un pedido nuevo. */
+      const existente = parked.orders.find(
+        (o) => !esFiado(o) && o.name.trim().toLowerCase() === limpio.toLowerCase(),
+      )
+      if (existente) {
+        void (async () => {
+          const combinado = mergeParkedCarts(existente.cart, serializeCart(cartStateNow(), Date.now()))
+          const r = await parked.update(existente.id, existente.updatedAt, combinado)
+          if (!r) return // el hook ya avisó; el carrito no se toca
+          if (r.saved) {
+            clearTip()
+            clearCart()
+            setOpenAccount(null)
+            vibra(12)
+            toast.success(`Se sumó a la cuenta «${existente.name}».`)
+            return
+          }
+          // Otro aparato la movió justo ahora: mismo trato que en
+          // saveToOpenAccount — no se pisa ni se tira, se guarda aparte.
+          const alterno = conflictName(existente.name, parked.orders.map((o) => o.name))
+          if (!parked.park(cartStateNow(), alterno)) {
+            toast.error("La bandeja está llena: cobra o descarta una cuenta y vuelve a guardar.")
+            return
+          }
+          clearTip()
+          clearCart()
+          setOpenAccount(null)
+          toast.warning(
+            `«${existente.name}» se movió en otro aparato. Esto se guardó como «${alterno}»: júntalas antes de cobrar.`,
+            { duration: 12000 },
+          )
+        })()
+        return
+      }
+
+      if (!parked.park(cartStateNow(), limpio)) {
         toast.error(`Ya hay ${parked.orders.length} cuentas abiertas; cobra o descarta alguna.`)
         return
       }
@@ -1135,7 +1190,7 @@ export default function POSClient({
       clearCart()
       setOpenAccount(null)
       vibra(12)
-      toast.success(`Cuenta «${name}» abierta.`)
+      toast.success(`Cuenta «${limpio}» abierta.`)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lines.length, parked, cartStateNow, clearCart],
@@ -1154,7 +1209,7 @@ export default function POSClient({
    */
   const saveToOpenAccount = useCallback(async (): Promise<boolean> => {
     if (!openAccount || lines.length === 0) return false
-    const r = await parked.update(openAccount.id, openAccount.updatedAt, cartStateNow())
+    const r = await parked.update(openAccount.id, openAccount.updatedAt, serializeCart(cartStateNow(), Date.now()))
     if (!r) return false // el hook ya avisó
     if (r.saved) {
       clearTip()
@@ -1233,6 +1288,9 @@ export default function POSClient({
       setTicketNotes(estado.ticketNotes)
       clearTip()
       setShowTray(false)
+      // En celular la hoja del carrito tapa la rejilla: se cierra para que
+      // el siguiente gesto —tocar productos de la ronda— ya sea posible.
+      setCartOpen(false)
       vibra(12)
       const caidos = order.cart.lines.length - estado.lines.length
       if (caidos > 0) {
@@ -2683,6 +2741,55 @@ export default function POSClient({
           </div>
           )}
 
+          {/* Cuentas abiertas, mesa-primero. En una mesa primero sabes QUIÉN
+              pide y después qué: el chip abre la cuenta en un toque, en vez
+              del viaje ⋮ → Cuentas → Abrir. La fila solo existe cuando hay
+              cuentas (y con el módulo encendido): un café de barra no gasta
+              ni un pixel en esto. Los fiados no salen aquí — son de alguien
+              que ya se fue, no una mesa activa; viven en la bandeja. */}
+          {parkedEnabled && (openAccount || chipsCuentas.length > 0) && (
+            <div className="flex items-center gap-2 mt-2 overflow-x-auto pb-1 scrollbar-hide">
+              {openAccount && (
+                <button
+                  type="button"
+                  onClick={() => setCartOpen(true)}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-amber-600 bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white"
+                  title={`«${openAccount.name}» está en el carrito`}
+                >
+                  <PauseCircle className="h-3.5 w-3.5" />
+                  {openAccount.name}
+                  <span className="opacity-80">· en el carrito</span>
+                </button>
+              )}
+              {chipsCuentas.map(({ o, total, vieja }) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => void resumeParked(o)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    vieja
+                      ? "border-amber-400 bg-amber-50 text-amber-800 hover:border-amber-500"
+                      : "border-stone-200 bg-white text-stone-700 hover:border-amber-400 hover:text-amber-700"
+                  }`}
+                  title={`Abrir «${o.name}» para agregarle o cobrarla`}
+                >
+                  <PauseCircle className={`h-3.5 w-3.5 ${vieja ? "text-amber-600" : "text-amber-500"}`} />
+                  {o.name}
+                  <span className={vieja ? "text-amber-700" : "text-stone-400"}>{formatCurrency(total)}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowTray(true)}
+                className="shrink-0 rounded-full border border-stone-200 bg-white p-1.5 text-stone-400 hover:border-amber-400 hover:text-amber-700"
+                title="Ver todas las cuentas"
+                aria-label="Ver todas las cuentas"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* Categories scroll */}
           <div className="flex gap-2 mt-2 overflow-x-auto pb-1 scrollbar-hide">
             {categories.map((cat) => (
@@ -2840,6 +2947,17 @@ export default function POSClient({
                   )}
                   <ChevronUp className="h-4 w-4 shrink-0 opacity-70" />
                 </Button>
+                {/* Con una cuenta abierta, guardar la ronda es tan común como
+                    cobrar — y obligaba a abrir la hoja solo para ese toque. */}
+                {openAccount && (
+                  <Button
+                    className="h-12 shrink-0 rounded-xl bg-amber-600 px-3 text-base font-bold text-white hover:bg-amber-700"
+                    onClick={() => void saveToOpenAccount()}
+                    title={`Guardar esta ronda en «${openAccount.name}»`}
+                  >
+                    Guardar
+                  </Button>
+                )}
                 {openSession ? (
                   <Button
                     className={`h-12 shrink-0 rounded-xl px-4 text-base font-bold text-white ${
@@ -3027,6 +3145,7 @@ export default function POSClient({
         onOpenChange={setShowPark}
         sugerido={autoName(new Date())}
         onPark={parkCurrent}
+        abiertas={chipsCuentas.map(({ o }) => o.name)}
       />
       <ParkedTrayDialog
         open={showTray}

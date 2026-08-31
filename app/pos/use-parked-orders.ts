@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { serializeCart, type CartState } from "./cart"
+// (serializeCart se usa en `park`; `update` ya recibe el carrito serializado)
 import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
 import { PARKED_MAX, type ParkedOrder } from "./parked"
 
@@ -183,9 +184,8 @@ export function useParkedOrders(businessId: string) {
     async (
       id: string,
       expectedUpdatedAt: string,
-      state: CartState,
+      cart: ParkedOrder["cart"],
     ): Promise<{ saved: boolean; updatedAt: string | null } | null> => {
-      const cart = serializeCart(state, Date.now())
       const r = await updateParked({ id, cart, expectedUpdatedAt })
       if (!r?.success) {
         toast.error(r?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")

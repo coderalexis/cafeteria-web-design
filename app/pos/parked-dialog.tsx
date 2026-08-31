@@ -25,13 +25,18 @@ export function ParkDialog({
   onOpenChange,
   sugerido,
   onPark,
+  abiertas = [],
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   sugerido: string
   onPark: (name: string) => void
+  /** Nombres de cuentas del día ya abiertas: elegir uno le SUMA, no duplica. */
+  abiertas?: string[]
 }) {
   const [nombre, setNombre] = useState("")
+  const yaAbierta = (n: string) => abiertas.some((a) => a.trim().toLowerCase() === n.trim().toLowerCase())
+  const escrita = nombre.trim() && yaAbierta(nombre)
 
   const guardar = (valor: string) => {
     onPark(valor.trim() || sugerido)
@@ -59,13 +64,23 @@ export function ParkDialog({
         <div className="space-y-3">
           <div className="flex flex-wrap gap-1.5">
             {CHIPS.map((c) => (
+              /* La mesa con cuenta se distingue y lo dice: tocarla SUMA lo del
+                 carrito a esa cuenta. Antes creaba una segunda «Mesa 1» que
+                 nadie sabía juntar — el gesto más natural producía el estado
+                 más confuso. */
               <button
                 key={c}
                 type="button"
                 onClick={() => guardar(c)}
-                className="rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-600 hover:border-amber-400 hover:text-amber-700"
+                className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  yaAbierta(c)
+                    ? "border-amber-400 bg-amber-50 text-amber-800 hover:border-amber-500"
+                    : "border-stone-200 bg-white text-stone-600 hover:border-amber-400 hover:text-amber-700"
+                }`}
+                title={yaAbierta(c) ? `«${c}» ya está abierta: se le sumará` : undefined}
               >
                 {c}
+                {yaAbierta(c) && <span className="ml-1 opacity-70">+</span>}
               </button>
             ))}
           </div>
@@ -82,9 +97,15 @@ export function ParkDialog({
               }
             }}
           />
-          <p className="text-xs text-stone-400">
-            Un nombre ayuda a reconocerla después. Si lo dejas vacío se llamará «{sugerido}».
-          </p>
+          {escrita ? (
+            <p className="text-xs font-medium text-amber-800">
+              «{nombre.trim()}» ya está abierta: esto se le sumará a esa cuenta.
+            </p>
+          ) : (
+            <p className="text-xs text-stone-400">
+              Un nombre ayuda a reconocerla después. Si lo dejas vacío se llamará «{sugerido}».
+            </p>
+          )}
         </div>
 
         <DialogFooter>
