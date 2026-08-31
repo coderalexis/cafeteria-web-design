@@ -103,6 +103,7 @@ import { useParkedOrders } from "./use-parked-orders"
 import {
   autoName,
   conflictName,
+  esFiado,
   isVieja,
   parkedAccount,
   waitingLabel,
@@ -822,9 +823,25 @@ export default function POSClient({
   const cuentasViejas = useMemo(() => {
     const ahora = Date.now()
     return cuentasVisibles
-      .filter((o) => isVieja(o.savedAt, ahora))
+      .filter((o) => !esFiado(o) && isVieja(o.savedAt, ahora))
       .map((o) => `«${o.name}» — abierta ${waitingLabel(o.savedAt, ahora)}`)
   }, [cuentasVisibles])
+
+  /**
+   * Pasa una cuenta a «Por cobrar». Si era la que estaba abierta en este
+   * carrito, se suelta el puntero: ya no se le va a seguir agregando.
+   */
+  const marcarFiado = useCallback(
+    async (id: string, contact: string | undefined) => {
+      const ok = await parked.fiar(id, contact)
+      if (ok) {
+        if (openAccount?.id === id) setOpenAccount(null)
+        toast.success("Pasó a «Por cobrar». No se registró ninguna venta.")
+      }
+      return ok
+    },
+    [parked, openAccount],
+  )
   // Última venta cobrada, para «Repetir» (sobrevive recargas)
   const [lastSale, setLastSale] = useState<{ folio: number; payload: unknown } | null>(null)
   const lastSaleKey = `pos-last:${businessId}:${cashierId}`
@@ -3020,6 +3037,7 @@ export default function POSClient({
         onResume={resumeParked}
         onRemove={parked.remove}
         onViewAccount={(o) => setAccountToView(parkedAccount(o, products, Date.now()))}
+        onMarkOwed={marcarFiado}
       />
       {appCtx.business && (
         <AccountDialog

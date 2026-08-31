@@ -304,7 +304,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar",
       href: "/pos",
       nodo: (
         <>
@@ -350,6 +350,13 @@ export function AyudaClient({ ticket, corte }: Props) {
               <strong>Se puede pagar días después.</strong> Alguien pide un café el viernes en la noche, se va a
               entrenar y regresa el martes: su cuenta sigue ahí. Las que llevan más de 8 horas se marcan en ámbar y
               se te nombran al cerrar la caja, para que no se te pasen. Se borran solas después de una semana.
+            </li>
+            <li>
+              <strong>Si se fue sin pagar</strong>, ábrela y toca <strong>«Se fue sin pagar»</strong>. Anota su
+              teléfono si lo tienes. La cuenta pasa a la sección <strong>Por cobrar</strong>: deja de estorbar la
+              lista del día, <em>ya no caduca nunca</em>, y aparece en <strong>Tu dinero → Por cobrar</strong> con
+              lo que te deben en total. Ahí <strong>no se registra ninguna venta</strong>: eso pasa el día que te
+              pague. Cuando vuelva, la abres desde <strong>Cuentas → Por cobrar</strong> y la cobras normal.
             </li>
             <li>
               La venta se registra <strong>el día que cobras</strong>, no el día que serviste. Si el café del viernes

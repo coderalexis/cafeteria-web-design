@@ -55,6 +55,21 @@ export interface ParkedOrder {
   cart: PersistedCart
   /** Sello de la última escritura; se devuelve al guardar para no pisar a nadie. */
   updatedAt: string
+  /**
+   * Desde cuándo se debe. Nulo = cuenta del día; con fecha = fiado.
+   *
+   * Son dos cosas distintas y por eso viven en listas distintas: la cuenta
+   * del día es de una mesa que está comiendo ahora, el fiado es de alguien
+   * que ya se fue. Mezclarlas convertía el aviso del corte en ruido.
+   */
+  owedSince: number | null
+  /** Teléfono o nota para poder cobrarle. */
+  owedContact: string | null
+}
+
+/** ¿Esta cuenta es un fiado (alguien se fue sin pagar)? */
+export function esFiado(o: ParkedOrder): boolean {
+  return o.owedSince !== null
 }
 
 export function autoName(now: Date): string {

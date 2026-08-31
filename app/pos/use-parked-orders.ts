@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { serializeCart, type CartState } from "./cart"
-import { listParked, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
+import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
 import { PARKED_MAX, type ParkedOrder } from "./parked"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
@@ -53,6 +53,8 @@ export function useParkedOrders(businessId: string) {
               savedAt: o.savedAt,
               cart: o.cart as ParkedOrder["cart"],
               updatedAt: o.updatedAt,
+              owedSince: o.owedSince,
+              owedContact: o.owedContact,
             }))
             .reverse(),
         )
@@ -146,6 +148,8 @@ export function useParkedOrders(businessId: string) {
         savedAt: Date.now(),
         cart: serializeCart(state, Date.now()),
         updatedAt: "",
+        owedSince: null,
+        owedContact: null,
       }
       aplicar([provisional, ...ref.current])
       ;(async () => {
@@ -214,5 +218,26 @@ export function useParkedOrders(businessId: string) {
     [aplicar, refrescar],
   )
 
-  return { orders, listo, park, update, remove, refrescar, full: orders.length >= PARKED_MAX }
+  /**
+   * Marca una cuenta como fiado. No cobra nada: solo la saca de la lista del
+   * día y la manda a «Por cobrar», donde ya no caduca.
+   */
+  const fiar = useCallback(
+    async (id: string, contact: string | undefined): Promise<boolean> => {
+      const r = await markOwed({ id, contact })
+      if (!r?.success) {
+        toast.error(r?.error ?? "No se pudo marcar como fiado.")
+        return false
+      }
+      aplicar(
+        ref.current.map((o) =>
+          o.id === id ? { ...o, owedSince: r.owedSince, owedContact: contact ?? null } : o,
+        ),
+      )
+      return true
+    },
+    [aplicar],
+  )
+
+  return { orders, listo, park, update, remove, fiar, refrescar, full: orders.length >= PARKED_MAX }
 }

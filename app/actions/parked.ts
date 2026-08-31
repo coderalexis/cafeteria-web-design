@@ -2,7 +2,9 @@
 
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { requireContext } from "@/lib/context"
+import { revalidatePath } from "next/cache"
+import { requireContext, requireRole } from "@/lib/context"
+import { logAudit } from "@/lib/audit"
 import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActionResult } from "./types"
 
@@ -24,9 +26,12 @@ import type { ActionResult } from "./types"
  * borraba sola —y en silencio— antes de que regresara: el café servido y sin
  * cobrar, sin rastro de que alguien debía.
  *
- * Una semana cubre ese caso con holgura. NO es un sistema de fiado: es el
- * plazo tras el cual una cuenta olvidada deja de estorbar. Antes de que se
- * cumpla, la lista y el corte la señalan por su edad (ver `waitingLabel`).
+ * Una semana cubre ese caso con holgura. Antes de que se cumpla, la lista y
+ * el corte la señalan por su edad (ver `waitingLabel`).
+ *
+ * NO aplica al fiado: una cuenta marcada como «se fue sin pagar» no caduca
+ * nunca. Ahí la deuda es el dato, y borrarla sola sería exactamente el error
+ * que este plazo vino a arreglar, solo que más caro.
  */
 const CADUCIDAD_HORAS = 7 * 24
 
@@ -43,6 +48,13 @@ export interface ParkedRecord {
    * desde otro aparato. Ver `updateParked`.
    */
   updatedAt: string
+  /**
+   * Desde cuándo se debe. Nulo = cuenta abierta del día; con fecha = fiado:
+   * la persona se fue sin pagar y esto ya no estorba la lista del día.
+   */
+  owedSince: number | null
+  /** Teléfono o nota para poder cobrarle. */
+  owedContact: string | null
 }
 
 /**
@@ -61,12 +73,14 @@ export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[
 
   // Sin `await`: que la limpieza no retrase la lista. Si falla, no pasa nada
   // —el filtro de abajo igual los esconde— y se reintenta a la siguiente.
-  void supabase.from("parked_orders").delete().lt("created_at", limite)
+  void supabase.from("parked_orders").delete().lt("created_at", limite).is("owed_since", null)
 
   const { data, error } = await supabase
     .from("parked_orders")
-    .select("id, name, cart, created_at, updated_at")
-    .gte("created_at", limite)
+    .select("id, name, cart, created_at, updated_at, owed_since, owed_contact")
+    // El fiado se salva de la caducidad: `or` mantiene las recientes Y todas
+    // las que alguien debe, sin importar de cuándo sean.
+    .or(`created_at.gte.${limite},owed_since.not.is.null`)
     .order("created_at", { ascending: true })
     .limit(50)
 
@@ -78,6 +92,8 @@ export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[
     savedAt: new Date(r.created_at).getTime(),
     cart: r.cart,
     updatedAt: r.updated_at,
+    owedSince: r.owed_since ? new Date(r.owed_since).getTime() : null,
+    owedContact: r.owed_contact,
   }))
   return { success: true, orders }
 }
@@ -172,5 +188,91 @@ export async function removeParked(id: string): Promise<ActionResult> {
   // fila y el borrado simplemente no afecta nada.
   const { error } = await supabase.from("parked_orders").delete().eq("id", id)
   if (error) return { error: dbErrorMessage(error) }
+  return { success: true }
+}
+
+const fiadoSchema = z.object({
+  id: z.string().uuid(),
+  /** Teléfono o nota para poder cobrarle después. Opcional. */
+  contact: z.string().trim().max(60).optional(),
+})
+
+/**
+ * Marca una cuenta como fiado: la persona se fue sin pagar.
+ *
+ * NO registra ninguna venta. La venta sigue naciendo al COBRAR, que es
+ * cuando entra el dinero a la caja: un ticket de hoy que nadie pagó dejaría
+ * el arqueo de esta noche corto y parecería un faltante.
+ *
+ * Lo único que cambia es dónde vive: sale de la lista del día —donde estorba
+ * y se vuelve ruido— y pasa a «Por cobrar», donde lo que importa es quién
+ * debe, cuánto y desde cuándo. Y deja de caducar.
+ */
+export async function markOwed(
+  input: z.infer<typeof fiadoSchema>,
+): Promise<ActionResult<{ owedSince: number }>> {
+  const { error: ctxError } = await requireContext()
+  if (ctxError !== null) return { error: ctxError }
+
+  const parsed = fiadoSchema.safeParse(input)
+  if (!parsed.success) return { error: "Datos inválidos." }
+
+  const ahora = new Date().toISOString()
+  const supabase = await createClient()
+  // `owed_since` solo se pone si aún no estaba: volver a marcar un fiado no
+  // debe reiniciar desde cuándo se debe.
+  const { data, error } = await supabase
+    .from("parked_orders")
+    .update({ owed_since: ahora, owed_contact: parsed.data.contact || null, updated_at: ahora })
+    .eq("id", parsed.data.id)
+    .is("owed_since", null)
+    .select("owed_since")
+
+  if (error) return { error: dbErrorMessage(error) }
+  const fila = data?.[0]
+  if (!fila) return { error: "Esa cuenta ya estaba marcada como fiado, o ya no existe." }
+  return { success: true, owedSince: new Date(fila.owed_since!).getTime() }
+}
+
+const condonarSchema = z.object({
+  id: z.string().uuid(),
+  reason: z.string().trim().min(3).max(120),
+})
+
+/**
+ * Perdona una deuda: la cuenta se borra sin cobrarse.
+ *
+ * Solo dueño o administrador, y con motivo obligatorio que queda en
+ * Actividad. Es la única forma de que dinero servido desaparezca sin entrar
+ * a la caja, así que tiene que quedar por escrito quién lo decidió y por qué
+ * — igual que una cancelación de venta.
+ */
+export async function forgiveOwed(
+  input: z.infer<typeof condonarSchema>,
+): Promise<ActionResult> {
+  const { error: ctxError } = await requireRole(["owner", "admin"])
+  if (ctxError !== null) return { error: ctxError }
+
+  const parsed = condonarSchema.safeParse(input)
+  if (!parsed.success) return { error: "Escribe un motivo de al menos 3 letras." }
+
+  const supabase = await createClient()
+  // Se lee antes de borrar: después no habría de qué dejar constancia.
+  const { data: fila } = await supabase
+    .from("parked_orders")
+    .select("name, owed_since, cart")
+    .eq("id", parsed.data.id)
+    .not("owed_since", "is", null)
+    .maybeSingle()
+  if (!fila) return { error: "Esa cuenta ya no existe o no está marcada como fiado." }
+
+  const { error } = await supabase.from("parked_orders").delete().eq("id", parsed.data.id)
+  if (error) return { error: dbErrorMessage(error) }
+
+  await logAudit("fiado.condonado", fila.name, {
+    motivo: parsed.data.reason,
+    debia_desde: fila.owed_since,
+  })
+  revalidatePath("/admin/por-cobrar")
   return { success: true }
 }

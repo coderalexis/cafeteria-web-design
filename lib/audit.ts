@@ -25,6 +25,7 @@ export async function logAudit(
 
 /** Etiquetas en español para la vista Actividad. */
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  "fiado.condonado": "Deuda condonada",
   "categoria.creada": "Categoría creada",
   "categoria.editada": "Categoría editada",
   "categoria.eliminada": "Categoría eliminada",
