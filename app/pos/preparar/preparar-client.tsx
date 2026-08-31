@@ -55,7 +55,12 @@ export default function PrepararClient({
   const [marcando, setMarcando] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
   // El último pedido recién hecho, para poder deshacer sin ir a buscarlo.
-  const [ultimoListo, setUltimoListo] = useState<KitchenOrder | null>(null)
+  // Junto al pedido va la foto que tenia ANTES de marcarlo: sin ella,
+  // «deshacer» en una cuenta no tiene a que volver.
+  const [ultimoListo, setUltimoListo] = useState<{
+    order: KitchenOrder
+    previous?: Record<string, number>
+  } | null>(null)
   const cargando = useRef(false)
 
   const refrescar = useCallback(async () => {
@@ -105,23 +110,32 @@ export default function PrepararClient({
     }
   }, [refrescar, pollSeconds, pollHiddenSeconds])
 
-  const marcar = async (order: KitchenOrder, listo: boolean) => {
+  const marcar = async (order: KitchenOrder, listo: boolean, previa?: Record<string, number>) => {
     setMarcando(order.id)
     // Se quita de la lista al instante: quien cocina ya lo dio por hecho y
     // esperar a que el servidor conteste se siente lento.
     if (listo) setOrders((prev) => prev.filter((o) => o.id !== order.id))
     // Una cuenta abierta no tiene ticket que marcar: se guarda la foto de lo
     // servido, para que la ronda siguiente salga sola y sin repetir.
-    const r = order.accountName
-      ? await setAccountPrepared({ id: order.id })
-      : await setOrderPrepared({ ticketId: order.id, prepared: listo })
+    // Las dos ramas se resuelven aparte para no perder los tipos: solo la de
+    // cuentas devuelve la foto anterior, que es lo que permite deshacer.
+    let anterior: Record<string, number> | undefined
+    let fallo: string | undefined
+    if (order.accountName) {
+      const r = await setAccountPrepared(listo ? { id: order.id } : { id: order.id, restore: previa ?? {} })
+      if (r.success) anterior = r.previous
+      else fallo = r.error
+    } else {
+      const r = await setOrderPrepared({ ticketId: order.id, prepared: listo })
+      if (!r.success) fallo = r.error
+    }
     setMarcando(null)
-    if (r?.error) {
-      toast.error(r.error)
+    if (fallo) {
+      toast.error(fallo)
       void refrescar() // se deshace solo: la verdad la tiene el servidor
       return
     }
-    setUltimoListo(listo ? order : null)
+    setUltimoListo(listo ? { order, previous: anterior } : null)
     void refrescar()
   }
 
@@ -134,7 +148,7 @@ export default function PrepararClient({
   return (
     <div className="flex h-[100dvh] flex-col bg-stone-100">
       {/* Barra superior */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-stone-200 bg-white px-4 py-3">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-stone-200 bg-white px-4 py-3">
         <Link href="/pos" className="shrink-0">
           <Button variant="outline" size="sm" className="gap-1.5">
             <ArrowLeft className="h-4 w-4" />
@@ -151,17 +165,24 @@ export default function PrepararClient({
           </h1>
         </div>
         {ultimoListo && (
+          /* En celular toma su propio renglon: apretado entre el titulo y el
+             boton de recargar quedaba descuadrado, y es un boton que se toca
+             con prisa y arrepentido. */
           <Button
             variant="outline"
             size="sm"
-            className="shrink-0 gap-1.5"
+            className="order-last w-full shrink-0 gap-1.5 sm:order-none sm:w-auto"
             onClick={() => {
-              void marcar(ultimoListo, false)
+              void marcar(ultimoListo.order, false, ultimoListo.previous)
               setUltimoListo(null)
             }}
           >
-            <Undo2 className="h-4 w-4" />
-            Deshacer #{ultimoListo.folio}
+            <Undo2 className="h-4 w-4 shrink-0" />
+            {/* Una cuenta no tiene folio: se reconoce por su mesa. Antes
+                decia «Deshacer #0». */}
+            <span className="truncate">
+              Deshacer {ultimoListo.order.accountName ?? `#${ultimoListo.order.folio}`}
+            </span>
           </Button>
         )}
         <Button variant="ghost" size="icon" onClick={() => void refrescar()} title="Buscar pedidos nuevos ahora">

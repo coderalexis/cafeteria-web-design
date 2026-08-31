@@ -222,7 +222,15 @@ async function cuentasPorPreparar(
   return out
 }
 
-const cuentaPreparadaSchema = z.object({ id: z.string().uuid() })
+const cuentaPreparadaSchema = z.object({
+  id: z.string().uuid(),
+  /**
+   * Foto a restaurar, para DESHACER. Sin esto, «deshacer» en una cuenta
+   * volvia a marcarla como preparada —el mismo efecto que el boton que
+   * intentaba revertir— y lo servido de menos no reaparecia nunca.
+   */
+  restore: z.record(z.string(), z.number()).optional(),
+})
 
 /**
  * Marca como hecho lo que hoy está pendiente de una cuenta.
@@ -230,7 +238,9 @@ const cuentaPreparadaSchema = z.object({ id: z.string().uuid() })
  * Guarda la foto de las cantidades ACTUALES: la ronda que llegue después
  * saldrá sola como pendiente, sin volver a pedir lo ya servido.
  */
-export async function setAccountPrepared(input: z.infer<typeof cuentaPreparadaSchema>): Promise<ActionResult> {
+export async function setAccountPrepared(
+  input: z.infer<typeof cuentaPreparadaSchema>,
+): Promise<ActionResult<{ previous: Record<string, number> }>> {
   const { error: ctxError } = await requireContext()
   if (ctxError !== null) return { error: ctxError }
   const parsed = cuentaPreparadaSchema.safeParse(input)
@@ -239,18 +249,25 @@ export async function setAccountPrepared(input: z.infer<typeof cuentaPreparadaSc
   const supabase = await createClient()
   const { data: fila } = await supabase
     .from("parked_orders")
-    .select("cart")
+    .select("cart, prepared_lines")
     .eq("id", parsed.data.id)
     .maybeSingle()
   if (!fila) return { error: "Esa cuenta ya no existe." }
+
+  // Lo que habia antes se devuelve para que «Deshacer» pueda restaurarlo.
+  const previous = (fila.prepared_lines ?? {}) as Record<string, number>
 
   // La foto va por CONTENIDO y no por `lineId`: ese identificador se
   // regenera al abrir la cuenta en el carrito, asi que una foto guardada con
   // el quedaba apuntando a renglones inexistentes y TODO volvia a salir como
   // pendiente en la ronda siguiente. Fue justo el fallo que se reporto.
-  const foto: Record<string, number> = {}
-  for (const l of ((fila.cart as { lines?: LineaCarrito[] } | null)?.lines ?? []) as LineaCarrito[]) {
-    foto[lineKey(l)] = (foto[lineKey(l)] ?? 0) + (Number(l.quantity) || 0)
+  let foto: Record<string, number> = {}
+  if (parsed.data.restore) {
+    foto = parsed.data.restore
+  } else {
+    for (const l of ((fila.cart as { lines?: LineaCarrito[] } | null)?.lines ?? []) as LineaCarrito[]) {
+      foto[lineKey(l)] = (foto[lineKey(l)] ?? 0) + (Number(l.quantity) || 0)
+    }
   }
 
   // NO se toca `updated_at`: es el sello del candado entre aparatos, y
@@ -262,7 +279,7 @@ export async function setAccountPrepared(input: z.infer<typeof cuentaPreparadaSc
     .eq("id", parsed.data.id)
 
   if (error) return { error: dbErrorMessage(error) }
-  return { success: true }
+  return { success: true, previous }
 }
 
 /**
