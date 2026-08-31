@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth"
 import { logAudit } from "@/lib/audit"
 import { homePathFor, parseContext } from "@/lib/context-shape"
 import { isValidTimeZone } from "@/lib/dates"
-import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings, MENU_NOTE_MAX } from "@/lib/settings"
+import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings, MENU_NOTE_MAX, TABLE_COUNT_MAX, parseAccountLabels } from "@/lib/settings"
 import { normalizeClosingTime } from "@/lib/cash-session"
 import type { ActionResult } from "./types"
 
@@ -74,6 +74,8 @@ const settingsSchema = z.object({
   publicMenu: z.enum(["on", "off"]).transform((v) => v === "on"),
   autoPrint: z.enum(["none", "ticket", "comanda", "both"]),
   parkedOrders: z.enum(["on", "off"]).transform((v) => v === "on"),
+  tableCount: z.coerce.number().int().min(0).max(TABLE_COUNT_MAX),
+  accountLabels: z.string().max(200).transform(parseAccountLabels),
   discountMaxCashier: z.number().int().min(0).max(100),
   menuNote: z.string().trim().max(MENU_NOTE_MAX, "La nota del menú es demasiado larga."),
   closingTime: z.string().trim().max(5),
@@ -102,6 +104,10 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     publicMenu: formData.get("public_menu") ?? "off",
     autoPrint: formData.get("auto_print") ?? "none",
     parkedOrders: formData.get("parked_orders") ?? "on",
+    // Campo vacío = 0 mesas, que es una respuesta válida (se trabaja por
+    // nombre) y no un «usa el valor por omisión».
+    tableCount: String(formData.get("table_count") ?? "").trim() || "0",
+    accountLabels: formData.get("account_labels") ?? "",
     discountMaxCashier: Number(formData.get("discount_max_cashier") ?? 100),
     menuNote: formData.get("menu_note") ?? "",
     closingTime: formData.get("closing_time") ?? "",
@@ -133,6 +139,8 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       publicMenu: v.publicMenu,
       autoPrint: v.autoPrint,
       parkedOrders: v.parkedOrders,
+      tableCount: v.tableCount,
+      accountLabels: v.accountLabels,
       discountMaxCashier: v.discountMaxCashier,
       menuNote: v.menuNote,
       closingTime: normalizeClosingTime(v.closingTime),
@@ -186,6 +194,12 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.loyaltyTarget !== v.loyaltyTarget) cambios.push(`meta de sellos: ${v.loyaltyTarget}`)
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")
   if (prevSettings.parkedOrders !== v.parkedOrders) cambios.push("módulo de cuentas abiertas")
+  if (
+    prevSettings.tableCount !== v.tableCount ||
+    prevSettings.accountLabels.join("|") !== v.accountLabels.join("|")
+  ) {
+    cambios.push("botones para abrir cuenta")
+  }
   if (prevSettings.discountMaxCashier !== v.discountMaxCashier) cambios.push("límite de descuento en caja")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })

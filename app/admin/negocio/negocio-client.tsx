@@ -347,6 +347,51 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 se registra como venta hasta que se cobra.
               </p>
 
+              {/* Los botones de un toque al abrir una cuenta. Eran fijos en
+                  código («Mesa 1..4, Para llevar, Mostrador») e iguales para
+                  toda cafetería: la del gym veía dos mesas que no tiene, y una
+                  de ocho tecleaba de la 5 en adelante. */}
+              <div className="mt-3 grid gap-3 rounded-lg border border-stone-100 bg-stone-50/60 p-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="table_count" className="text-sm font-medium text-stone-700">
+                    ¿Cuántas mesas tienes?
+                  </label>
+                  <input
+                    id="table_count"
+                    name="table_count"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={30}
+                    step={1}
+                    defaultValue={String(currentSettings.tableCount)}
+                    className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-stone-400">
+                    Salen como botones «Mesa 1», «Mesa 2»… Pon <strong>0</strong> si no trabajas por mesas y
+                    prefieres anotar el nombre de quien pide.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="account_labels" className="text-sm font-medium text-stone-700">
+                    Otros botones
+                  </label>
+                  <input
+                    id="account_labels"
+                    name="account_labels"
+                    type="text"
+                    maxLength={200}
+                    defaultValue={currentSettings.accountLabels.join(", ")}
+                    placeholder="Barra, Terraza, Para llevar"
+                    className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-stone-400">
+                    Separados por comas, hasta 8. Aparecen después de las mesas. Siempre puedes escribir cualquier
+                    otro nombre a mano.
+                  </p>
+                </div>
+              </div>
+
               <div className="border-t border-stone-100 pt-3">
                 <label htmlFor="discount_max_cashier" className="text-sm font-medium text-stone-700">
                   Descuento máximo en caja

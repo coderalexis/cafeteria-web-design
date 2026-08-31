@@ -209,6 +209,8 @@ export default async function POSPage() {
       lockMinutes={settings.lockMinutes}
       autoPrint={settings.autoPrint}
       parkedOrders={settings.parkedOrders}
+      tableCount={settings.tableCount}
+      accountLabels={settings.accountLabels}
       loyalty={settings.loyalty}
       loyaltyTarget={settings.loyaltyTarget}
       loyaltyReward={settings.loyaltyReward}

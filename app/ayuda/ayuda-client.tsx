@@ -316,8 +316,9 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ol className="mt-3 space-y-3">
             <Step n={1} title="Abre la cuenta">
               Con artículos en el carrito, toca <strong>Abrir cuenta</strong> arriba. Ponle nombre con los botones
-              rápidos (<em>Mesa 1</em>, <em>Para llevar</em>…) o escríbelo (<em>«Sra. suéter rojo»</em>). Si lo dejas
-              vacío se llama con la hora. El carrito queda libre para atender al siguiente.
+              rápidos (<em>Mesa 1</em>, <em>Barra</em>…) o escríbelo (<em>«Sra. suéter rojo»</em>). Si lo dejas vacío
+              se llama con la hora. El carrito queda libre para atender al siguiente. Las mesas que ya tienen cuenta
+              <strong> salen primero</strong>, para no buscarlas entre las vacías.
             </Step>
             <Step n={2} title="Súmale las rondas que pidan">
               Cada cuenta abierta aparece como un <strong>chip arriba de los productos</strong>, con su total. Toca{" "}
@@ -378,6 +379,12 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               Cerrar la caja con cuentas abiertas <strong>no</strong> afecta el corte: no son ventas. El sistema te
               avisa que se quedan para el siguiente turno.
+            </li>
+            <li>
+              <strong>Los botones son tuyos.</strong> En <strong>Datos y ajustes → Módulos del POS</strong> dices
+              cuántas mesas tienes (salen como <em>Mesa 1…N</em>) y agregas los que quieras —{" "}
+              <em>Barra, Terraza, Para llevar</em>—. Si pones <strong>0 mesas</strong> no sale ninguna: es para
+              quien anota por nombre de la persona.
             </li>
             <li>
               Viene <strong>encendido</strong> en toda cafetería. ¿No lo usas? El dueño lo apaga en{" "}

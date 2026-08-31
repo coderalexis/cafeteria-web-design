@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, memo } from "react"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS, PAYMENT_METHOD_KEYS, formatDate } from "@/lib/format"
+import { accountChips, DEFAULT_SETTINGS } from "@/lib/settings"
 import {
   buildKitchenLines,
   buildShareText,
@@ -188,6 +189,10 @@ interface POSClientProps {
   autoPrint: "none" | "ticket" | "comanda" | "both"
   /** Módulo de cuentas abiertas activado para esta cafetería. */
   parkedOrders: boolean
+  /** Cuántas mesas tiene: genera los chips «Mesa 1…N» al abrir una cuenta. */
+  tableCount: number
+  /** Etiquetas propias de un toque, además de las mesas («Barra», «Terraza»). */
+  accountLabels: string[]
   /** Lealtad con sellos activada para esta cafetería. */
   loyalty: boolean
   /** Sellos necesarios para el premio. */
@@ -649,6 +654,8 @@ export default function POSClient({
   favoriteVariantIds,
   autoPrint,
   parkedOrders: parkedEnabled,
+  tableCount,
+  accountLabels,
   loyalty,
   loyaltyTarget,
   loyaltyReward,
@@ -829,6 +836,16 @@ export default function POSClient({
       .filter((o) => !esFiado(o) && isVieja(o.savedAt, ahora))
       .map((o) => `«${o.name}» — abierta ${waitingLabel(o.savedAt, ahora)}`)
   }, [cuentasVisibles])
+
+  /** Chips del diálogo «Abrir cuenta», según los ajustes de esta cafetería. */
+  const chipsDeNombre = useMemo(
+    () =>
+      accountChips(
+        { ...DEFAULT_SETTINGS, tableCount, accountLabels },
+        cuentasVisibles.filter((o) => !esFiado(o)).map((o) => o.name),
+      ),
+    [tableCount, accountLabels, cuentasVisibles],
+  )
 
   /** Chips de la rejilla: solo cuentas del día, con su total al menú de hoy. */
   const chipsCuentas = useMemo(() => {
@@ -3146,6 +3163,7 @@ export default function POSClient({
         sugerido={autoName(new Date())}
         onPark={parkCurrent}
         abiertas={chipsCuentas.map(({ o }) => o.name)}
+        chips={chipsDeNombre}
       />
       <ParkedTrayDialog
         open={showTray}

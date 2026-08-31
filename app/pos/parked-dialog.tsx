@@ -16,9 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-/** Nombres de un toque: lo que más se usa en una cafetería con mesas. */
-const CHIPS = ["Mesa 1", "Mesa 2", "Mesa 3", "Mesa 4", "Para llevar", "Mostrador"]
-
 /* ── Guardar el pedido actual ─────────────────────────────────────── */
 export function ParkDialog({
   open,
@@ -26,6 +23,7 @@ export function ParkDialog({
   sugerido,
   onPark,
   abiertas = [],
+  chips = [],
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -33,6 +31,13 @@ export function ParkDialog({
   onPark: (name: string) => void
   /** Nombres de cuentas del día ya abiertas: elegir uno le SUMA, no duplica. */
   abiertas?: string[]
+  /**
+   * Chips de un toque, ya en orden (mesas ocupadas primero). Vienen de los
+   * ajustes de LA cafetería: eran fijos en código e iguales para todas, así
+   * que un café de dos mesas veía cuatro y uno de ocho tecleaba de la 5 en
+   * adelante — justo en el camino más caliente.
+   */
+  chips?: string[]
 }) {
   const [nombre, setNombre] = useState("")
   const yaAbierta = (n: string) => abiertas.some((a) => a.trim().toLowerCase() === n.trim().toLowerCase())
@@ -62,8 +67,11 @@ export function ParkDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Una cafetería puede quedarse sin chips (cero mesas y sin
+              etiquetas): ahí el campo de texto se basta solo. */}
+          {chips.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {CHIPS.map((c) => (
+            {chips.map((c) => (
               /* La mesa con cuenta se distingue y lo dice: tocarla SUMA lo del
                  carrito a esa cuenta. Antes creaba una segunda «Mesa 1» que
                  nadie sabía juntar — el gesto más natural producía el estado
@@ -84,6 +92,7 @@ export function ParkDialog({
               </button>
             ))}
           </div>
+          )}
           <Input
             autoFocus
             value={nombre}

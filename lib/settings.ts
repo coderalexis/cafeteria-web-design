@@ -60,6 +60,53 @@ export interface BusinessSettings {
    * ticket — para eso está `receipt_footer`.
    */
   menuNote: string
+  /**
+   * Cuántas mesas tiene la cafetería: genera los chips «Mesa 1…N» al abrir
+   * una cuenta. 0 = ninguna, para quien trabaja por nombre de persona.
+   */
+  tableCount: number
+  /**
+   * Etiquetas propias de un toque, además de las mesas: «Barra», «Terraza».
+   * Eran fijas en código («Para llevar», «Mostrador») e iguales para todos.
+   */
+  accountLabels: string[]
+}
+
+/** Tope de mesas: más que esto y los chips dejan de ser un atajo. */
+export const TABLE_COUNT_MAX = 30
+/** Tope de etiquetas propias, por la misma razón. */
+export const ACCOUNT_LABELS_MAX = 8
+
+/**
+ * Los chips del diálogo «Abrir cuenta», en orden.
+ *
+ * Las mesas que YA tienen cuenta van primero: con 12 mesas, la que te va a
+ * pedir otra ronda es casi siempre una de las ocupadas, y enterrarla entre
+ * chips vacíos convierte el atajo en una búsqueda. El orden dentro de cada
+ * grupo no cambia nunca — un botón que se mueve solo mata la memoria muscular.
+ */
+export function accountChips(s: BusinessSettings, abiertas: string[] = []): string[] {
+  const mesas = Array.from({ length: Math.max(0, Math.min(s.tableCount, TABLE_COUNT_MAX)) }, (_, i) => `Mesa ${i + 1}`)
+  const ocupada = new Set(abiertas.map((n) => n.trim().toLowerCase()))
+  const usadas = mesas.filter((m) => ocupada.has(m.toLowerCase()))
+  const libres = mesas.filter((m) => !ocupada.has(m.toLowerCase()))
+  return [...usadas, ...libres, ...s.accountLabels]
+}
+
+/** Lista escrita con comas → etiquetas limpias, sin repetidos ni vacías. */
+export function parseAccountLabels(raw: unknown): string[] {
+  const texto = typeof raw === "string" ? raw : Array.isArray(raw) ? raw.join(",") : ""
+  const vistas = new Set<string>()
+  const out: string[] = []
+  for (const parte of texto.split(",")) {
+    const limpia = parte.trim().replace(/\s+/g, " ").slice(0, 24)
+    const clave = limpia.toLowerCase()
+    if (!limpia || vistas.has(clave)) continue
+    vistas.add(clave)
+    out.push(limpia)
+    if (out.length >= ACCOUNT_LABELS_MAX) break
+  }
+  return out
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -82,6 +129,10 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   loyalty: false,
   loyaltyTarget: 10,
   loyaltyReward: "Bebida gratis",
+  // 4 mesas + estas dos etiquetas = exactamente los chips que estaban fijos
+  // en código, para que ninguna cafetería vea cambiar lo que ya conocía.
+  tableCount: 4,
+  accountLabels: ["Para llevar", "Mostrador"],
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -119,6 +170,11 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
       out.discountMaxCashier = Math.round(tope)
     }
     if (typeof r.menu_note === "string") out.menuNote = r.menu_note.slice(0, MENU_NOTE_MAX)
+    const mesas = Number(r.table_count)
+    // `>= 0` y no `> 0`: cero mesas es una respuesta válida (se trabaja por
+    // nombre), no un campo vacío que deba caer al valor por omisión.
+    if (Number.isFinite(mesas) && mesas >= 0 && mesas <= TABLE_COUNT_MAX) out.tableCount = Math.round(mesas)
+    if (Array.isArray(r.account_labels)) out.accountLabels = parseAccountLabels(r.account_labels.join(","))
     if (typeof r.closing_time === "string") out.closingTime = normalizeClosingTime(r.closing_time)
     const cargo = Number(r.takeout_fee)
     if (Number.isFinite(cargo) && cargo > 0) out.takeoutFee = Math.min(Math.round(cargo * 100) / 100, 100)
@@ -149,6 +205,8 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     parked_orders: s.parkedOrders,
     discount_max_cashier: s.discountMaxCashier,
     menu_note: s.menuNote,
+    table_count: s.tableCount,
+    account_labels: s.accountLabels,
     closing_time: s.closingTime,
     takeout_fee: s.takeoutFee,
     card_fee_pct: s.cardFeePct,
