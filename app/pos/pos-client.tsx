@@ -8,6 +8,7 @@ import {
   buildTicketLines,
   printLines,
   receiptBusinessFrom,
+  type AccountData,
   type ReceiptData,
 } from "@/lib/receipt"
 import { LazyMotion, m, AnimatePresence, useAnimationControls, useReducedMotion } from "framer-motion"
@@ -97,8 +98,9 @@ import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { RecentOrdersDialog } from "./recent-orders-dialog"
 import { ModifierSheet } from "./modifier-sheet"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
+import { AccountDialog } from "./account-dialog"
 import { useParkedOrders } from "./use-parked-orders"
-import { autoName, type ParkedOrder } from "./parked"
+import { autoName, conflictName, parkedAccount, type ParkedOrder } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -172,7 +174,7 @@ interface POSClientProps {
   favoriteVariantIds: string[]
   /** Qué imprimir en automático al cobrar (ajuste del negocio). */
   autoPrint: "none" | "ticket" | "comanda" | "both"
-  /** Módulo de pedidos en espera activado para esta cafetería. */
+  /** Módulo de cuentas abiertas activado para esta cafetería. */
   parkedOrders: boolean
   /** Lealtad con sellos activada para esta cafetería. */
   loyalty: boolean
@@ -770,10 +772,40 @@ export default function POSClient({
   } | null>(null)
   // Teclear la cantidad exacta en vez de tocar «+» once veces
   const [editingQtyFor, setEditingQtyFor] = useState<string | null>(null)
-  // Pedidos en espera (este dispositivo, por cafetería)
+  // Cuentas abiertas de la cafetería (compartidas entre aparatos)
   const parked = useParkedOrders(businessId)
   const [showPark, setShowPark] = useState(false)
   const [showTray, setShowTray] = useState(false)
+  /** Cuenta que se está viendo con precios («¿me trae la cuenta?»). */
+  const [accountToView, setAccountToView] = useState<AccountData | null>(null)
+  /**
+   * La cuenta que está ABIERTA en este carrito, si la hay.
+   *
+   * Es lo que le da continuidad entre rondas: el carrito deja de ser una venta
+   * suelta y pasa a ser «lo que lleva la mesa 3». Sin esto cada ronda creaba
+   * una cuenta nueva y había que reescribir el nombre.
+   *
+   * Vive también en localStorage porque el carrito sobrevive a una recarga: si
+   * el puntero no sobreviviera con él, guardar después de recargar crearía una
+   * cuenta duplicada de la misma mesa.
+   */
+  const [openAccount, setOpenAccount] = useState<{
+    id: string
+    name: string
+    openedAt: number
+    /** Sello de la última escritura; se manda al guardar para no pisar a nadie. */
+    updatedAt: string
+  } | null>(null)
+  const openAccountKey = `pos-open-account:${businessId}:${cashierId}`
+  /**
+   * La cuenta que se está editando no se lista: ya está aquí, en el carrito.
+   * Verla también en la bandeja invitaría a abrirla dos veces y a acabar con
+   * dos versiones de la misma mesa.
+   */
+  const cuentasVisibles = useMemo(
+    () => parked.orders.filter((o) => o.id !== openAccount?.id),
+    [parked.orders, openAccount],
+  )
   // Última venta cobrada, para «Repetir» (sobrevive recargas)
   const [lastSale, setLastSale] = useState<{ folio: number; payload: unknown } | null>(null)
   const lastSaleKey = `pos-last:${businessId}:${cashierId}`
@@ -786,6 +818,41 @@ export default function POSClient({
       /* dato corrupto: sin repetir */
     }
   }, [lastSaleKey])
+
+  /** Recuperar a qué cuenta pertenece el carrito que sobrevivió a la recarga. */
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(openAccountKey)
+      if (raw) setOpenAccount(JSON.parse(raw))
+    } catch {
+      /* dato corrupto: se trata como carrito suelto */
+    }
+  }, [openAccountKey])
+
+  useEffect(() => {
+    try {
+      if (openAccount) window.localStorage.setItem(openAccountKey, JSON.stringify(openAccount))
+      else window.localStorage.removeItem(openAccountKey)
+    } catch {
+      /* sin espacio: solo se pierde la continuidad tras recargar */
+    }
+  }, [openAccount, openAccountKey])
+
+  /**
+   * La cuenta apuntada puede haber desaparecido mientras este aparato no
+   * miraba: otra persona la cobró o la descartó. Guardar sobre una cuenta que
+   * ya no existe no fallaría —el update afecta 0 filas— pero se vería como si
+   * hubiera guardado. Mejor avisarlo y soltar el puntero: lo que hay en el
+   * carrito no se toca y se guardará como cuenta nueva.
+   */
+  useEffect(() => {
+    if (!openAccount || !parked.listo) return
+    if (parked.orders.some((o) => o.id === openAccount.id)) return
+    setOpenAccount(null)
+    toast.warning(
+      `La cuenta «${openAccount.name}» ya no existe: alguien la cobró o la descartó. Lo que tienes en el carrito sigue aquí.`,
+    )
+  }, [openAccount, parked.listo, parked.orders])
 
   /* Pantalla despierta mientras la caja esté abierta: una tablet que se
      bloquea sola a media fila es un "toca-espera-desbloquea" constante. */
@@ -1025,50 +1092,115 @@ export default function POSClient({
     (name: string) => {
       if (lines.length === 0) return
       if (!parked.park(cartStateNow(), name)) {
-        toast.error(`Ya hay ${parked.orders.length} pedidos en espera; cobra o descarta alguno.`)
+        toast.error(`Ya hay ${parked.orders.length} cuentas abiertas; cobra o descarta alguna.`)
         return
       }
       clearTip()
       clearCart()
+      setOpenAccount(null)
       vibra(12)
-      toast.success(`Pedido «${name}» guardado.`)
+      toast.success(`Cuenta «${name}» abierta.`)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lines.length, parked, cartStateNow, clearCart],
   )
 
   /**
-   * Retoma un pedido. Si hay algo en el carrito se guarda solo antes: con
-   * prisa nadie debe poder tirar una venta a medias por contestar mal un
-   * "¿seguro?".
+   * Guarda la ronda actual EN la cuenta que está abierta.
+   *
+   * Este es el camino normal de una cafetería con mesas: la cuenta se abre una
+   * vez y cada ronda se le suma, sin volver a escribir el nombre ni reiniciar
+   * el reloj de «abierta hace 40 min».
+   *
+   * Si otro aparato la movió mientras tanto, lo de aquí NO se pisa ni se tira:
+   * se guarda aparte con nombre reconocible. Son productos ya servidos; una
+   * ronda perdida en silencio es comida que nunca se cobra.
+   */
+  const saveToOpenAccount = useCallback(async (): Promise<boolean> => {
+    if (!openAccount || lines.length === 0) return false
+    const r = await parked.update(openAccount.id, openAccount.updatedAt, cartStateNow())
+    if (!r) return false // el hook ya avisó
+    if (r.saved) {
+      clearTip()
+      clearCart()
+      setOpenAccount(null)
+      vibra(12)
+      toast.success(`Guardado en «${openAccount.name}».`)
+      return true
+    }
+    const alterno = conflictName(
+      openAccount.name,
+      parked.orders.map((o) => o.name),
+    )
+    if (!parked.park(cartStateNow(), alterno)) {
+      toast.error(
+        `«${openAccount.name}» cambió en otro aparato y la bandeja está llena. Cobra o descarta una cuenta y vuelve a guardar.`,
+      )
+      return false
+    }
+    clearTip()
+    clearCart()
+    setOpenAccount(null)
+    vibra(12)
+    toast.warning(
+      `«${openAccount.name}» se movió en otro aparato. Para no perder nada, esto se guardó como «${alterno}»: júntalas antes de cobrar.`,
+      { duration: 12000 },
+    )
+    return true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAccount, lines.length, parked, cartStateNow, clearCart])
+
+  /**
+   * Abre una cuenta en el carrito para agregarle o cobrarla.
+   *
+   * La fila NO se borra del servidor: se apunta cuál es y se actualiza al
+   * guardar. Antes se borraba, y eso tenía dos costos — la cuenta perdía su
+   * nombre y su hora en cada ronda, y si este aparato moría en medio, la mesa
+   * desaparecía también del otro.
+   *
+   * Si hay algo en el carrito se guarda solo antes: con prisa nadie debe poder
+   * tirar una venta a medias por contestar mal un "¿seguro?".
    */
   const resumeParked = useCallback(
-    (order: ParkedOrder) => {
+    async (order: ParkedOrder) => {
       const estado = rehydrateCart(order.cart, products, Date.now())
       if (!estado || estado.lines.length === 0) {
-        toast.error("Ese pedido ya no se puede retomar; el menú cambió o caducó.")
+        toast.error("Esa cuenta ya no se puede abrir; el menú cambió o caducó.")
         return
       }
       if (lines.length > 0) {
-        const auto = autoName(new Date())
-        if (!parked.park(cartStateNow(), auto)) {
-          toast.error("La bandeja está llena: cobra o descarta un pedido antes de cambiar.")
-          return
+        // Lo que está en el carrito va a su sitio: a su propia cuenta si ya
+        // tenía una, o a una nueva si era una venta suelta.
+        if (openAccount) {
+          // Si no se pudo poner a salvo, NO se sigue: abrir la otra cuenta
+          // reemplazaría el carrito y esas líneas se perderían.
+          if (!(await saveToOpenAccount())) return
+        } else {
+          const auto = autoName(new Date())
+          if (!parked.park(cartStateNow(), auto)) {
+            toast.error("La bandeja está llena: cobra o descarta una cuenta antes de cambiar.")
+            return
+          }
+          toast.info(`Lo que tenías en el carrito se guardó como «${auto}».`)
         }
-        toast.info(`Tu pedido en curso se guardó como «${auto}».`)
       }
-      parked.remove(order.id)
+      setOpenAccount({
+        id: order.id,
+        name: order.name,
+        openedAt: order.savedAt,
+        updatedAt: order.updatedAt,
+      })
       restoreLines(estado.lines)
       setTicketNotes(estado.ticketNotes)
       clearTip()
       setShowTray(false)
       vibra(12)
       if (estado.lines.length < order.cart.lines.length) {
-        toast.info("Se retomó, pero algún artículo ya no está en el menú.")
+        toast.info("Se abrió, pero algún artículo ya no está en el menú.")
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [products, lines.length, parked, cartStateNow, restoreLines, setTicketNotes],
+    [products, lines.length, openAccount, saveToOpenAccount, parked, cartStateNow, restoreLines, setTicketNotes],
   )
 
   const clearTip = useCallback(() => {
@@ -1093,6 +1225,19 @@ export default function POSClient({
 
   const canCharge =
     lines.length > 0 && !isProcessing && !!openSession && !cashInsufficient && !discountInvalid
+
+  /**
+   * La cuenta ya se cobró: se borra del servidor y se suelta el puntero.
+   *
+   * Es el único momento en que una cuenta desaparece por buenas razones —el
+   * resto de las veces sobrevive a propósito—. Se hace después de que el
+   * servidor confirmó la venta (o de que quedó en la cola), nunca antes.
+   */
+  const cerrarCuentaCobrada = useCallback(() => {
+    if (!openAccount) return
+    parked.remove(openAccount.id)
+    setOpenAccount(null)
+  }, [openAccount, parked])
 
   const finalizeSale = useCallback(async () => {
     if (!canCharge) return
@@ -1168,6 +1313,7 @@ export default function POSClient({
         clearTip()
         setLoyaltyCustomer(null)
         setLoyaltyRedeem(false)
+        cerrarCuentaCobrada()
         resetAfterSale()
         setCartOpen(false)
       } else {
@@ -1206,6 +1352,9 @@ export default function POSClient({
         clearTip()
         setLoyaltyCustomer(null)
         setLoyaltyRedeem(false)
+        // La cuenta se cierra igual: la venta ya está capturada y va en la
+        // cola. Dejarla abierta invitaría a cobrarla dos veces.
+        cerrarCuentaCobrada()
         resetAfterSale()
         setCartOpen(false)
       } else {
@@ -1216,7 +1365,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada])
 
   /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
   const chooseProduct = useCallback(
@@ -1419,30 +1568,60 @@ export default function POSClient({
             >
               <ShoppingBag className="h-5 w-5 text-amber-700" />
             </m.span>
-            <h2 className="truncate text-lg font-bold text-stone-800">Venta Actual</h2>
+            {/* Con una cuenta abierta el carrito ya no es «una venta»: es lo
+                que lleva esa mesa. Decirlo aquí evita cobrarle a la mesa 3 lo
+                que se estaba anotando para la 1. */}
+            <h2 className="truncate text-lg font-bold text-stone-800">
+              {openAccount ? openAccount.name : "Venta Actual"}
+            </h2>
           </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-            {parkedEnabled && (parked.orders.length > 0 || lines.length > 0) && (
+            {parkedEnabled && (cuentasVisibles.length > 0 || lines.length > 0) && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-8 gap-1 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700"
-                onClick={() => (lines.length > 0 ? setShowPark(true) : setShowTray(true))}
-                title={lines.length > 0 ? "Guardar este pedido para retomarlo después" : "Ver pedidos en espera"}
-                aria-label={lines.length > 0 ? "Guardar pedido" : "Pedidos en espera"}
+                onClick={() => {
+                  // Con una cuenta abierta no hay nada que preguntar: ya tiene
+                  // nombre. Volver a pedirlo en cada ronda era justamente lo
+                  // que hacía que esto se sintiera un carrito y no una cuenta.
+                  if (openAccount && lines.length > 0) void saveToOpenAccount()
+                  else if (lines.length > 0) setShowPark(true)
+                  else setShowTray(true)
+                }}
+                title={
+                  openAccount && lines.length > 0
+                    ? `Guardar esta ronda en «${openAccount.name}»`
+                    : lines.length > 0
+                      ? "Abrir una cuenta con esto para cobrarla al final"
+                      : "Ver cuentas abiertas"
+                }
+                aria-label={
+                  openAccount && lines.length > 0
+                    ? `Guardar en ${openAccount.name}`
+                    : lines.length > 0
+                      ? "Abrir cuenta"
+                      : "Cuentas abiertas"
+                }
               >
                 <PauseCircle className="h-3.5 w-3.5" />
-                <span className="hidden md:inline">{lines.length > 0 ? "Guardar" : "En espera"}</span>
+                <span className="hidden truncate md:inline">
+                  {openAccount && lines.length > 0
+                    ? `Guardar en ${openAccount.name}`
+                    : lines.length > 0
+                      ? "Abrir cuenta"
+                      : "Cuentas"}
+                </span>
               </Button>
             )}
-            {parkedEnabled && parked.orders.length > 0 && (
+            {parkedEnabled && cuentasVisibles.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowTray(true)}
-                title="Pedidos en espera"
+                title="Cuentas abiertas"
                 className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-amber-600 px-1.5 text-xs font-bold text-white hover:bg-amber-700"
               >
-                {parked.orders.length}
+                {cuentasVisibles.length}
               </button>
             )}
             {lines.length > 0 && (
@@ -2345,10 +2524,10 @@ export default function POSClient({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-60">
-                    {parkedEnabled && parked.orders.length > 0 && (
+                    {parkedEnabled && cuentasVisibles.length > 0 && (
                       <DropdownMenuItem onSelect={() => setShowTray(true)}>
                         <PauseCircle className="h-4 w-4 mr-2" />
-                        Pedidos en espera ({parked.orders.length})
+                        Cuentas abiertas ({cuentasVisibles.length})
                       </DropdownMenuItem>
                     )}
                     {/* La comanda en pantalla, para quien no tiene impresora.
@@ -2755,7 +2934,7 @@ export default function POSClient({
         open={showCashDialog}
         onOpenChange={setShowCashDialog}
         session={openSession}
-        parkedCount={parkedEnabled ? parked.orders.length : 0}
+        parkedCount={parkedEnabled ? cuentasVisibles.length : 0}
         cardFeePct={cardFeePct}
         pendingUploads={cola.pendientes + cola.porRevisar}
       />
@@ -2804,12 +2983,20 @@ export default function POSClient({
       <ParkedTrayDialog
         open={showTray}
         onOpenChange={setShowTray}
-        orders={parked.orders}
+        orders={cuentasVisibles}
         products={products}
         cartHasLines={lines.length > 0}
         onResume={resumeParked}
         onRemove={parked.remove}
+        onViewAccount={(o) => setAccountToView(parkedAccount(o, products, Date.now()))}
       />
+      {appCtx.business && (
+        <AccountDialog
+          account={accountToView}
+          business={appCtx.business}
+          onClose={() => setAccountToView(null)}
+        />
+      )}
       <ModifierSheet
         pending={pendingModifiers}
         onClose={() => setPendingModifiers(null)}
@@ -2836,10 +3023,11 @@ export default function POSClient({
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Vaciar el carrito?</AlertDialogTitle>
+            <AlertDialogTitle>{openAccount ? `¿Salir de «${openAccount.name}»?` : "¿Vaciar el carrito?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se quitarán {itemCount} artículo{itemCount === 1 ? "" : "s"}, la nota y el descuento de esta venta. No se
-              registra nada.
+              {openAccount
+                ? `Se quitan de aquí los ${itemCount} artículo${itemCount === 1 ? "" : "s"} que tienes en pantalla. La cuenta «${openAccount.name}» se queda como estaba, con lo que ya tenía guardado.`
+                : `Se quitarán ${itemCount} artículo${itemCount === 1 ? "" : "s"}, la nota y el descuento de esta venta. No se registra nada.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2849,6 +3037,9 @@ export default function POSClient({
               onClick={() => {
                 clearCart()
                 clearTip()
+                // Solo se suelta el puntero: la fila del servidor no se tocó
+                // en ningún momento, así que la cuenta queda intacta.
+                setOpenAccount(null)
                 setConfirmClear(false)
               }}
             >

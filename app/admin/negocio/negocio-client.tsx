@@ -330,7 +330,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardHeader>
             <CardContent className="space-y-2">
               <label htmlFor="parked_orders" className="text-sm font-medium text-stone-700">
-                Pedidos en espera
+                Cuentas abiertas
               </label>
               <select
                 id="parked_orders"
@@ -342,8 +342,9 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 <option value="off">Desactivado</option>
               </select>
               <p className="text-xs text-stone-400">
-                Deja a medias el pedido de un cliente indeciso, cobra al siguiente y retómalo después. Los pedidos se
-                guardan en ese dispositivo, no se cobran solos y se pierden si se limpia el navegador.
+                Para mesas que piden, se sientan y pagan al final: se le va sumando a la cuenta y se cobra cuando
+                pidan la cuenta. Se guardan en el servidor, así que se toman en un aparato y se cobran en otro; nada
+                se registra como venta hasta que se cobra.
               </p>
 
               <div className="border-t border-stone-100 pt-3">

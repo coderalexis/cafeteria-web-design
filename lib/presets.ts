@@ -20,13 +20,13 @@ export const PRESETS: PresetDef[] = [
   {
     key: "mostrador",
     label: "Mostrador rápido",
-    hint: "Se pide y se paga en la barra. Sin pedidos en espera; el ticket sale solo al cobrar.",
+    hint: "Se pide y se paga en la barra. Sin cuentas abiertas; el ticket sale solo al cobrar.",
     settings: { parkedOrders: false, autoPrint: "ticket", discountMaxCashier: 10 },
   },
   {
     key: "mesas",
     label: "Con mesas",
-    hint: "El cliente se sienta y pide. Pedidos en espera encendido para guardar cuentas a medias.",
+    hint: "El cliente se sienta y pide. Cuentas abiertas encendido: se les suma cada ronda y se cobran al final.",
     settings: { parkedOrders: true, autoPrint: "ticket", discountMaxCashier: 10 },
   },
   {

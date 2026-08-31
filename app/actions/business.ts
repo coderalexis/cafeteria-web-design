@@ -185,7 +185,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.loyalty !== v.loyalty) cambios.push(v.loyalty ? "lealtad activada" : "lealtad desactivada")
   if (prevSettings.loyaltyTarget !== v.loyaltyTarget) cambios.push(`meta de sellos: ${v.loyaltyTarget}`)
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")
-  if (prevSettings.parkedOrders !== v.parkedOrders) cambios.push("módulo de pedidos en espera")
+  if (prevSettings.parkedOrders !== v.parkedOrders) cambios.push("módulo de cuentas abiertas")
   if (prevSettings.discountMaxCashier !== v.discountMaxCashier) cambios.push("límite de descuento en caja")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })

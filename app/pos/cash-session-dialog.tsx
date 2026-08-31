@@ -30,7 +30,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   session: OpenSession | null
-  /** Pedidos en espera de este dispositivo, solo para avisar al cerrar. */
+  /** Cuentas abiertas sin cobrar, solo para avisar al cerrar. */
   parkedCount?: number
   /** Comisión de la terminal (%): solo para mostrar el neto de tarjeta. */
   cardFeePct?: number
@@ -469,8 +469,9 @@ function CloseSessionForm({
 
           {parkedCount > 0 && (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Tienes {parkedCount} pedido{parkedCount === 1 ? "" : "s"} en espera. No son ventas ni afectan este corte:
-              se quedan guardados para el siguiente turno en esta tablet.
+              Tienes {parkedCount} cuenta{parkedCount === 1 ? "" : "s"} abierta{parkedCount === 1 ? "" : "s"} sin
+              cobrar. No son ventas ni afectan este corte: siguen ahí para el turno que entre, en este aparato o en
+              cualquier otro.
             </p>
           )}
 

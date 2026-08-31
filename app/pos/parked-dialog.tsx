@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRight, PauseCircle, Play, Trash2, TriangleAlert } from "lucide-react"
+import { ChevronRight, PauseCircle, Play, Receipt, Trash2, TriangleAlert } from "lucide-react"
 import { formatCurrency } from "@/lib/format"
 import { parkedDetail, parkedSummary, waitingLabel, type ParkedOrder } from "./parked"
 import type { Product } from "./cart"
@@ -49,9 +49,10 @@ export function ParkDialog({
     >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Guardar pedido</DialogTitle>
+          <DialogTitle>Abrir cuenta</DialogTitle>
           <DialogDescription>
-            El carrito queda libre para cobrarle a alguien más. Nadie paga nada todavía.
+            Se le puede seguir agregando y se cobra al final. El carrito queda libre para atender a alguien
+            más; nadie paga nada todavía.
           </DialogDescription>
         </DialogHeader>
 
@@ -82,7 +83,7 @@ export function ParkDialog({
             }}
           />
           <p className="text-xs text-stone-400">
-            Un nombre ayuda a reconocerlo después. Si lo dejas vacío se llamará «{sugerido}».
+            Un nombre ayuda a reconocerla después. Si lo dejas vacío se llamará «{sugerido}».
           </p>
         </div>
 
@@ -91,7 +92,7 @@ export function ParkDialog({
             Cancelar
           </Button>
           <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => guardar(nombre)}>
-            Guardar pedido
+            Abrir cuenta
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -99,7 +100,7 @@ export function ParkDialog({
   )
 }
 
-/* ── Bandeja: retomar o descartar ─────────────────────────────────── */
+/* ── Cuentas abiertas: abrir, ver la cuenta o descartar ───────────── */
 export function ParkedTrayDialog({
   open,
   onOpenChange,
@@ -108,15 +109,18 @@ export function ParkedTrayDialog({
   cartHasLines,
   onResume,
   onRemove,
+  onViewAccount,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   orders: ParkedOrder[]
   products: Product[]
-  /** Si hay algo en el carrito, retomar guardará ese primero (no se pierde). */
+  /** Si hay algo en el carrito, abrir otra cuenta guardará eso primero. */
   cartHasLines: boolean
   onResume: (order: ParkedOrder) => void
   onRemove: (id: string) => void
+  /** «¿Me trae la cuenta?»: enseña el desglose con precios, sin cobrar. */
+  onViewAccount: (order: ParkedOrder) => void
 }) {
   const ahora = Date.now()
   /** Cuál se abrió para ver qué preparar. */
@@ -134,18 +138,18 @@ export function ParkedTrayDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PauseCircle className="h-5 w-5 text-amber-700" />
-            Pedidos en espera ({orders.length})
+            Cuentas abiertas ({orders.length})
           </DialogTitle>
           <DialogDescription>
             {cartHasLines
-              ? "Toca uno para ver qué lleva. Al retomarlo, lo que tienes en el carrito se guarda solo."
-              : "Toca uno para ver qué lleva, o «Retomar» para regresarlo al carrito y cobrarlo."}
+              ? "Toca una para ver qué lleva. Al abrirla, lo que tienes en el carrito se guarda solo."
+              : "Toca una para ver qué lleva, o «Abrir» para agregarle más productos o cobrarla."}
           </DialogDescription>
         </DialogHeader>
 
         {orders.length === 0 ? (
           <p className="py-8 text-center text-sm text-stone-400">
-            No hay pedidos en espera. Usa «Guardar pedido» cuando alguien se tarde en decidir.
+            No hay cuentas abiertas. Usa «Abrir cuenta» cuando una mesa vaya a pagar al final.
           </p>
         ) : (
           <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
@@ -173,7 +177,11 @@ export function ParkedTrayDialog({
                   >
                     <div className="flex items-baseline gap-2">
                       <p className="truncate font-semibold text-stone-800">{o.name}</p>
-                      <span className="shrink-0 text-xs text-stone-400">{waitingLabel(o.savedAt, ahora)}</span>
+                      {/* Desde que llegó la mesa, no desde la última ronda: es
+                          lo que dice si ya llevan mucho esperando la cuenta. */}
+                      <span className="shrink-0 text-xs text-stone-400">
+                        abierta {waitingLabel(o.savedAt, ahora)}
+                      </span>
                       {r.ok && (
                         <ChevronRight
                           className={`h-3.5 w-3.5 shrink-0 text-stone-300 transition-transform ${
@@ -198,10 +206,11 @@ export function ParkedTrayDialog({
                     size="sm"
                     className="shrink-0 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
                     disabled={!r.ok}
+                    title={`Abrir «${o.name}» para agregarle o cobrarla`}
                     onClick={() => onResume(o)}
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Retomar
+                    Abrir
                   </Button>
                   <Button
                     variant="ghost"
@@ -210,7 +219,12 @@ export function ParkedTrayDialog({
                     title={`Descartar «${o.name}»`}
                     aria-label={`Descartar ${o.name}`}
                     onClick={() => {
-                      if (window.confirm(`¿Descartar el pedido «${o.name}»? No se puede recuperar.`)) onRemove(o.id)
+                      if (
+                        window.confirm(
+                          `¿Descartar la cuenta «${o.name}»? Se pierde lo que lleva y no se puede recuperar.`,
+                        )
+                      )
+                        onRemove(o.id)
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -236,6 +250,18 @@ export function ParkedTrayDialog({
                         </li>
                       ))}
                     </ul>
+                    {/* El desglose de arriba es para preparar (sin precios).
+                        Cuando la mesa pide la cuenta hace falta el otro: con
+                        precios y total, y sin cobrar todavía. */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full gap-2"
+                      onClick={() => onViewAccount(o)}
+                    >
+                      <Receipt className="h-3.5 w-3.5" />
+                      Ver la cuenta ({formatCurrency(r.total)})
+                    </Button>
                   </div>
                 )}
                 </div>

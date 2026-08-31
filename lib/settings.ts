@@ -21,7 +21,7 @@ export interface BusinessSettings {
   publicMenu: boolean
   /** Qué imprimir solo al cobrar, sin pasos extra del cajero. */
   autoPrint: "none" | "ticket" | "comanda" | "both"
-  /** Módulo del POS: guardar pedidos a medias y retomarlos. */
+  /** Módulo del POS: cuentas abiertas (se les suma cada ronda y se cobran al final). */
   parkedOrders: boolean
   /**
    * Descuento máximo (%) que puede aplicar un cajero. 0 = solo administradores,

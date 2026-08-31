@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { serializeCart, type CartState } from "./cart"
-import { listParked, parkOrder, removeParked } from "@/app/actions/parked"
+import { listParked, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
 import { PARKED_MAX, type ParkedOrder } from "./parked"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
 const REFRESCO_MS = 10_000
 
 /**
- * Bandeja de pedidos en espera de la CAFETERÍA, no del aparato.
+ * Cuentas abiertas de la CAFETERÍA, no del aparato.
  *
  * Antes vivía en `localStorage`. El razonamiento era correcto a medias —un
  * pedido en espera no es una venta, así que no puede ir en `tickets`— pero de
@@ -28,6 +28,8 @@ const REFRESCO_MS = 10_000
  */
 export function useParkedOrders(businessId: string) {
   const [orders, setOrders] = useState<ParkedOrder[]>([])
+  /** Ya sabemos qué hay en el servidor (aunque sea nada). */
+  const [listo, setListo] = useState(false)
   const ref = useRef<ParkedOrder[]>([])
   const cargando = useRef(false)
 
@@ -45,9 +47,16 @@ export function useParkedOrders(businessId: string) {
         // Más reciente primero: es el que más probablemente se retoma.
         aplicar(
           r.orders
-            .map((o) => ({ id: o.id, name: o.name, savedAt: o.savedAt, cart: o.cart as ParkedOrder["cart"] }))
+            .map((o) => ({
+              id: o.id,
+              name: o.name,
+              savedAt: o.savedAt,
+              cart: o.cart as ParkedOrder["cart"],
+              updatedAt: o.updatedAt,
+            }))
             .reverse(),
         )
+        setListo(true)
       }
     } catch {
       /* sin señal: la bandeja se queda con lo último que supo */
@@ -86,7 +95,7 @@ export function useParkedOrders(businessId: string) {
           }
           if (guardados.length > 0) {
             toast.success(
-              `Se recuperaron ${guardados.length} pedido${guardados.length === 1 ? "" : "s"} en espera de este aparato.`,
+              `Se recuperaron ${guardados.length} cuenta${guardados.length === 1 ? "" : "s"} abierta${guardados.length === 1 ? "" : "s"} de este aparato.`,
             )
           }
         }
@@ -136,22 +145,58 @@ export function useParkedOrders(businessId: string) {
         name: name.trim().slice(0, 40),
         savedAt: Date.now(),
         cart: serializeCart(state, Date.now()),
+        updatedAt: "",
       }
       aplicar([provisional, ...ref.current])
       ;(async () => {
         const r = await parkOrder({ name: provisional.name, cart: provisional.cart })
         if (r?.success) {
-          // Le ponemos el id de verdad: con el provisional, descartarlo después
-          // no borraría nada en el servidor y el pedido reaparecería solo.
-          aplicar(ref.current.map((o) => (o.id === provisional.id ? { ...o, id: r.id } : o)))
+          // Le ponemos el id de verdad: con el provisional, descartarla después
+          // no borraría nada en el servidor y la cuenta reaparecería sola.
+          aplicar(
+            ref.current.map((o) =>
+              o.id === provisional.id ? { ...o, id: r.id, updatedAt: r.updatedAt } : o,
+            ),
+          )
           return
         }
         aplicar(ref.current.filter((o) => o.id !== provisional.id))
-        toast.error(r?.error ?? "No se pudo guardar el pedido. Vuelve a intentar.")
+        toast.error(r?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
       })()
       return true
     },
     [aplicar],
+  )
+
+  /**
+   * Guarda una ronda nueva en una cuenta que ya existe.
+   *
+   * Devuelve `saved: false` cuando otro aparato la movió mientras tanto: aquí
+   * NO se decide qué hacer con eso, solo se reporta. Quien llama es el que
+   * sabe que lo suyo son productos ya servidos y hay que ponerlos a salvo.
+   */
+  const update = useCallback(
+    async (
+      id: string,
+      expectedUpdatedAt: string,
+      state: CartState,
+    ): Promise<{ saved: boolean; updatedAt: string | null } | null> => {
+      const cart = serializeCart(state, Date.now())
+      const r = await updateParked({ id, cart, expectedUpdatedAt })
+      if (!r?.success) {
+        toast.error(r?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
+        return null
+      }
+      if (r.saved) {
+        aplicar(
+          ref.current.map((o) => (o.id === id ? { ...o, cart, updatedAt: r.updatedAt ?? o.updatedAt } : o)),
+        )
+      } else {
+        void refrescar() // la versión buena es la del servidor
+      }
+      return { saved: r.saved, updatedAt: r.updatedAt }
+    },
+    [aplicar, refrescar],
   )
 
   const remove = useCallback(
@@ -169,5 +214,5 @@ export function useParkedOrders(businessId: string) {
     [aplicar, refrescar],
   )
 
-  return { orders, park, remove, full: orders.length >= PARKED_MAX }
+  return { orders, listo, park, update, remove, refrescar, full: orders.length >= PARKED_MAX }
 }

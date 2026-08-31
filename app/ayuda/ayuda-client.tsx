@@ -302,46 +302,61 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "espera",
       grupo: "cajero",
       icon: PauseCircle,
-      titulo: "Pedidos en espera",
-      palabras: "guardar pausar retomar bandeja mesa indeciso fila pendiente",
+      titulo: "Cuentas abiertas",
+      palabras:
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta",
       href: "/pos",
       nodo: (
         <>
           <p className="text-sm text-stone-600">
-            Para cuando un cliente se tarda en decidir y atrás hay fila: guardas su pedido a medias, cobras al
-            siguiente y lo retomas después. Nadie paga nada mientras espera.
+            Para cuando el cliente pide, se sienta, y paga hasta el final. Abres una cuenta a su nombre, le vas
+            sumando lo que pida, y la cobras cuando pida la cuenta. Nadie paga nada mientras tanto.
           </p>
           <ol className="mt-3 space-y-3">
-            <Step n={1} title="Guarda el pedido">
-              Con artículos en el carrito, toca <strong>Guardar</strong> arriba. Ponle un nombre con los botones
+            <Step n={1} title="Abre la cuenta">
+              Con artículos en el carrito, toca <strong>Abrir cuenta</strong> arriba. Ponle nombre con los botones
               rápidos (<em>Mesa 1</em>, <em>Para llevar</em>…) o escríbelo (<em>«Sra. suéter rojo»</em>). Si lo dejas
-              vacío se llama con la hora. El carrito queda libre.
+              vacío se llama con la hora. El carrito queda libre para atender al siguiente.
             </Step>
-            <Step n={2} title="Retómalo cuando regrese">
-              El número naranja junto a <strong>En espera</strong> dice cuántos hay. Ábrelo y toca{" "}
-              <strong>Retomar</strong>: el pedido vuelve al carrito con sus notas, y ya puedes cobrarlo.
+            <Step n={2} title="Súmale las rondas que pidan">
+              El número naranja junto a <strong>Cuentas</strong> dice cuántas hay. Ábrela, agrega lo nuevo y toca{" "}
+              <strong>Guardar en «Mesa 1»</strong> — <em>el nombre ya no hay que volver a escribirlo</em>. Arriba del
+              carrito verás en todo momento de qué mesa es lo que estás anotando.
             </Step>
-            <Step n={3} title="Si tenías algo en el carrito">
-              No se pierde: se guarda solo antes de traer el otro, con la hora como nombre. Nunca se descarta una venta
-              a medias por error.
+            <Step n={3} title="«¿Me trae la cuenta?»">
+              En <strong>Cuentas</strong>, toca la mesa y luego <strong>Ver la cuenta</strong>: sale el desglose con
+              precios y total para enseñárselo, imprimirlo o mandarlo por WhatsApp. Dice{" "}
+              <em>«pendiente de pago»</em> porque todavía no es un ticket.
+            </Step>
+            <Step n={4} title="Cóbrala">
+              Ábrela otra vez y cobra como siempre, con su método de pago y su propina. Ahí se genera el ticket con
+              folio, se cierra la cuenta y sale de la lista.
             </Step>
           </ol>
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
-              Los pedidos viven <strong>en esa tablet</strong>, no en el servidor: quien entre después en ese mismo
-              aparato los ve y los puede cobrar, y la venta se registra a nombre de quien cobra.
+              Las cuentas son <strong>de la cafetería</strong>, no del aparato: puedes tomar el pedido en el celular y
+              cobrarlo en la tablet. La venta se registra a nombre de quien cobra.
             </li>
             <li>
-              Si el menú cambió mientras esperaba (un producto se desactivó o caducó tras 12 horas), la bandeja lo
-              marca en ámbar y no deja retomarlo a ciegas.
+              La hora que ves («abierta hace 40 min») cuenta desde que llegó la mesa, no desde la última ronda: sirve
+              para saber quién lleva mucho esperando.
             </li>
             <li>
-              Cerrar la caja con pedidos en espera <strong>no</strong> afecta el corte: no son ventas. El sistema te
+              Si dos personas le agregan a la misma mesa desde aparatos distintos, <strong>no se pierde nada</strong>:
+              lo segundo se guarda aparte como <em>«Mesa 1 (2)»</em> y te avisa que las juntes antes de cobrar.
+            </li>
+            <li>
+              Si el menú cambió mientras tanto (un producto se desactivó o caducó tras 12 horas), la lista lo marca en
+              ámbar y no deja abrirla a ciegas.
+            </li>
+            <li>
+              Cerrar la caja con cuentas abiertas <strong>no</strong> afecta el corte: no son ventas. El sistema te
               avisa que se quedan para el siguiente turno.
             </li>
             <li>
-              ¿No lo usas? El dueño puede apagar el módulo en <strong>Negocio → Módulos del POS</strong> y los botones
-              desaparecen.
+              ¿No lo usas? El dueño puede apagar el módulo en <strong>Datos y ajustes → Módulos del POS</strong> y los
+              botones desaparecen.
             </li>
           </ul>
         </>
@@ -924,7 +939,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
-              <strong>Pedidos en espera</strong>, y define el <strong>descuento máximo en caja</strong> (dueños y
+              <strong>Cuentas abiertas</strong>, y define el <strong>descuento máximo en caja</strong> (dueños y
               administradores no tienen tope). Ese límite se aplica en el servidor, no solo en la pantalla.
             </li>
             <li>

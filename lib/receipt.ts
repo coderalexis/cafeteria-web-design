@@ -246,6 +246,70 @@ export function buildShareText(r: ReceiptData, biz: ReceiptBusiness): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Cuenta de la mesa («¿me trae la cuenta?»)                          */
+/* ------------------------------------------------------------------ */
+
+export interface AccountData {
+  /** Cómo se llama la cuenta: "Mesa 3", "Sra. suéter rojo". */
+  name: string
+  /** Cuándo se abrió. */
+  openedAt: Date
+  items: ReceiptItem[]
+  total: number
+}
+
+/**
+ * Lo que se le lleva a la mesa cuando piden la cuenta, ANTES de cobrar.
+ *
+ * No es un ticket y el papel tiene que decirlo con todas sus letras: no lleva
+ * folio (todavía no existe la venta), no dice método de pago, y el pie avisa
+ * que no es comprobante. Un papel con productos y total se parece demasiado a
+ * un comprobante de pago como para dejar la distinción al contexto — y quien
+ * lo recibe es el cliente, no el cajero.
+ */
+export function buildAccountLines(a: AccountData, biz: ReceiptBusiness): string[] {
+  const tz = biz.timezone
+  const lines: string[] = [
+    ...headerLines(biz, "CUENTA"),
+    "",
+    `${a.name}`,
+    `Abierta: ${formatDate(a.openedAt, tz)} ${formatTime(a.openedAt, tz)}`,
+    "",
+    THIN,
+  ]
+
+  for (const item of a.items) {
+    lines.push(`${item.quantity}x ${item.label}`)
+    for (const m of item.modifiers ?? []) {
+      lines.push(row(`   + ${m.name}`, m.price > 0 ? `+${formatCurrency(m.price)}` : ""))
+    }
+    lines.push(row(`     ${formatCurrency(item.unitPrice)} c/u`, formatCurrency(item.lineTotal)))
+    if (item.notes) lines.push(`     * ${item.notes}`)
+  }
+
+  lines.push(THIN, "", row("  TOTAL:", formatCurrency(a.total)), "")
+  lines.push(RULE, center("PENDIENTE DE PAGO"), center("No es comprobante fiscal"), RULE)
+  return lines
+}
+
+/** La misma cuenta como texto, para mandarla por mensaje. */
+export function buildAccountShareText(a: AccountData, biz: ReceiptBusiness): string {
+  const tz = biz.timezone
+  const lines: string[] = [
+    `${biz.name} — Cuenta`,
+    `${a.name} · abierta ${formatDate(a.openedAt, tz)} ${formatTime(a.openedAt, tz)}`,
+    "",
+  ]
+  for (const item of a.items) {
+    lines.push(`${item.quantity}x ${item.label} — ${formatCurrency(item.lineTotal)}`)
+    for (const m of item.modifiers ?? []) lines.push(`   + ${m.name}`)
+    if (item.notes) lines.push(`   * ${item.notes}`)
+  }
+  lines.push("", `Total: ${formatCurrency(a.total)}`, "", "Pendiente de pago (no es comprobante).")
+  return lines.join("\n")
+}
+
+/* ------------------------------------------------------------------ */
 /*  Comanda para barra/cocina (sin precios: qué preparar y cómo)       */
 /* ------------------------------------------------------------------ */
 
