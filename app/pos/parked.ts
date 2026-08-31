@@ -74,6 +74,38 @@ export function serializeParked(orders: ParkedOrder[]): ParkedStore {
  * productos desaparecieron, `ok` es false y la tarjeta lo dice en vez de
  * dejar que el cajero lo descubra al retomarlo.
  */
+/** Un renglón del pedido tal como hay que prepararlo. */
+export interface ParkedLine {
+  label: string
+  quantity: number
+  notes: string | null
+  modifiers: string[]
+}
+
+/**
+ * Qué hay que PREPARAR de un pedido en espera, sin un solo precio.
+ *
+ * Existe porque hay cafeterías —como la del gym— donde se toma el pedido, se
+ * sirve, y se cobra hasta el final. En ese flujo la comida se hace ANTES de
+ * que exista la venta, así que la pantalla «Por preparar» (que muestra lo ya
+ * cobrado) llega tarde: la lista de lo que falta hacer son justamente estos
+ * pedidos en espera.
+ *
+ * El resumen de `parkedSummary` no sirve para eso —corta a tres productos y
+ * lleva el total en pesos, porque está pensado para retomar y cobrar—. Esto
+ * es lo mismo visto desde la barra: cantidades, tamaños, opciones y notas.
+ */
+export function parkedDetail(order: ParkedOrder, products: Product[], now: number): ParkedLine[] {
+  const state = rehydrateCart(order.cart, products, now)
+  if (!state) return []
+  return state.lines.map((l) => ({
+    label: l.size ? `${l.product.name} (${l.size.label})` : l.product.name,
+    quantity: l.quantity,
+    notes: l.notes.trim() || null,
+    modifiers: l.modifiers.map((m) => m.name),
+  }))
+}
+
 export function parkedSummary(
   order: ParkedOrder,
   products: Product[],

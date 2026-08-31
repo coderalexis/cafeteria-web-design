@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { PauseCircle, Play, Trash2, TriangleAlert } from "lucide-react"
+import { ChevronRight, PauseCircle, Play, Trash2, TriangleAlert } from "lucide-react"
 import { formatCurrency } from "@/lib/format"
-import { parkedSummary, waitingLabel, type ParkedOrder } from "./parked"
+import { parkedDetail, parkedSummary, waitingLabel, type ParkedOrder } from "./parked"
 import type { Product } from "./cart"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -119,9 +119,17 @@ export function ParkedTrayDialog({
   onRemove: (id: string) => void
 }) {
   const ahora = Date.now()
+  /** Cuál se abrió para ver qué preparar. */
+  const [abierto, setAbierto] = useState<string | null>(null)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v)
+        if (!v) setAbierto(null)
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -130,8 +138,8 @@ export function ParkedTrayDialog({
           </DialogTitle>
           <DialogDescription>
             {cartHasLines
-              ? "Al retomar uno, el pedido que tienes en el carrito se guarda solo para que no se pierda."
-              : "Toca uno para regresarlo al carrito y cobrarlo."}
+              ? "Toca uno para ver qué lleva. Al retomarlo, lo que tienes en el carrito se guarda solo."
+              : "Toca uno para ver qué lleva, o «Retomar» para regresarlo al carrito y cobrarlo."}
           </DialogDescription>
         </DialogHeader>
 
@@ -143,17 +151,36 @@ export function ParkedTrayDialog({
           <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
             {orders.map((o) => {
               const r = parkedSummary(o, products, ahora)
+              const desplegado = abierto === o.id
               return (
                 <div
                   key={o.id}
-                  className={`flex items-center gap-3 rounded-xl border p-3 ${
+                  className={`rounded-xl border ${
                     r.ok ? "border-stone-200 bg-white" : "border-amber-200 bg-amber-50"
                   }`}
                 >
-                  <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-3 p-3">
+                  {/* Tocar el renglón despliega QUÉ PREPARAR. En una cafetería
+                      con mesas la comida se hace antes de cobrar, así que esta
+                      lista es la de pendientes de la barra — y el resumen de
+                      arriba (tres productos y el total) no alcanza para eso. */}
+                  <button
+                    type="button"
+                    onClick={() => setAbierto(desplegado ? null : o.id)}
+                    disabled={!r.ok}
+                    aria-expanded={desplegado}
+                    className="min-w-0 flex-1 text-left disabled:cursor-default"
+                  >
                     <div className="flex items-baseline gap-2">
                       <p className="truncate font-semibold text-stone-800">{o.name}</p>
                       <span className="shrink-0 text-xs text-stone-400">{waitingLabel(o.savedAt, ahora)}</span>
+                      {r.ok && (
+                        <ChevronRight
+                          className={`h-3.5 w-3.5 shrink-0 text-stone-300 transition-transform ${
+                            desplegado ? "rotate-90" : ""
+                          }`}
+                        />
+                      )}
                     </div>
                     {r.ok ? (
                       <p className="truncate text-xs text-stone-500">
@@ -165,7 +192,7 @@ export function ParkedTrayDialog({
                         {r.expired ? "Caducado (más de 12 h)" : "Algún producto ya no está en el menú"}
                       </p>
                     )}
-                  </div>
+                  </button>
 
                   <Button
                     size="sm"
@@ -188,6 +215,29 @@ export function ParkedTrayDialog({
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                </div>
+
+                {desplegado && (
+                  <div className="border-t border-stone-200 px-3 py-3">
+                    <ul className="space-y-2">
+                      {parkedDetail(o, products, ahora).map((l, i) => (
+                        <li key={i}>
+                          <p className="text-sm font-semibold leading-snug text-stone-800">
+                            <span className="text-amber-700">{l.quantity}×</span> {l.label}
+                          </p>
+                          {l.modifiers.map((m, k) => (
+                            <p key={k} className="pl-5 text-sm text-stone-600">
+                              + {m}
+                            </p>
+                          ))}
+                          {l.notes && (
+                            <p className="pl-5 text-sm font-semibold uppercase text-amber-800">* {l.notes}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 </div>
               )
             })}
