@@ -8,18 +8,25 @@ import {
 } from "./cart"
 
 /**
- * Pedidos en espera (v1): viven en ESTE dispositivo, por cafetería.
+ * Pedidos en espera: cómo se LEEN. El guardado vive en `app/actions/parked.ts`.
  *
- * Un pedido en espera todavía no es una venta — es el mismo carrito de
- * siempre, guardado aparte. Por eso reutiliza `serializeCart`/`rehydrateCart`
- * y no toca la base de datos: nada llega a `tickets` hasta que se cobra.
+ * Un pedido en espera todavía no es una venta —es el mismo carrito de siempre,
+ * guardado aparte—, así que nada llega a `tickets` hasta que se cobra. Pero sí
+ * vive en la base, en su propia tabla: antes se guardaba en el navegador de
+ * cada aparato y eso significaba perderlo al borrar datos, y no poder tomar el
+ * pedido en el celular para cobrarlo en la tablet.
  *
- * La clave es por NEGOCIO y no por cajero: si María guarda un pedido y entra
- * Pedro en la misma tablet, tiene que poder cobrarlo (la venta se atribuye a
- * quien cobra, que es lo correcto).
+ * Son de la CAFETERÍA y no de quien los tomó: si María guarda un pedido y
+ * llega Pedro, tiene que poder cobrarlo (la venta se atribuye a quien cobra,
+ * que es lo correcto).
  */
 
-export const PARKED_STORAGE_VERSION = 1
+/**
+ * Tope de pedidos a la vez. Es una guía de uso, no una regla del sistema: vive
+ * aquí y no en las acciones de servidor porque un archivo «use server» solo
+ * puede exportar funciones —exportar esta constante desde ahí tumbaba el POS
+ * entero con un 500—.
+ */
 export const PARKED_MAX = 10
 
 export interface ParkedOrder {
@@ -30,50 +37,12 @@ export interface ParkedOrder {
   cart: PersistedCart
 }
 
-export interface ParkedStore {
-  v: typeof PARKED_STORAGE_VERSION
-  orders: ParkedOrder[]
-}
-
-export function parkedStorageKey(businessId: string): string {
-  return `pos-parked:${businessId}`
-}
-
-/** Nombre por defecto cuando el cajero no escribe uno: la hora de guardado. */
 export function autoName(now: Date): string {
   const hh = String(now.getHours()).padStart(2, "0")
   const mm = String(now.getMinutes()).padStart(2, "0")
   return `Pedido ${hh}:${mm}`
 }
 
-/** Lee la lista guardada, descartando lo corrupto. Nunca lanza. */
-export function parseParked(raw: unknown): ParkedOrder[] {
-  if (!raw || typeof raw !== "object") return []
-  const store = raw as Partial<ParkedStore>
-  if (store.v !== PARKED_STORAGE_VERSION || !Array.isArray(store.orders)) return []
-
-  const out: ParkedOrder[] = []
-  for (const o of store.orders) {
-    if (!o || typeof o !== "object") continue
-    const { id, name, savedAt, cart } = o as Partial<ParkedOrder>
-    if (typeof id !== "string" || !id) continue
-    if (typeof savedAt !== "number" || !Number.isFinite(savedAt)) continue
-    if (!cart || typeof cart !== "object" || !Array.isArray((cart as PersistedCart).lines)) continue
-    out.push({ id, name: typeof name === "string" ? name : "", savedAt, cart: cart as PersistedCart })
-  }
-  return out.slice(0, PARKED_MAX)
-}
-
-export function serializeParked(orders: ParkedOrder[]): ParkedStore {
-  return { v: PARKED_STORAGE_VERSION, orders: orders.slice(0, PARKED_MAX) }
-}
-
-/**
- * Resumen para la tarjeta de la bandeja, calculado con el menú VIGENTE: si un
- * precio cambió, el total que se ve ya es el nuevo; si el pedido caducó o sus
- * productos desaparecieron, `ok` es false y la tarjeta lo dice en vez de
- * dejar que el cajero lo descubra al retomarlo.
- */
 /** Un renglón del pedido tal como hay que prepararlo. */
 export interface ParkedLine {
   label: string
