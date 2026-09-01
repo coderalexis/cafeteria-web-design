@@ -1449,6 +1449,24 @@ export type Database = {
         Args: { p_prepared?: boolean; p_ticket_id: string }
         Returns: string
       }
+      ticket_lines: {
+        Args: { p_biz: string; p_items: Json }
+        Returns: {
+          category_id: string
+          idx: number
+          line_total: number
+          modifier_ids: Json
+          notes: string
+          product_id: string
+          product_name: string
+          quantity: number
+          size_label: string
+          unit_cost: number
+          unit_price: number
+          variant_id: string
+          variant_name: string
+        }[]
+      }
       top_variants: {
         Args: { p_days?: number; p_limit?: number }
         Returns: {
