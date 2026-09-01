@@ -8,7 +8,9 @@
     "lint": "eslint .",
     "start": "next start",
     "test": "vitest run",
-    "test:sql": "bash tests/sql/run.sh"
+    "test:sql": "bash tests/sql/run.sh",
+    "types:check": "node scripts/verificar-tipos.mjs",
+    "types:write": "node scripts/verificar-tipos.mjs --escribir"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -76,6 +78,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.25",
     "postcss": "^8.5",
+    "supabase": "^2.116.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5",
     "vitest": "^4.1.11"

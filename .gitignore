@@ -25,3 +25,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# salida del verificador de tipos (scripts/verificar-tipos.mjs); el bueno es database.types.ts
+lib/supabase/database.types.generated.ts
