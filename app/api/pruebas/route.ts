@@ -1,4 +1,5 @@
 import { runTrialCheck } from "@/lib/trials"
+import { sendErrorDigest } from "@/app/actions/errors"
 
 /**
  * GET /api/pruebas — cron diario de Vercel (15:00 UTC ≈ 09:00 en CDMX).
@@ -17,10 +18,16 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url)
+  const dryRun = url.searchParams.get("dry") === "1"
   const { results, error } = await runTrialCheck({
-    dryRun: url.searchParams.get("dry") === "1",
+    dryRun,
     onlySlug: url.searchParams.get("business"),
   })
   if (error) return Response.json({ error }, { status: 500 })
-  return Response.json({ results })
+
+  // El resumen diario de errores viaja en este mismo cron porque el plan de
+  // Vercel limita cuántos crons hay, y ya son dos. Va DESPUÉS de las pruebas
+  // y no las bloquea: si el correo falla, las suspensiones ya quedaron.
+  const errores = await sendErrorDigest({ dryRun })
+  return Response.json({ results, errores })
 }

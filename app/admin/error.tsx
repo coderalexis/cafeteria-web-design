@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { AlertTriangle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { reportClientError } from "@/app/actions/errors"
 
 /** Error boundary del panel admin: conserva la barra lateral (layout). */
 export default function AdminError({
@@ -14,6 +15,15 @@ export default function AdminError({
 }) {
   useEffect(() => {
     console.error(error)
+    // Que alguien más se entere, no solo la consola de este aparato: el
+    // reporte se guarda y llega al operador en el resumen de la mañana.
+    void reportClientError({
+      route: typeof window !== "undefined" ? window.location.pathname : "?",
+      message: error.message || String(error),
+      digest: error.digest,
+      stack: error.stack?.slice(0, 4000),
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : undefined,
+    })
   }, [error])
 
   return (

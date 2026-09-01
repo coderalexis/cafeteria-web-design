@@ -1,6 +1,7 @@
 import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/admin"
+import { sendWithResend } from "@/lib/email"
 import { isSyntheticEmail } from "@/lib/accounts"
 import { addDays, dateStringInTz, formatDateString, type DateString } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
@@ -131,32 +132,6 @@ export function buildWeeklyEmailText(s: WeeklySummaryData): string {
 /* ------------------------------------------------------------------ */
 /*  Orquestación                                                       */
 /* ------------------------------------------------------------------ */
-
-async function sendWithResend(args: {
-  apiKey: string
-  fromName: string
-  to: string[]
-  subject: string
-  html: string
-  text: string
-}): Promise<string | null> {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${args.apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: `${args.fromName} <resumen@cafecitopos.com>`,
-      to: args.to,
-      subject: args.subject,
-      html: args.html,
-      text: args.text,
-    }),
-  })
-  if (!response.ok) {
-    const body = await response.text().catch(() => "")
-    return `Resend ${response.status}: ${body.slice(0, 200)}`
-  }
-  return null
-}
 
 /**
  * Corre el resumen para todos los negocios activos (o solo `onlySlug`).
