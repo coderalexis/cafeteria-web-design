@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_errors: {
+        Row: {
+          actor_id: string | null
+          business_id: string | null
+          created_at: string
+          digest: string | null
+          id: number
+          message: string
+          route: string
+          stack: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          business_id?: string | null
+          created_at?: string
+          digest?: string | null
+          id?: never
+          message: string
+          route: string
+          stack?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          business_id?: string | null
+          created_at?: string
+          digest?: string | null
+          id?: never
+          message?: string
+          route?: string
+          stack?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_errors_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_events: {
         Row: {
           action: string
@@ -1259,6 +1303,7 @@ export type Database = {
       }
       platform_overview: { Args: never; Returns: Json }
       profit_report: { Args: { p_month?: string }; Returns: Json }
+      report_error: { Args: { p_route: string; p_message: string; p_digest?: string; p_stack?: string; p_user_agent?: string }; Returns: undefined }
       promo_preview: { Args: { p_items: Json }; Returns: Json }
       promotions_report: { Args: { p_days?: number }; Returns: Json }
       sales_insights: { Args: { p_from: string; p_to: string }; Returns: Json }
