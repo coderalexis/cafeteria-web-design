@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Tag, Package, SlidersHorizontal, Receipt, Users, Wallet, Store, BarChart3, History, Stamp, HandCoins } from "lucide-react"
+import { LayoutDashboard, Tag, Package, SlidersHorizontal, Receipt, Users, Wallet, Store, BarChart3, History, Stamp, HandCoins, Coins } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
@@ -41,6 +41,7 @@ const navGroups: { titulo?: string; items: { href: string; label: string; icon: 
       { href: "/admin/ventas", label: "Ventas", icon: Receipt },
       { href: "/admin/cortes", label: "Cortes de caja", icon: Wallet },
       { href: "/admin/por-cobrar", label: "Por cobrar", icon: HandCoins },
+      { href: "/admin/gastos", label: "Gastos y utilidad", icon: Coins },
       { href: "/admin/analisis", label: "Análisis", icon: BarChart3 },
     ],
   },

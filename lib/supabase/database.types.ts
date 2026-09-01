@@ -361,6 +361,81 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount: number
+          business_id: string
+          cash_movement_id: string | null
+          category: string
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          paid_with: string | null
+          spent_on: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          business_id?: string
+          cash_movement_id?: string | null
+          category: string
+          created_at?: string
+          created_by?: string
+          description: string
+          id?: string
+          paid_with?: string | null
+          spent_on: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          cash_movement_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          paid_with?: string | null
+          spent_on?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fixed_expenses: {
+        Row: {
+          business_id: string
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          monthly_amount: number
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          business_id?: string
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          monthly_amount: number
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          monthly_amount?: number
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       loyalty_customers: {
         Row: {
           business_id: string
@@ -1122,6 +1197,7 @@ export type Database = {
         Returns: Json
       }
       platform_overview: { Args: never; Returns: Json }
+      profit_report: { Args: { p_month?: string }; Returns: Json }
       sales_insights: { Args: { p_from: string; p_to: string }; Returns: Json }
       sales_report: {
         Args: {
