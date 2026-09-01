@@ -50,6 +50,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "app_errors_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "app_errors_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
@@ -91,47 +98,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "audit_events_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "audit_events_actor_id_fkey"
             columns: ["actor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      member_pins: {
-        Row: {
-          business_id: string
-          pin_hash: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          business_id: string
-          pin_hash: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          business_id?: string
-          pin_hash?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "member_pins_business_id_user_id_fkey"
-            columns: ["business_id", "user_id"]
-            isOneToOne: true
-            referencedRelation: "business_members"
-            referencedColumns: ["business_id", "user_id"]
+            foreignKeyName: "audit_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -405,6 +383,47 @@ export type Database = {
           },
         ]
       }
+      deleted_businesses: {
+        Row: {
+          business_id: string
+          deleted_at: string
+          deleted_by: string | null
+          deleted_by_name: string
+          id: number
+          name: string
+          slug: string
+          summary: Json
+        }
+        Insert: {
+          business_id: string
+          deleted_at?: string
+          deleted_by?: string | null
+          deleted_by_name?: string
+          id?: never
+          name: string
+          slug: string
+          summary?: Json
+        }
+        Update: {
+          business_id?: string
+          deleted_at?: string
+          deleted_by?: string | null
+          deleted_by_name?: string
+          id?: never
+          name?: string
+          slug?: string
+          summary?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deleted_businesses_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -445,7 +464,29 @@ export type Database = {
           spent_on?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_cash_movement_id_fkey"
+            columns: ["cash_movement_id"]
+            isOneToOne: true
+            referencedRelation: "cash_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fixed_expenses: {
         Row: {
@@ -478,7 +519,15 @@ export type Database = {
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fixed_expenses_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       loyalty_customers: {
         Row: {
@@ -521,6 +570,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "businesses"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_pins: {
+        Row: {
+          business_id: string
+          pin_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_id: string
+          pin_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string
+          pin_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_pins_business_id_user_id_fkey"
+            columns: ["business_id", "user_id"]
+            isOneToOne: true
+            referencedRelation: "business_members"
+            referencedColumns: ["business_id", "user_id"]
           },
         ]
       }
@@ -964,7 +1042,22 @@ export type Database = {
           value?: number
           weekdays?: number[]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "promotions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotions_categoria_fkey"
+            columns: ["category_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_categories"
+            referencedColumns: ["id", "business_id"]
+          },
+        ]
       }
       ticket_item_modifiers: {
         Row: {
@@ -1139,8 +1232,8 @@ export type Database = {
           loyalty_delta?: number
           notes?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
-          prepared_at: string | null
-          promotion_id: string | null
+          prepared_at?: string | null
+          promotion_id?: string | null
           session_id: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
@@ -1200,6 +1293,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_loyalty_customer_id_fkey"
+            columns: ["loyalty_customer_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -1217,6 +1324,10 @@ export type Database = {
         Args: { p_amount: number; p_kind: string; p_reason: string }
         Returns: Json
       }
+      admin_set_member_pin: {
+        Args: { p_pin?: string; p_user_id: string }
+        Returns: undefined
+      }
       business_day: { Args: { ts: string; tz: string }; Returns: string }
       cancel_ticket: {
         Args: { p_reason: string; p_ticket_id: string }
@@ -1225,23 +1336,6 @@ export type Database = {
       cash_session_summary: { Args: { p_session_id: string }; Returns: Json }
       clone_menu: {
         Args: { p_source: string; p_target: string }
-        Returns: Json
-      }
-      loyalty_adjust: {
-        Args: { p_customer: string; p_delta: number; p_reason: string }
-        Returns: Json
-      }
-      loyalty_find_or_create: {
-        Args: { p_name?: string; p_phone: string }
-        Returns: Json
-      }
-      forgive_owed: { Args: { p_id: string; p_reason: string }; Returns: Json }
-      force_close_cash_session: {
-        Args: { p_deadline: string; p_reason: string; p_session_id: string }
-        Returns: Json
-      }
-      install_menu_pack: {
-        Args: { p_pack: Json }
         Returns: Json
       }
       close_cash_session: {
@@ -1269,16 +1363,36 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["business_role"]
       }
-      admin_set_member_pin: {
-        Args: { p_pin?: string; p_user_id: string }
-        Returns: undefined
+      delete_business: {
+        Args: {
+          p_actor?: string
+          p_actor_name?: string
+          p_business_id: string
+          p_slug: string
+        }
+        Returns: Json
       }
       derive_uuid: { Args: { p_key: string; p_ns: string }; Returns: string }
       find_user_id_by_email: { Args: { p_email: string }; Returns: string }
+      force_close_cash_session: {
+        Args: { p_deadline: string; p_reason: string; p_session_id: string }
+        Returns: Json
+      }
+      forgive_owed: { Args: { p_id: string; p_reason: string }; Returns: Json }
+      install_menu_pack: { Args: { p_pack: Json }; Returns: Json }
       log_audit: {
         Args: { p_action: string; p_details?: Json; p_entity?: string }
         Returns: undefined
       }
+      loyalty_adjust: {
+        Args: { p_customer: string; p_delta: number; p_reason: string }
+        Returns: Json
+      }
+      loyalty_find_or_create: {
+        Args: { p_name?: string; p_phone: string }
+        Returns: Json
+      }
+      margin_report: { Args: { p_from: string; p_to: string }; Returns: Json }
       member_ctx: {
         Args: never
         Returns: {
@@ -1291,21 +1405,34 @@ export type Database = {
       }
       my_context: { Args: never; Returns: Json }
       my_pin_set: { Args: never; Returns: boolean }
-      set_my_pin: { Args: { p_pin: string }; Returns: undefined }
-      set_ticket_prepared: {
-        Args: { p_prepared?: boolean; p_ticket_id: string }
-        Returns: string
-      }
-      verify_my_pin: { Args: { p_pin: string }; Returns: boolean }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }
         Returns: Json
       }
       platform_overview: { Args: never; Returns: Json }
       profit_report: { Args: { p_month?: string }; Returns: Json }
-      report_error: { Args: { p_route: string; p_message: string; p_digest?: string; p_stack?: string; p_user_agent?: string }; Returns: undefined }
+      promo_best: {
+        Args: { p_biz: string; p_items: Json; p_tz: string; p_when: string }
+        Returns: {
+          discount: number
+          id: string
+          name: string
+        }[]
+      }
       promo_preview: { Args: { p_items: Json }; Returns: Json }
       promotions_report: { Args: { p_days?: number }; Returns: Json }
+      public_menu: { Args: { p_slug: string }; Returns: Json }
+      public_receipt: { Args: { p_ticket: string }; Returns: Json }
+      report_error: {
+        Args: {
+          p_digest?: string
+          p_message: string
+          p_route: string
+          p_stack?: string
+          p_user_agent?: string
+        }
+        Returns: undefined
+      }
       sales_insights: { Args: { p_from: string; p_to: string }; Returns: Json }
       sales_report: {
         Args: {
@@ -1317,29 +1444,22 @@ export type Database = {
         Returns: Json
       }
       set_active_business: { Args: { p_business_id: string }; Returns: Json }
-      delete_business: {
-        Args: { p_business_id: string; p_slug: string; p_actor?: string; p_actor_name?: string }
-        Returns: Json
-      }
-      public_menu: {
-        Args: { p_slug: string }
-        Returns: Json
-      }
-      public_receipt: {
-        Args: { p_ticket: string }
-        Returns: Json
-      }
-      margin_report: {
-        Args: { p_from: string; p_to: string }
-        Returns: Json
-      }
-      weekly_summary: {
-        Args: { p_business_id: string; p_from: string; p_to: string }
-        Returns: Json
+      set_my_pin: { Args: { p_pin: string }; Returns: undefined }
+      set_ticket_prepared: {
+        Args: { p_prepared?: boolean; p_ticket_id: string }
+        Returns: string
       }
       top_variants: {
         Args: { p_days?: number; p_limit?: number }
-        Returns: { qty: number; variant_id: string }[]
+        Returns: {
+          qty: number
+          variant_id: string
+        }[]
+      }
+      verify_my_pin: { Args: { p_pin: string }; Returns: boolean }
+      weekly_summary: {
+        Args: { p_business_id: string; p_from: string; p_to: string }
+        Returns: Json
       }
     }
     Enums: {
@@ -1479,3 +1599,4 @@ export const Constants = {
     },
   },
 } as const
+

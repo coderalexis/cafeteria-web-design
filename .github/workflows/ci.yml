@@ -69,3 +69,29 @@ jobs:
         run: bash tests/sql/run.sh
         env:
           DATABASE_URL: postgres://postgres:pruebas@localhost:5432/pruebas
+
+      # Los tipos de TypeScript se generan contra ESTA base —la que acaba de
+      # nacer de las migraciones— y se comparan con el archivo del repo. Así
+      # el archivo deja de parcharse a mano: si una migración cambia el
+      # esquema y los tipos no, esto se pone rojo y deja el archivo correcto
+      # como artefacto para bajarlo y confirmarlo.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Instalar dependencias (para el CLI de Supabase)
+        run: pnpm install --frozen-lockfile
+      - name: Tipos al día con el esquema
+        run: node scripts/verificar-tipos.mjs
+        env:
+          DATABASE_URL: postgres://postgres:pruebas@localhost:5432/pruebas
+      - name: Guardar los tipos generados si difieren
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database.types.generated
+          path: lib/supabase/database.types.generated.ts
+          if-no-files-found: ignore
