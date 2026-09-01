@@ -110,3 +110,9 @@ begin
     raise exception 'FALLA: %', p_mensaje;
   end if;
 end $$;
+
+-- Los ayudantes se llaman también DESDE una sesión impersonada (rol
+-- `authenticated`), por ejemplo para volver a postgres al final de una
+-- prueba; sin esto el rol ni siquiera puede entrar al esquema.
+grant usage on schema pruebas to anon, authenticated;
+grant execute on all functions in schema pruebas to anon, authenticated;
