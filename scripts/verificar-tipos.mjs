@@ -29,12 +29,31 @@ if (!url) {
 }
 
 // El binario del CLI vive en node_modules; `pnpm exec` lo resuelve igual que
-// en los scripts de package.json.
-const salida = execFileSync(
-  process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-  ["exec", "supabase", "gen", "types", "--lang", "typescript", "--schema", "public", "--db-url", url],
-  { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 64 * 1024 * 1024 },
-)
+// en los scripts de package.json. Por debajo levanta un contenedor de
+// postgres-meta, y en el runner del CI ese arranque falla de vez en cuando
+// («error running container: exit 125») sin que nada esté mal: se reintenta
+// un par de veces antes de darlo por perdido. Un desfase de tipos de verdad
+// no pasa por aquí —eso lo decide la comparación de abajo—, así que el
+// reintento no puede esconder nada.
+function generar(intento = 1) {
+  try {
+    return execFileSync(
+      process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+      ["exec", "supabase", "gen", "types", "--lang", "typescript", "--schema", "public", "--db-url", url],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 },
+    )
+  } catch (e) {
+    const detalle = String(e.stderr ?? e.message ?? e)
+    if (intento < 3 && /error running container|exit 125/i.test(detalle)) {
+      console.error(`El contenedor del CLI no arrancó (intento ${intento}); se reintenta…`)
+      execFileSync(process.platform === "win32" ? "timeout" : "sleep", process.platform === "win32" ? ["/t", "15"] : ["15"], { stdio: "ignore" })
+      return generar(intento + 1)
+    }
+    console.error(detalle.slice(-2000))
+    throw e
+  }
+}
+const salida = generar()
 
 /**
  * Lo que NO es esquema no cuenta: la versión de PostgREST (`__InternalSupabase`)
