@@ -44,6 +44,8 @@ const salida = execFileSync(
 function normalizar(texto) {
   return texto
     .replace(/\r\n/g, "\n")
+    // …y los dos comentarios que la plataforma pone justo encima del bloque.
+    .replace(/  \/\/ Allows to automatically instantiate createClient[^\n]*\n  \/\/ instead of createClient[^\n]*\n/, "")
     .replace(/  __InternalSupabase: \{\n[\s\S]*?\n  \}\n/, "")
     .split("\n")
     .map((l) => l.replace(/\s+$/, ""))
