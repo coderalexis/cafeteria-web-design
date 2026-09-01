@@ -211,6 +211,7 @@ export default async function POSPage() {
       parkedOrders={settings.parkedOrders}
       tableCount={settings.tableCount}
       accountLabels={settings.accountLabels}
+      publicReceipt={settings.publicReceipt}
       loyalty={settings.loyalty}
       loyaltyTarget={settings.loyaltyTarget}
       loyaltyReward={settings.loyaltyReward}

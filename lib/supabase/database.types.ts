@@ -1141,6 +1141,10 @@ export type Database = {
         Args: { p_slug: string }
         Returns: Json
       }
+      public_receipt: {
+        Args: { p_ticket: string }
+        Returns: Json
+      }
       margin_report: {
         Args: { p_from: string; p_to: string }
         Returns: Json

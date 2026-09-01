@@ -502,6 +502,29 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 <option value="comanda">Comanda para preparación</option>
                 <option value="both">Ticket y comanda</option>
               </select>
+
+              {/* La alternativa al papel: el cliente escanea y se lleva su
+                  nota en el celular. Encendido por omisión — el enlace solo
+                  lo tiene quien estuvo en el mostrador y caduca solo. */}
+              <div className="mt-4 border-t border-stone-100 pt-3">
+                <label htmlFor="public_receipt" className="text-sm font-medium text-stone-700">
+                  Nota de compra en la web (QR)
+                </label>
+                <select
+                  id="public_receipt"
+                  name="public_receipt"
+                  defaultValue={currentSettings.publicReceipt ? "on" : "off"}
+                  className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                >
+                  <option value="on">Activado</option>
+                  <option value="off">Desactivado</option>
+                </select>
+                <p className="mt-1 text-xs text-stone-400">
+                  Al cobrar aparece un código QR: el cliente lo escanea y ve su nota en su celular, sin necesidad de
+                  impresora. El enlace <strong>caduca a los 7 días</strong> y no muestra tus costos. Se avisa en la
+                  página que es una nota de compra, no un comprobante fiscal.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

@@ -74,6 +74,13 @@ export interface BusinessSettings {
   kitchenPollSeconds: number
   /** Y cada cuantos con la pantalla oculta (siempre >= la de arriba). */
   kitchenPollHiddenSeconds: number
+  /**
+   * Nota de compra en la web: el cliente escanea un QR al pagar y la ve en su
+   * celular. ENCENDIDO por omision, al reves que el menu publico: aqui no se
+   * publica el negocio sino una nota suelta cuyo enlace solo tiene quien
+   * estuvo en el mostrador, y caduca a los 7 dias.
+   */
+  publicReceipt: boolean
 }
 
 /* Topes del ritmo de «Por preparar». Abajo del minimo se martillea el
@@ -159,6 +166,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   accountLabels: ["Para llevar", "Mostrador"],
   kitchenPollSeconds: 4,
   kitchenPollHiddenSeconds: 30,
+  publicReceipt: true,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -216,6 +224,8 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     // Oculta mas rapido que a la vista no tiene sentido: el ritmo lento es
     // para ahorrar bateria cuando nadie mira.
     out.kitchenPollHiddenSeconds = Math.max(out.kitchenPollHiddenSeconds, out.kitchenPollSeconds)
+    // Igual que en el RPC: solo se apaga si el cafe lo pidio expresamente.
+    out.publicReceipt = r.public_receipt !== false
     if (typeof r.closing_time === "string") out.closingTime = normalizeClosingTime(r.closing_time)
     const cargo = Number(r.takeout_fee)
     if (Number.isFinite(cargo) && cargo > 0) out.takeoutFee = Math.min(Math.round(cargo * 100) / 100, 100)
@@ -250,6 +260,7 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     account_labels: s.accountLabels,
     kitchen_poll_seconds: s.kitchenPollSeconds,
     kitchen_poll_hidden_seconds: s.kitchenPollHiddenSeconds,
+    public_receipt: s.publicReceipt,
     closing_time: s.closingTime,
     takeout_fee: s.takeoutFee,
     card_fee_pct: s.cardFeePct,

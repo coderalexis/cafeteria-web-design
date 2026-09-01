@@ -205,6 +205,7 @@ export function Landing() {
               "Descuentos que piden motivo, para saber después por qué se dieron.",
               "Si se va el internet, la venta en curso se guarda y la cobras al volver.",
               "¿Sin impresora térmica? Una pantalla te dice qué falta preparar y se actualiza sola —también lo de las mesas que aún no pagan, y nunca repite lo que ya serviste.",
+              "Y el ticket del cliente en su celular: escanea un QR al pagar y ahí está su nota, sin papel.",
             ]}
           />
           <Bloque

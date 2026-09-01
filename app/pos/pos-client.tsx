@@ -12,6 +12,7 @@ import {
   type AccountData,
   type ReceiptData,
 } from "@/lib/receipt"
+import QRCode from "react-qr-code"
 import { LazyMotion, m, AnimatePresence, useAnimationControls, useReducedMotion } from "framer-motion"
 import cargarAnimaciones from "./motion-features"
 import {
@@ -54,6 +55,7 @@ import {
   RotateCcw,
   Pencil,
   PauseCircle,
+  QrCode,
 } from "lucide-react"
 import { useAppContext, useBusiness } from "@/components/business-provider"
 import { BusinessSwitcher } from "@/components/business-switcher"
@@ -203,6 +205,8 @@ interface POSClientProps {
   discountMaxCashier: number
   /** Cargo por «Para llevar» ($, 0 = sin cargo). El monto lo valida el servidor. */
   takeoutFee: number
+  /** Nota de compra en la web: QR al cobrar para que el cliente la vea. */
+  publicReceipt: boolean
   /** Comisión de la terminal (%), solo para mostrar el neto en el corte. */
   cardFeePct: number
   initialTotalSales: number
@@ -312,10 +316,13 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
 function ReceiptView({
   sale,
   autoPrint,
+  publicReceipt,
   onClose,
 }: {
   sale: CompletedSale
   autoPrint: "none" | "ticket" | "comanda" | "both"
+  /** El cafe ofrece la nota en la web (QR para el cliente). */
+  publicReceipt: boolean
   onClose: () => void
 }) {
   const paymentInfo = PAYMENT_METHODS[sale.paymentMethod]
@@ -335,6 +342,10 @@ function ReceiptView({
     }
   }
 
+  const [mostrarQr, setMostrarQr] = useState(false)
+  // Ruta corta a proposito: mientras mas texto, mas denso el QR y mas cuesta
+  // escanearlo con un celular viejo bajo la luz de una cafeteria.
+  const urlNota = typeof window !== "undefined" ? `${window.location.origin}/t/${sale.ticketId}` : ""
   const [printedAuto, setPrintedAuto] = useState(false)
   useEffect(() => {
     if (autoPrint === "none") return
@@ -488,6 +499,38 @@ function ReceiptView({
           <Printer className="h-3.5 w-3.5" />
           {autoPrint === "both" ? "Ticket y comanda enviados a imprimir" : autoPrint === "ticket" ? "Ticket enviado a imprimir" : "Comanda enviada a imprimir"}
         </p>
+      )}
+
+      {/* Nota de compra: el cliente la escanea de esta misma pantalla, que
+          es el unico momento en que sigue enfrente. Se despliega en vez de
+          estar siempre a la vista porque la mayoria de las ventas no la
+          pide, y ocupar espacio fijo con eso empujaria «Nueva venta» —el
+          boton que SI se toca siempre— fuera del alcance del pulgar. */}
+      {publicReceipt && (
+        <div className="mt-4 w-full">
+          {mostrarQr ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white p-4">
+              <QRCode value={urlNota} size={148} bgColor="#ffffff" fgColor="#1c1917" />
+              <p className="text-center text-xs text-stone-500">
+                Que lo escanee el cliente con su celular.
+                <br />
+                Disponible 7 días.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMostrarQr(false)}
+                className="text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600"
+              >
+                ocultar
+              </button>
+            </div>
+          ) : (
+            <Button variant="outline" className="w-full gap-2" onClick={() => setMostrarQr(true)}>
+              <QrCode className="h-4 w-4" />
+              Nota para el cliente (QR)
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Actions */}
@@ -656,6 +699,7 @@ export default function POSClient({
   parkedOrders: parkedEnabled,
   tableCount,
   accountLabels,
+  publicReceipt,
   loyalty,
   loyaltyTarget,
   loyaltyReward,
@@ -3274,7 +3318,12 @@ export default function POSClient({
             <DialogTitle className="sr-only">Ticket de venta</DialogTitle>
           </DialogHeader>
           {completedSale && (
-            <ReceiptView sale={completedSale} autoPrint={autoPrint} onClose={() => setCompletedSale(null)} />
+            <ReceiptView
+              sale={completedSale}
+              autoPrint={autoPrint}
+              publicReceipt={publicReceipt}
+              onClose={() => setCompletedSale(null)}
+            />
           )}
         </DialogContent>
       </Dialog>

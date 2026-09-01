@@ -1030,6 +1030,13 @@ export function AyudaClient({ ticket, corte }: Props) {
           <DemoQR />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
+              <strong>Nota de compra en la web</strong>: al cobrar aparece un código QR. El cliente lo escanea con
+              su celular y ve su nota ahí mismo — útil si no tienes impresora, y muchos lo prefieren al papel. El
+              enlace <strong>caduca a los 7 días</strong>, no muestra tus costos, y la página avisa que es una{" "}
+              <em>nota de compra</em> y no un comprobante fiscal. Viene encendido; se apaga en{" "}
+              <strong>Datos y ajustes → Impresión</strong>.
+            </li>
+            <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
               <strong>Cuentas abiertas</strong>; define cuántas <strong>mesas</strong> tienes y qué otros botones
               salen al abrir una cuenta; ajusta cada cuánto se actualiza <strong>«Por preparar»</strong>; y pone el{" "}

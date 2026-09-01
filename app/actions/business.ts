@@ -78,6 +78,7 @@ const settingsSchema = z.object({
   accountLabels: z.string().max(200).transform(parseAccountLabels),
   kitchenPollSeconds: z.coerce.number().int().min(KITCHEN_POLL_MIN).max(KITCHEN_POLL_MAX),
   kitchenPollHiddenSeconds: z.coerce.number().int().min(KITCHEN_POLL_HIDDEN_MIN).max(KITCHEN_POLL_HIDDEN_MAX),
+  publicReceipt: z.enum(["on", "off"]).transform((v) => v === "on"),
   discountMaxCashier: z.number().int().min(0).max(100),
   menuNote: z.string().trim().max(MENU_NOTE_MAX, "La nota del menú es demasiado larga."),
   closingTime: z.string().trim().max(5),
@@ -114,6 +115,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     // preguntando sin parar.
     kitchenPollSeconds: String(formData.get("kitchen_poll_seconds") ?? "").trim() || "4",
     kitchenPollHiddenSeconds: String(formData.get("kitchen_poll_hidden_seconds") ?? "").trim() || "30",
+    publicReceipt: formData.get("public_receipt") ?? "on",
     discountMaxCashier: Number(formData.get("discount_max_cashier") ?? 100),
     menuNote: formData.get("menu_note") ?? "",
     closingTime: formData.get("closing_time") ?? "",
@@ -149,6 +151,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       accountLabels: v.accountLabels,
       kitchenPollSeconds: v.kitchenPollSeconds,
       kitchenPollHiddenSeconds: v.kitchenPollHiddenSeconds,
+      publicReceipt: v.publicReceipt,
       discountMaxCashier: v.discountMaxCashier,
       menuNote: v.menuNote,
       closingTime: normalizeClosingTime(v.closingTime),
@@ -214,6 +217,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   ) {
     cambios.push("ritmo de «Por preparar»")
   }
+  if (prevSettings.publicReceipt !== v.publicReceipt) cambios.push("nota de compra en la web")
   if (prevSettings.discountMaxCashier !== v.discountMaxCashier) cambios.push("límite de descuento en caja")
   if (cambios.length > 0) {
     await logAudit("negocio.ajustes", v.name, { cambios })

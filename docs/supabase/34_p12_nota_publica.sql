@@ -1,0 +1,32 @@
+-- ============================================================
+--  P12 - Nota de compra en la web (QR para el cliente)
+-- ============================================================
+--
+-- El cliente escanea un QR en la pantalla al pagar y ve su nota en el
+-- celular. Nacio como alternativa mientras no hay impresora termica, pero
+-- se queda despues: mucha gente prefiere el enlace al papel.
+--
+-- Es el SEGUNDO RPC con permiso anonimo, despues de `public_menu`: la pagina
+-- /t/<id> no tiene sesion, asi que no hay RLS que la cubra y toda la
+-- seguridad vive dentro de la funcion.
+--
+-- Cuatro guardas, y NULL en todos los casos (sin distinguir "no existe" de
+-- "no disponible", para no confirmarle nada a quien pruebe ids):
+--   1. el ticket debe existir
+--   2. no puede tener mas de 7 dias
+--   3. el negocio activo y no plantilla
+--   4. el cafe no debe haberlo apagado
+--
+-- ENCENDIDO POR OMISION, al reves que `public_menu`: aqui no se publica el
+-- negocio entero sino una nota suelta cuyo enlace solo tiene quien estuvo en
+-- el mostrador. Decision del usuario.
+--
+-- Columnas EXPLICITAS: `ticket_items.unit_cost` jamas sale de aqui. Tampoco
+-- la lealtad: los sellos son del cliente y el enlace lo abre cualquiera que
+-- lo tenga.
+--
+-- El id del ticket es un uuid v4 (aleatorio) y no se expone en ningun otro
+-- lado publico, asi que sirve de llave sin inventar un token aparte.
+--
+-- Aplicada el 2026-08-31 como `p12_nota_de_compra_publica`.
+-- (El cuerpo vive en la migracion; aqui queda el porque.)
