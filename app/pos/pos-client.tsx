@@ -3192,7 +3192,12 @@ export default function POSClient({
         cardFeePct={cardFeePct}
         pendingUploads={cola.pendientes + cola.porRevisar}
       />
-      <TicketHistoryDialog open={showTickets} onOpenChange={setShowTickets} isAdmin={isAdmin} />
+      <TicketHistoryDialog
+        open={showTickets}
+        onOpenChange={setShowTickets}
+        isAdmin={isAdmin}
+        publicReceipt={publicReceipt}
+      />
       <RecentOrdersDialog open={showRecent} onOpenChange={setShowRecent} />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />
       <CartLineDialog line={infoLine} onClose={() => setInfoLine(null)} />

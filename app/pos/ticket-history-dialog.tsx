@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Ban, ChefHat, Printer, Receipt, RefreshCw } from "lucide-react"
+import { Ban, ChefHat, Printer, QrCode, Receipt, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,16 +30,20 @@ import { formatCurrency, formatTime, PAYMENT_METHODS, type PaymentMethodKey } fr
 import { buildKitchenLines, buildTicketLines, printLines, receiptBusinessFrom, receiptFromTicket } from "@/lib/receipt"
 import { useBusiness } from "@/components/business-provider"
 import { ticketItemLabel, type TicketRecord } from "@/lib/tickets"
+import { ReceiptQrDialog, useReceiptQr } from "@/components/receipt-qr-dialog"
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   isAdmin: boolean
+  /** El café ofrece la nota en la web: se puede volver a mostrar su QR. */
+  publicReceipt: boolean
 }
 
-export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
+export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt }: Props) {
   const router = useRouter()
   const receiptBiz = receiptBusinessFrom(useBusiness())
+  const qr = useReceiptQr()
   const [tickets, setTickets] = useState<TicketRecord[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [toCancel, setToCancel] = useState<TicketRecord | null>(null)
@@ -193,6 +197,20 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
                         >
                           <ChefHat className="h-3.5 w-3.5" />
                         </Button>
+                        {/* Para cuando el cliente dijo que no queria ticket y
+                            se arrepintio. En una venta cancelada no se
+                            ofrece: no hay nada que entregarle. */}
+                        {publicReceipt && !cancelled && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Mostrar el QR de la nota al cliente"
+                            onClick={() => qr.abrir(ticket.id, ticket.folio)}
+                          >
+                            <QrCode className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="icon"
@@ -215,6 +233,7 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin }: Props) {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <ReceiptQrDialog {...qr.props} />
 
       {/* Confirmación de cancelación con motivo */}
       <AlertDialog open={toCancel !== null} onOpenChange={(o) => !o && setToCancel(null)}>

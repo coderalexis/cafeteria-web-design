@@ -1037,6 +1037,11 @@ export function AyudaClient({ ticket, corte }: Props) {
               <strong>Datos y ajustes → Impresión</strong>.
             </li>
             <li>
+              ¿El cliente dijo que no quería ticket y se arrepintió? No hay que rehacer nada: entra a{" "}
+              <strong>⋮ → Tickets del día</strong>, busca su venta y toca el botón del <strong>QR</strong>. Ahí
+              también puedes <strong>copiar el enlace</strong> para mandárselo por mensaje si ya se fue.
+            </li>
+            <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
               <strong>Cuentas abiertas</strong>; define cuántas <strong>mesas</strong> tienes y qué otros botones
               salen al abrir una cuenta; ajusta cada cuánto se actualiza <strong>«Por preparar»</strong>; y pone el{" "}
