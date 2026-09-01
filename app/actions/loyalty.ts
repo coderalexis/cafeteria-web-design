@@ -3,7 +3,6 @@
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext, requireRole } from "@/lib/context"
-import { logAudit } from "@/lib/audit"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -123,7 +122,7 @@ export async function adjustLoyalty(
 
   const parsed = adjustSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
-  const { customerId, delta, reason, label } = parsed.data
+  const { customerId, delta, reason } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("loyalty_adjust", {
@@ -133,7 +132,8 @@ export async function adjustLoyalty(
   })
   if (error) return { error: error.message }
 
-  await logAudit("lealtad.ajuste", label || customerId, { delta, reason })
+  // La bitácora la escribe el propio RPC `loyalty_adjust`, en la misma
+  // transacción que el ajuste (migración 37): aquí ya no hay nada que anotar.
   const r = data as { stamps: number }
   return { success: true, stamps: r.stamps }
 }

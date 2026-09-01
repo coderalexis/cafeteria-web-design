@@ -4,7 +4,6 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { requireContext, requireRole } from "@/lib/context"
-import { logAudit } from "@/lib/audit"
 import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActionResult } from "./types"
 
@@ -256,23 +255,17 @@ export async function forgiveOwed(
   const parsed = condonarSchema.safeParse(input)
   if (!parsed.success) return { error: "Escribe un motivo de al menos 3 letras." }
 
+  // El borrado y la bitácora van en el MISMO RPC, en una sola transacción:
+  // o quedan los dos, o ninguno. Antes se borraba aquí y se auditaba
+  // después con `logAudit`, que traga errores — dinero que desaparecía sin
+  // constancia si la bitácora fallaba.
   const supabase = await createClient()
-  // Se lee antes de borrar: después no habría de qué dejar constancia.
-  const { data: fila } = await supabase
-    .from("parked_orders")
-    .select("name, owed_since, cart")
-    .eq("id", parsed.data.id)
-    .not("owed_since", "is", null)
-    .maybeSingle()
-  if (!fila) return { error: "Esa cuenta ya no existe o no está marcada como fiado." }
-
-  const { error } = await supabase.from("parked_orders").delete().eq("id", parsed.data.id)
+  const { error } = await supabase.rpc("forgive_owed", {
+    p_id: parsed.data.id,
+    p_reason: parsed.data.reason,
+  })
   if (error) return { error: dbErrorMessage(error) }
 
-  await logAudit("fiado.condonado", fila.name, {
-    motivo: parsed.data.reason,
-    debia_desde: fila.owed_since,
-  })
   revalidatePath("/admin/por-cobrar")
   return { success: true }
 }
