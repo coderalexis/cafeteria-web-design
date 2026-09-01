@@ -44,7 +44,7 @@ export function AccountDialog({
     if (!account || !biz) return
     // Sin await de por medio: `printLines` abre la ventana y el bloqueador
     // solo la perdona mientras siga dentro del gesto del toque.
-    if (!printLines(buildAccountLines(account, biz), `Cuenta ${account.name}`)) {
+    if (!printLines(buildAccountLines(account, biz), `Cuenta ${account.name}`, biz.widthMm)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

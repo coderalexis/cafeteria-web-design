@@ -66,13 +66,13 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
   }, [open, load])
 
   const reprint = (ticket: TicketRecord) => {
-    if (!printLines(buildTicketLines(receiptFromTicket(ticket, true), receiptBiz), `Ticket ${ticket.folio}`)) {
+    if (!printLines(buildTicketLines(receiptFromTicket(ticket, true), receiptBiz), `Ticket ${ticket.folio}`, receiptBiz.widthMm)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }
 
   const printKitchen = (ticket: TicketRecord) => {
-    if (!printLines(buildKitchenLines(receiptFromTicket(ticket), receiptBiz), `Comanda ${ticket.folio}`)) {
+    if (!printLines(buildKitchenLines(receiptFromTicket(ticket), receiptBiz), `Comanda ${ticket.folio}`, receiptBiz.widthMm)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

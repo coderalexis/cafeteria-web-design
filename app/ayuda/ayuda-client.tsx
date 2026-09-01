@@ -1042,6 +1042,12 @@ export function AyudaClient({ ticket, corte }: Props) {
               también puedes <strong>copiar el enlace</strong> para mandárselo por mensaje si ya se fue.
             </li>
             <li>
+              <strong>Si compras impresora térmica</strong>, dile al sistema qué rollo usa en{" "}
+              <strong>Datos y ajustes → Impresión → Ancho del papel</strong>. El ticket está armado a la medida del
+              rollo de <strong>58 mm</strong>, que es el más común y el más barato; si el tuyo es de 80 mm,
+              cámbialo ahí. Si la letra sale muy grande o muy chica, casi siempre es este ajuste.
+            </li>
+            <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
               <strong>Cuentas abiertas</strong>; define cuántas <strong>mesas</strong> tienes y qué otros botones
               salen al abrir una cuenta; ajusta cada cuánto se actualiza <strong>«Por preparar»</strong>; y pone el{" "}

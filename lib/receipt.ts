@@ -2,11 +2,16 @@ import { formatCurrency, formatDate, formatTime, paymentLabel } from "@/lib/form
 import type { BusinessInfo } from "@/lib/context-shape"
 import type { TicketRecord } from "@/lib/tickets"
 import { ticketItemLabel } from "@/lib/tickets"
+import { parseBusinessSettings, printableWidthMm } from "@/lib/settings"
 
 /* ------------------------------------------------------------------ */
-/*  Impresión en impresora térmica de 72 mm vía popup + window.print   */
-/*  (32 columnas en Courier 11px). Lo usan el POS, el historial y el   */
-/*  corte de caja.                                                     */
+/*  Impresión térmica vía popup + window.print. Lo usan el POS, el      */
+/*  historial y el corte de caja.                                       */
+/*                                                                      */
+/*  32 columnas: es la medida NATIVA del rollo de 58 mm (384 puntos a   */
+/*  12 por caracter). El ANCHO DE LA HOJA lo pone cada cafeteria segun  */
+/*  su papel — antes estaba fijo en 72 mm, que es el de 80, y con 32    */
+/*  columnas no calzaba en ninguno de los dos.                          */
 /* ------------------------------------------------------------------ */
 
 const WIDTH = 32
@@ -48,10 +53,13 @@ export interface ReceiptBusiness {
   phone?: string | null
   receiptHeader?: string | null
   receiptFooter?: string | null
+  /** Rollo de la impresora en mm (58 por omision). */
+  widthMm?: 58 | 80
 }
 
 export function receiptBusinessFrom(b: BusinessInfo): ReceiptBusiness {
   return {
+    widthMm: parseBusinessSettings(b.settings).receiptWidthMm,
     name: b.name,
     timezone: b.timezone,
     address: b.address,
@@ -444,7 +452,7 @@ function escapeHtml(text: string): string {
 }
 
 /** Abre el popup e imprime. Devuelve false si el navegador lo bloqueó. */
-export function printLines(lines: string[], title: string): boolean {
+export function printLines(lines: string[], title: string, paperMm: 58 | 80 = 58): boolean {
   const printWindow = window.open("", "_blank", "width=320,height=600")
   if (!printWindow) return false
 
@@ -463,7 +471,9 @@ export function printLines(lines: string[], title: string): boolean {
           }
           pre { margin: 0; white-space: pre-wrap; }
           @media print {
-            body { width: 72mm; font-size: 11px; }
+            /* Lo que de verdad imprime: la hoja mide el ancho util del rollo,
+               asi las 32 columnas caen en su tamano nativo y no escaladas. */
+            body { width: ${printableWidthMm(paperMm)}mm; font-size: 11px; }
           }
         </style>
       </head>

@@ -81,6 +81,21 @@ export interface BusinessSettings {
    * estuvo en el mostrador, y caduca a los 7 dias.
    */
   publicReceipt: boolean
+  /**
+   * Ancho del rollo de la impresora termica, en mm.
+   *
+   * El ticket se arma a 32 columnas, que es la medida NATIVA de 58 mm (384
+   * puntos / 12 por caracter). La hoja de impresion decia 72 mm —la de 80—
+   * asi que no calzaba exacto en ninguno de los dos: en 80 salia 50% mas
+   * grande de lo normal, y en 58 el driver lo encogia. Con este ajuste la
+   * hoja mide lo que mide el papel y cada caracter cae en su lugar.
+   */
+  receiptWidthMm: 58 | 80
+}
+
+/** Milimetros IMPRIMIBLES de cada rollo (el papel trae margen a los lados). */
+export function printableWidthMm(paper: 58 | 80): number {
+  return paper === 80 ? 72 : 48
 }
 
 /* Topes del ritmo de «Por preparar». Abajo del minimo se martillea el
@@ -167,6 +182,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   kitchenPollSeconds: 4,
   kitchenPollHiddenSeconds: 30,
   publicReceipt: true,
+  receiptWidthMm: 58,
 }
 
 /** Meta en pesos: entero positivo con tope sano. */
@@ -226,6 +242,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     out.kitchenPollHiddenSeconds = Math.max(out.kitchenPollHiddenSeconds, out.kitchenPollSeconds)
     // Igual que en el RPC: solo se apaga si el cafe lo pidio expresamente.
     out.publicReceipt = r.public_receipt !== false
+    if (Number(r.receipt_width_mm) === 80) out.receiptWidthMm = 80
     if (typeof r.closing_time === "string") out.closingTime = normalizeClosingTime(r.closing_time)
     const cargo = Number(r.takeout_fee)
     if (Number.isFinite(cargo) && cargo > 0) out.takeoutFee = Math.min(Math.round(cargo * 100) / 100, 100)
@@ -261,6 +278,7 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     kitchen_poll_seconds: s.kitchenPollSeconds,
     kitchen_poll_hidden_seconds: s.kitchenPollHiddenSeconds,
     public_receipt: s.publicReceipt,
+    receipt_width_mm: s.receiptWidthMm,
     closing_time: s.closingTime,
     takeout_fee: s.takeoutFee,
     card_fee_pct: s.cardFeePct,

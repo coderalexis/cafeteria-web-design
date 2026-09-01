@@ -178,7 +178,7 @@ export default function VentasClient({
 
   function handleReprint() {
     if (!selectedTicket) return
-    if (!printLines(buildTicketLines(receiptFromTicket(selectedTicket, true), receiptBusinessFrom(business)), `Ticket ${selectedTicket.folio}`)) {
+    if (!printLines(buildTicketLines(receiptFromTicket(selectedTicket, true), receiptBusinessFrom(business)), `Ticket ${selectedTicket.folio}`, receiptBusinessFrom(business).widthMm)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

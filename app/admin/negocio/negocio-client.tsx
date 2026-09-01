@@ -503,6 +503,29 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 <option value="both">Ticket y comanda</option>
               </select>
 
+              {/* El rollo que usa la impresora. El ticket se arma a 32
+                  columnas, que es la medida nativa de 58 mm; con este dato la
+                  hoja mide lo que mide el papel y cada caracter cae en su
+                  tamano real en vez de salir estirado o encogido. */}
+              <div className="mt-4 border-t border-stone-100 pt-3">
+                <label htmlFor="receipt_width_mm" className="text-sm font-medium text-stone-700">
+                  Ancho del papel de la impresora
+                </label>
+                <select
+                  id="receipt_width_mm"
+                  name="receipt_width_mm"
+                  defaultValue={String(currentSettings.receiptWidthMm)}
+                  className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                >
+                  <option value="58">58 mm (el rollo más común)</option>
+                  <option value="80">80 mm (rollo ancho)</option>
+                </select>
+                <p className="mt-1 text-xs text-stone-400">
+                  Mide el rollo que usa tu impresora. Si el ticket sale con la letra muy grande o muy chica, casi
+                  siempre es este ajuste.
+                </p>
+              </div>
+
               {/* La alternativa al papel: el cliente escanea y se lleva su
                   nota en el celular. Encendido por omisión — el enlace solo
                   lo tiene quien estuvo en el mostrador y caduca solo. */}
