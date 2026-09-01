@@ -29,7 +29,7 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Pruebas unitarias (lo puro: recibo, ajustes, fechas, carrito)
+      - name: "Pruebas unitarias (lo puro: ajustes, fechas, carrito, cuentas)"
         run: pnpm test
 
       - name: Build
