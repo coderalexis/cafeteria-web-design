@@ -41,7 +41,7 @@ as $$
   select nullif(
     coalesce(
       current_setting('request.jwt.claim.sub', true),
-      (current_setting('request.jwt.claims', true)::jsonb ->> 'sub')
+      (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
     ), '')::uuid
 $$;
 
@@ -50,14 +50,16 @@ language sql stable
 as $$
   select coalesce(
     current_setting('request.jwt.claim.role', true),
-    (current_setting('request.jwt.claims', true)::jsonb ->> 'role')
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
   )
 $$;
 
 create or replace function auth.jwt() returns jsonb
 language sql stable
 as $$
-  select coalesce(current_setting('request.jwt.claims', true), '{}')::jsonb
+  -- Un claims vacío es «sin sesión», no un JSON inválido: así lo trata el
+  -- auth.uid() real de Supabase, y así lo dejan las pruebas al pasar a anon.
+  select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
 $$;
 
 grant usage on schema auth to anon, authenticated, service_role;
