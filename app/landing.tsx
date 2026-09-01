@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import {
   Coffee,
   ArrowRight,
@@ -131,7 +132,7 @@ export function Landing() {
           aria-hidden
           className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl"
         />
-        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:py-20 lg:grid-cols-[1.1fr_auto] lg:items-center">
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:py-20 lg:grid-cols-[1fr_1.15fr] lg:items-center">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-800">
               <Coffee className="h-3.5 w-3.5" />
@@ -168,16 +169,25 @@ export function Landing() {
             </p>
           </div>
 
-          {/* Ticket real, generado con la misma función que imprime el sistema */}
-          <div className="mx-auto w-full max-w-[19rem] lg:mx-0">
-            <div className="rotate-1 rounded-lg bg-white p-4 shadow-xl ring-1 ring-stone-200">
-              <pre className="overflow-hidden whitespace-pre font-mono text-[10px] leading-[1.45] text-stone-700">
-                {TICKET_MUESTRA.join("\n")}
-              </pre>
+          {/* Capturas REALES del sistema, no maquetas: es la pantalla de venta
+              tal cual, con el celular encima para que se vea de un golpe que
+              sirve en los dos aparatos. */}
+          <div className="relative">
+            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl">
+              <div className="flex items-center gap-1.5 border-b border-stone-200 bg-stone-100 px-3 py-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
+              </div>
+              <Image
+                src="/capturas/pos.webp"
+                alt="Pantalla de venta de Cafecito POS con el menu y el carrito"
+                width={1600}
+                height={1000}
+                priority
+                className="w-full"
+              />
             </div>
-            <p className="mt-3 text-center text-xs text-stone-400">
-              Así sale el ticket de tu impresora térmica
-            </p>
           </div>
         </div>
       </div>
@@ -295,6 +305,82 @@ export function Landing() {
           />
         </div>
 
+        {/* ── Así se ve por dentro ──────────────────────────────── */}
+        <section className="mt-20">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-stone-900">Así se ve por dentro</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-stone-600">
+              Capturas del sistema funcionando, no ilustraciones. Los números son de una cafetería de ejemplo con un
+              mes de ventas.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            {[
+              {
+                src: "/capturas/tablero.webp",
+                w: 1600,
+                h: 1000,
+                titulo: "Sabes cómo va el día sin sacar cuentas",
+                texto:
+                  "Cuánto llevas hoy, cómo vas contra tu meta, y la comparación con ayer y con el mismo día de la semana pasada a la misma hora.",
+              },
+              {
+                src: "/capturas/analisis.webp",
+                w: 1600,
+                h: 1089,
+                titulo: "A qué hora se llena y qué deja más",
+                texto:
+                  "Mapa de calor por día y hora para acomodar turnos, comparativo por cajero, y el margen real de cada producto una vez pagados los insumos.",
+              },
+              {
+                src: "/capturas/preparar.webp",
+                w: 1400,
+                h: 875,
+                titulo: "La comanda, sin impresora",
+                texto:
+                  "Lo que falta preparar en una pantalla que se actualiza sola. Incluye las cuentas de mesas que todavía no pagan, y nunca repite lo ya servido.",
+              },
+              {
+                src: "/capturas/cortes.webp",
+                w: 1400,
+                h: 875,
+                titulo: "El corte, cuadrado y guardado",
+                texto:
+                  "Cada turno con su fondo, lo esperado contra lo contado y la diferencia a la vista. Queda archivado para consultarlo cuando haga falta.",
+              },
+            ].map((c) => (
+              <figure key={c.src} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <Image src={c.src} alt={c.titulo} width={c.w} height={c.h} className="w-full border-b border-stone-100" />
+                <figcaption className="p-5">
+                  <h3 className="font-bold text-stone-800">{c.titulo}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-stone-600">{c.texto}</p>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+
+          {/* El ticket sigue siendo real: lo genera la MISMA función que
+              imprime el sistema, así que no puede quedar desactualizado. */}
+          <div className="mt-6 grid items-center gap-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:grid-cols-[auto_1fr]">
+            <div className="mx-auto w-[16rem] rotate-1 rounded-lg bg-stone-50 p-4 ring-1 ring-stone-200">
+              <pre className="overflow-hidden whitespace-pre font-mono text-[9px] leading-[1.45] text-stone-700">
+                {TICKET_MUESTRA.join("\n")}
+              </pre>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-stone-800">Y el ticket del cliente, como debe ser</h3>
+              <p className="mt-2 text-stone-600">
+                Este de aquí no es una imagen: lo arma la misma función que imprime tu impresora térmica, así que es
+                exactamente lo que va a salir en papel. Con tu nombre, tu dirección y el mensaje que tú elijas.
+              </p>
+              <p className="mt-2 text-sm text-stone-500">
+                ¿Todavía sin impresora? El cliente escanea un código QR al pagar y se lleva su nota en el celular.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* ── El diferenciador ──────────────────────────────────── */}
         <section className="mt-16 overflow-hidden rounded-2xl border border-stone-800 bg-stone-900">
           <div className="grid gap-8 p-8 sm:p-10 lg:grid-cols-2 lg:items-center">
@@ -403,27 +489,38 @@ export function Landing() {
         {/* ── Requisitos ────────────────────────────────────────── */}
         <section className="mt-16 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
           <h2 className="text-xl font-bold text-stone-800">Funciona con lo que ya tienes</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-3">
-            <div className="flex gap-3">
-              <Smartphone className="h-5 w-5 shrink-0 text-amber-700" />
-              <p className="text-sm text-stone-600">
-                <strong className="text-stone-800">Tablet, celular o computadora.</strong> Se abre en el navegador y se
-                instala como aplicación si quieres.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Printer className="h-5 w-5 shrink-0 text-amber-700" />
-              <p className="text-sm text-stone-600">
-                <strong className="text-stone-800">Impresora térmica opcional.</strong> Si no tienes, manda el ticket
-                por WhatsApp.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Wallet className="h-5 w-5 shrink-0 text-amber-700" />
-              <p className="text-sm text-stone-600">
-                <strong className="text-stone-800">Tu terminal de siempre.</strong> Cobras la tarjeta con la que ya
-                usas; aquí solo se registra la venta.
-              </p>
+          <div className="mt-5 grid gap-6 sm:grid-cols-[auto_1fr] sm:items-center">
+            {/* La misma pantalla en un celular: se ve de un golpe que no hay
+                una version recortada, es el POS completo en la mano. */}
+            <Image
+              src="/capturas/pos-movil.webp"
+              alt="La pantalla de venta de Cafecito POS en un celular"
+              width={480}
+              height={985}
+              className="mx-auto w-32 rounded-2xl border-4 border-white bg-white shadow-lg sm:w-36"
+            />
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex gap-3">
+                <Smartphone className="h-5 w-5 shrink-0 text-amber-700" />
+                <p className="text-sm text-stone-600">
+                  <strong className="text-stone-800">Tablet, celular o computadora.</strong> Se abre en el navegador y se
+                  instala como aplicación si quieres.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Printer className="h-5 w-5 shrink-0 text-amber-700" />
+                <p className="text-sm text-stone-600">
+                  <strong className="text-stone-800">Impresora térmica opcional.</strong> Si no tienes, manda el ticket
+                  por WhatsApp.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Wallet className="h-5 w-5 shrink-0 text-amber-700" />
+                <p className="text-sm text-stone-600">
+                  <strong className="text-stone-800">Tu terminal de siempre.</strong> Cobras la tarjeta con la que ya
+                  usas; aquí solo se registra la venta.
+                </p>
+              </div>
             </div>
           </div>
         </section>
