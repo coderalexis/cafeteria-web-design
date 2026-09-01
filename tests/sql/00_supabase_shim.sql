@@ -64,8 +64,17 @@ grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid(), auth.role(), auth.jwt() to anon, authenticated, service_role;
 grant select on auth.users to service_role;
 
--- Supabase da estos permisos de base sobre `public`; sin ellos, los grants
--- de las migraciones («grant select on table … to authenticated») no bastan
--- porque el rol ni siquiera puede entrar al esquema.
+-- Supabase da estos permisos de base sobre `public`: los tres roles pueden
+-- TODO sobre cualquier tabla, secuencia o función nueva, y la puerta real es
+-- la RLS. Por eso una migración solo necesita «revocar de anon» donde quiere
+-- cerrar (la 04 lo hace) y dar grants explícitos solo en tablas donde quiere
+-- ser más estricta. Sin esto, el replay pedía permisos que en producción
+-- nadie tuvo que pedir, y la suite fallaba por una razón que no era del
+-- sistema.
 grant usage on schema public to anon, authenticated, service_role;
-alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant all on all functions in schema public to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
