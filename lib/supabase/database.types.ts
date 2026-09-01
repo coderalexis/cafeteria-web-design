@@ -1191,6 +1191,7 @@ export type Database = {
         Args: { p_name?: string; p_phone: string }
         Returns: Json
       }
+      forgive_owed: { Args: { p_id: string; p_reason: string }; Returns: Json }
       force_close_cash_session: {
         Args: { p_deadline: string; p_reason: string; p_session_id: string }
         Returns: Json

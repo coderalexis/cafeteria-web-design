@@ -3,8 +3,14 @@ import { createClient } from "@/lib/supabase/server"
 
 /**
  * Registra un evento en la bitácora del negocio activo (RPC `log_audit`,
- * solo owner|admin). Es "fire-and-forget": un fallo de auditoría nunca debe
- * romper la acción principal.
+ * solo owner|admin).
+ *
+ * Es de buen esfuerzo A PROPÓSITO: que la bitácora tosa no debe impedir
+ * guardar la carta. Pero callar del todo era peor —una auditoría que puede
+ * fallar sin ruido es decorativa—, así que un fallo queda en los logs del
+ * servidor con la acción que se perdió. Lo que SÍ es dinero (condonar un
+ * fiado, ajustar sellos) ya no pasa por aquí: lo escribe el propio RPC en la
+ * misma transacción que el cambio (migración 37), o no ocurre.
  */
 export async function logAudit(
   action: string,
@@ -13,13 +19,14 @@ export async function logAudit(
 ): Promise<void> {
   try {
     const supabase = await createClient()
-    await supabase.rpc("log_audit", {
+    const { error } = await supabase.rpc("log_audit", {
       p_action: action,
       p_entity: entity ?? undefined,
       p_details: details as never,
     })
-  } catch {
-    // silencioso a propósito
+    if (error) throw error
+  } catch (e) {
+    console.error(`[bitácora] no se pudo registrar «${action}»:`, e instanceof Error ? e.message : e)
   }
 }
 
