@@ -110,17 +110,20 @@ export function Landing() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-700">
               <Coffee className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-stone-800">Cafecito POS</span>
+            <span className="whitespace-nowrap font-bold text-stone-800">Cafecito POS</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/login" className="px-3 py-2 text-sm font-semibold text-stone-600 hover:text-amber-700">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Link
+              href="/login"
+              className="hidden px-3 py-2 text-sm font-semibold text-stone-600 hover:text-amber-700 min-[360px]:block"
+            >
               Entrar
             </Link>
             <Link
               href="/registro"
-              className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+              className="whitespace-nowrap rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 sm:px-4"
             >
-              Crear mi cafetería
+              Crear<span className="hidden sm:inline"> mi</span> cafetería
             </Link>
           </div>
         </div>
@@ -173,7 +176,17 @@ export function Landing() {
               tal cual, con el celular encima para que se vea de un golpe que
               sirve en los dos aparatos. */}
           <div className="relative">
-            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl">
+            <div className="mx-auto max-w-[15rem] overflow-hidden rounded-[1.75rem] border-[6px] border-stone-800 bg-white shadow-2xl md:hidden">
+              <Image
+                src="/capturas/pos-movil.webp"
+                alt="Pantalla de venta de Cafecito POS en un celular"
+                width={480}
+                height={1039}
+                priority
+                className="w-full"
+              />
+            </div>
+            <div className="hidden overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl md:block">
               <div className="flex items-center gap-1.5 border-b border-stone-200 bg-stone-100 px-3 py-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
                 <span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
@@ -184,7 +197,6 @@ export function Landing() {
                 alt="Pantalla de venta de Cafecito POS con el menu y el carrito"
                 width={1600}
                 height={1000}
-                priority
                 className="w-full"
               />
             </div>
@@ -319,6 +331,7 @@ export function Landing() {
             {[
               {
                 src: "/capturas/tablero.webp",
+                movil: "/capturas/tablero-movil.webp",
                 w: 1600,
                 h: 1000,
                 titulo: "Sabes cómo va el día sin sacar cuentas",
@@ -327,6 +340,7 @@ export function Landing() {
               },
               {
                 src: "/capturas/analisis.webp",
+                movil: "/capturas/analisis-movil.webp",
                 w: 1600,
                 h: 1089,
                 titulo: "A qué hora se llena y qué deja más",
@@ -335,6 +349,7 @@ export function Landing() {
               },
               {
                 src: "/capturas/preparar.webp",
+                movil: "/capturas/preparar-movil.webp",
                 w: 1400,
                 h: 875,
                 titulo: "La comanda, sin impresora",
@@ -343,6 +358,7 @@ export function Landing() {
               },
               {
                 src: "/capturas/cortes.webp",
+                movil: "/capturas/cortes-movil.webp",
                 w: 1400,
                 h: 875,
                 titulo: "El corte, cuadrado y guardado",
@@ -351,7 +367,20 @@ export function Landing() {
               },
             ].map((c) => (
               <figure key={c.src} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-                <Image src={c.src} alt={c.titulo} width={c.w} height={c.h} className="w-full border-b border-stone-100" />
+                <Image
+                  src={c.movil}
+                  alt={c.titulo}
+                  width={480}
+                  height={1039}
+                  className="mx-auto w-full max-w-[22rem] border-b border-stone-100 md:hidden"
+                />
+                <Image
+                  src={c.src}
+                  alt={c.titulo}
+                  width={c.w}
+                  height={c.h}
+                  className="hidden w-full border-b border-stone-100 md:block"
+                />
                 <figcaption className="p-5">
                   <h3 className="font-bold text-stone-800">{c.titulo}</h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-stone-600">{c.texto}</p>
