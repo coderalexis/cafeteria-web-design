@@ -8,6 +8,7 @@ import { hideStartupChecklist } from "@/app/actions/business"
 import { ActionForm } from "@/components/action-form"
 import { formatCurrency, formatTime, paymentLabel, PAYMENT_METHODS } from "@/lib/format"
 import type { SalesReport } from "@/app/admin/ventas/params"
+import type { ReporteUtilidad } from "@/app/admin/gastos/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -28,6 +29,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Coins,
 } from "lucide-react"
 import Link from "next/link"
 import { MenuPackPicker } from "@/components/menu-pack-picker"
@@ -75,6 +77,7 @@ export default async function AdminDashboard() {
     { data: yData },
     { data: wData },
     { data: mData },
+    { data: profitData },
     checklistData,
   ] = await Promise.all([
     supabase
@@ -95,12 +98,16 @@ export default async function AdminDashboard() {
     supabase.rpc("sales_report", { p_from: yesterday, p_to: yesterday }),
     supabase.rpc("sales_report", { p_from: lastWeekDay, p_to: lastWeekDay }),
     supabase.rpc("sales_report", { p_from: monthStart, p_to: today }),
+    supabase.rpc("profit_report"),
     checklistCounts,
   ])
 
   const yReport = (yData as unknown as SalesReport | null) ?? null
   const wReport = (wData as unknown as SalesReport | null) ?? null
   const monthRevenue = (mData as unknown as SalesReport | null)?.totals.revenue ?? 0
+  // La cuenta completa del mes: ingresos − costo de lo vendido − gastos. Es
+  // null mientras el negocio no haya capturado nada de gastos.
+  const utilidad = profitData as unknown as ReporteUtilidad | null
 
   let checklist: Array<{ label: string; hint: string; done: boolean; href: string }> | null = null
   if (checklistData) {
@@ -435,6 +442,78 @@ export default async function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Utilidad del mes ──────────────────────────────────────────
+          El tablero decia cuanto vendio y cuanto llevaba contra su meta,
+          pero no si estaba GANANDO. Con los gastos capturados la cuenta se
+          cierra aqui, que es donde el dueno mira primero. */}
+      <Card className={utilidad && utilidad.expenses_total > 0 ? "border-stone-300" : undefined}>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Coins className="h-5 w-5 text-amber-700" />
+            Utilidad de este mes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!utilidad || utilidad.expenses_total === 0 ? (
+            <div className="py-2">
+              <p className="text-sm text-stone-600">
+                El sistema ya sabe cuánto vendes y cuánto te cuesta prepararlo. Falta lo que pagas para tener abierto
+                —renta, sueldos, luz— y entonces puede decirte cuánto <strong>ganaste</strong> y cuánto necesitas
+                vender para no perder.
+              </p>
+              <Link
+                href="/admin/gastos"
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+              >
+                <Coins className="h-4 w-4" />
+                Capturar mis gastos
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-stone-500">Vendiste</span>
+                  <span className="tabular-nums text-stone-700">{formatCurrency(utilidad.revenue)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-stone-500">Te costó prepararlo</span>
+                  <span className="tabular-nums text-stone-700">−{formatCurrency(utilidad.cost_of_goods)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-stone-500">Gastos del negocio</span>
+                  <span className="tabular-nums text-stone-700">−{formatCurrency(utilidad.expenses_total)}</span>
+                </div>
+                {utilidad.covered_on && (
+                  <p className="pt-1 text-xs text-emerald-700">Ya cubriste tus gastos del mes.</p>
+                )}
+              </div>
+              <div className="text-right sm:pl-6">
+                {/* Mes en curso y todavia en numeros rojos: se dice lo que
+                    FALTA, no «perdiste». El dia 2 la renta completa contra dos
+                    dias de venta no es una perdida, es un mes empezando. */}
+                <p className="text-xs uppercase tracking-wide text-stone-400">
+                  {utilidad.net_profit < 0 ? "Te faltan" : "Llevas ganado"}
+                </p>
+                <p
+                  className={`text-3xl font-bold tabular-nums ${
+                    utilidad.net_profit >= 0 ? "text-emerald-700" : "text-amber-700"
+                  }`}
+                >
+                  {formatCurrency(Math.abs(utilidad.net_profit))}
+                </p>
+                <Link
+                  href="/admin/gastos"
+                  className="mt-1 inline-block text-sm text-amber-700 underline underline-offset-2"
+                >
+                  Ver el detalle
+                </Link>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Revenue + Best seller + Payment breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

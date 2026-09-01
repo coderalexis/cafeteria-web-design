@@ -11,6 +11,7 @@ import {
   saveExpense,
   saveFixedExpense,
   toggleFixedExpense,
+  applyBreakEvenGoal,
 } from "@/app/actions/expenses"
 import {
   CATEGORIAS_GASTO,
@@ -161,19 +162,36 @@ export function GastosClient({
               monto={-reporte.expenses_total}
               nota={`Fijos ${formatCurrency(reporte.fixed_total)} · De este mes ${formatCurrency(reporte.variable_total)}`}
             />
+            {/* Un mes EN CURSO no ha perdido la renta completa el dia 2: los
+                gastos fijos son de todo el mes y las ventas van a la mitad.
+                Mientras no se cubran se dice lo que FALTA, que es la verdad y
+                ademas es accionable; «perdiste $80,400» el dia 1 no es ninguna
+                de las dos cosas. Un mes cerrado si se llama por su nombre. */}
             <div className="mt-2 border-t-2 border-stone-300 pt-2">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-base font-bold text-stone-800">
-                  {reporte.net_profit >= 0 ? "Ganaste" : "Perdiste"}
-                </span>
-                <span
-                  className={`text-2xl font-bold tabular-nums ${
-                    reporte.net_profit >= 0 ? "text-emerald-700" : "text-red-600"
-                  }`}
-                >
-                  {formatCurrency(Math.abs(reporte.net_profit))}
-                </span>
-              </div>
+              {reporte.is_current_month && reporte.net_profit < 0 ? (
+                <>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-base font-bold text-stone-800">Te faltan</span>
+                    <span className="text-2xl font-bold tabular-nums text-amber-700">
+                      {formatCurrency(-reporte.net_profit)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-400">para cubrir los gastos de este mes</p>
+                </>
+              ) : (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-base font-bold text-stone-800">
+                    {reporte.net_profit >= 0 ? (reporte.is_current_month ? "Llevas ganado" : "Ganaste") : "Perdiste"}
+                  </span>
+                  <span
+                    className={`text-2xl font-bold tabular-nums ${
+                      reporte.net_profit >= 0 ? "text-emerald-700" : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(Math.abs(reporte.net_profit))}
+                  </span>
+                </div>
+              )}
             </div>
 
             {reporte.covered_on ? (
@@ -244,6 +262,25 @@ export function GastosClient({
                   {formatCurrency(reporte.break_even.monthly ?? 0)} al mes. Sale de tu margen real de los últimos 60
                   días ({reporte.break_even.margin_pct}%) y de que abres {reporte.break_even.days_open} días al mes.
                 </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 bg-white"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const r = await applyBreakEvenGoal()
+                      if (!r.success) {
+                        toast.error(r.error)
+                        return
+                      }
+                      refrescar(`Tu meta del día quedó en ${formatCurrency(r.goal)}.`)
+                    })
+                  }
+                >
+                  <Target className="h-4 w-4" />
+                  Usar como meta del día
+                </Button>
               </>
             )}
           </CardContent>

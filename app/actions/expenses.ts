@@ -167,3 +167,44 @@ export async function deleteExpense(id: string): Promise<ActionResult> {
   revalidatePath("/admin")
   return { success: true }
 }
+
+/* ── El equilibrio como meta del día ──────────────────────────────── */
+
+/**
+ * Pone el punto de equilibrio como meta diaria de venta.
+ *
+ * La meta del día venía siendo un número que el dueño inventaba. Con los
+ * gastos capturados ya no hace falta adivinar: es lo que tiene que vender
+ * para no perder. Se redondea hacia ARRIBA a los siguientes $50 porque una
+ * meta de «$3,836.99» no se recuerda ni se persigue, y quedarse corto por
+ * redondeo sería justo el error que no se vale cometer aquí.
+ */
+export async function applyBreakEvenGoal(): Promise<ActionResult<{ goal: number }>> {
+  const { ctx, error: authError } = await requireRole(["owner", "admin"])
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("profit_report")
+  if (error) return { error: error.message }
+
+  const diario = (data as { break_even?: { daily?: number | null } } | null)?.break_even?.daily
+  if (!diario || diario <= 0) {
+    return { error: "Todavía no se puede calcular: captura tus gastos fijos y los costos de tus productos." }
+  }
+  const meta = Math.ceil(diario / 50) * 50
+
+  const previas =
+    ctx.business.settings && typeof ctx.business.settings === "object"
+      ? (ctx.business.settings as Record<string, unknown>)
+      : {}
+  const { error: errorGuardar } = await supabase
+    .from("businesses")
+    .update({ settings: { ...previas, daily_goal: meta } as never })
+    .eq("id", ctx.business.id)
+  if (errorGuardar) return { error: errorGuardar.message }
+
+  await logAudit("meta.desde_equilibrio", `Meta del día: ${meta}`, { equilibrio: diario })
+  revalidatePath("/admin", "layout")
+  revalidatePath("/admin/gastos")
+  return { success: true, goal: meta }
+}
