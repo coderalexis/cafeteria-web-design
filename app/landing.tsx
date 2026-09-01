@@ -375,9 +375,54 @@ export function Landing() {
                 exactamente lo que va a salir en papel. Con tu nombre, tu dirección y el mensaje que tú elijas.
               </p>
               <p className="mt-2 text-sm text-stone-500">
-                ¿Todavía sin impresora? El cliente escanea un código QR al pagar y se lleva su nota en el celular.
+                ¿Todavía sin impresora? Entonces el ticket va por el otro camino, el de aquí abajo.
               </p>
             </div>
+          </div>
+
+          {/* Los dos lados de la nota por QR. Se enseña la secuencia completa
+              —lo que ve la cajera y lo que le queda al cliente— porque el
+              «te mando un QR» no se entiende hasta que se ve el resultado. */}
+          <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+            <h3 className="text-xl font-bold text-stone-800">¿Sin impresora? El cliente se lleva su nota en el celular</h3>
+            <p className="mt-2 max-w-3xl text-stone-600">
+              Al cerrar la venta aparece un botón para mostrar el código. El cliente lo escanea de esa misma pantalla,
+              mientras sigue enfrente, y ahí está su nota. Nada que instalar y nada que pedirle por WhatsApp.
+            </p>
+            {/* Rotulo arriba de cada captura: las dos imagenes no miden
+                exactamente lo mismo y con el pie abajo los numeros quedaban
+                a distinta altura, que es justo lo que rompe la secuencia. */}
+            <div className="mt-7 grid justify-center gap-8 sm:grid-cols-[auto_auto_auto] sm:items-start sm:gap-6">
+              <figure className="max-w-[16rem]">
+                <figcaption className="mb-3 text-center text-sm text-stone-600">
+                  <strong className="text-stone-800">1. En la caja.</strong> Un toque y sale el código.
+                </figcaption>
+                <Image
+                  src="/capturas/qr-venta.webp"
+                  alt="Pantalla de venta registrada con el codigo QR para el cliente"
+                  width={760}
+                  height={1330}
+                  className="w-full rounded-xl border border-stone-200 shadow-md"
+                />
+              </figure>
+              <ArrowRight aria-hidden className="mx-auto h-6 w-6 rotate-90 self-center text-stone-300 sm:rotate-0" />
+              <figure className="max-w-[13.5rem]">
+                <figcaption className="mb-3 text-center text-sm text-stone-600">
+                  <strong className="text-stone-800">2. En su celular.</strong> El mismo ticket, sin papel.
+                </figcaption>
+                <Image
+                  src="/capturas/nota-cliente.webp"
+                  alt="La nota de compra abierta en el celular del cliente"
+                  width={480}
+                  height={853}
+                  className="w-full rounded-[1.5rem] border-4 border-stone-800 bg-white shadow-md"
+                />
+              </figure>
+            </div>
+            <p className="mt-6 text-sm text-stone-500">
+              El enlace vive 7 días y luego deja de funcionar, para que una nota vieja no ande dando vueltas. Viene
+              prendido, y si prefieres que no aparezca lo apagas en los ajustes de tu cafetería.
+            </p>
           </div>
         </section>
 
@@ -489,38 +534,27 @@ export function Landing() {
         {/* ── Requisitos ────────────────────────────────────────── */}
         <section className="mt-16 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
           <h2 className="text-xl font-bold text-stone-800">Funciona con lo que ya tienes</h2>
-          <div className="mt-5 grid gap-6 sm:grid-cols-[auto_1fr] sm:items-center">
-            {/* La misma pantalla en un celular: se ve de un golpe que no hay
-                una version recortada, es el POS completo en la mano. */}
-            <Image
-              src="/capturas/pos-movil.webp"
-              alt="La pantalla de venta de Cafecito POS en un celular"
-              width={480}
-              height={985}
-              className="mx-auto w-32 rounded-2xl border-4 border-white bg-white shadow-lg sm:w-36"
-            />
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="flex gap-3">
-                <Smartphone className="h-5 w-5 shrink-0 text-amber-700" />
-                <p className="text-sm text-stone-600">
-                  <strong className="text-stone-800">Tablet, celular o computadora.</strong> Se abre en el navegador y se
-                  instala como aplicación si quieres.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Printer className="h-5 w-5 shrink-0 text-amber-700" />
-                <p className="text-sm text-stone-600">
-                  <strong className="text-stone-800">Impresora térmica opcional.</strong> Si no tienes, manda el ticket
-                  por WhatsApp.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Wallet className="h-5 w-5 shrink-0 text-amber-700" />
-                <p className="text-sm text-stone-600">
-                  <strong className="text-stone-800">Tu terminal de siempre.</strong> Cobras la tarjeta con la que ya
-                  usas; aquí solo se registra la venta.
-                </p>
-              </div>
+          <div className="mt-5 grid gap-5 sm:grid-cols-3">
+            <div className="flex gap-3">
+              <Smartphone className="h-5 w-5 shrink-0 text-amber-700" />
+              <p className="text-sm text-stone-600">
+                <strong className="text-stone-800">Tablet, celular o computadora.</strong> Se abre en el navegador y se
+                instala como aplicación si quieres.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Printer className="h-5 w-5 shrink-0 text-amber-700" />
+              <p className="text-sm text-stone-600">
+                <strong className="text-stone-800">Impresora térmica opcional.</strong> Si no tienes, manda el ticket
+                por WhatsApp.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Wallet className="h-5 w-5 shrink-0 text-amber-700" />
+              <p className="text-sm text-stone-600">
+                <strong className="text-stone-800">Tu terminal de siempre.</strong> Cobras la tarjeta con la que ya
+                usas; aquí solo se registra la venta.
+              </p>
             </div>
           </div>
         </section>
