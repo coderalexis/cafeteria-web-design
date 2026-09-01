@@ -29,6 +29,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: "Pruebas unitarias (lo puro: ajustes, fechas, carrito, cuentas)"
+        run: pnpm test
+
       - name: Build
         run: pnpm build
         env:
@@ -37,3 +40,32 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
           SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
+
+  # La lógica de dinero vive en la base (create_ticket, cortes, promociones,
+  # utilidad). Se prueba contra un Postgres real recién nacido: se le pone el
+  # shim de Supabase, se le aplican las 36 migraciones tal cual están en el
+  # repo y se corren los ensayos. Nada de mocks: si una migración deja de
+  # aplicar desde cero o una regla de dinero cambia, esto se pone rojo.
+  sql:
+    name: Pruebas SQL (migraciones + reglas de dinero)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: pruebas
+          POSTGRES_DB: pruebas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Correr la suite
+        run: bash tests/sql/run.sh
+        env:
+          DATABASE_URL: postgres://postgres:pruebas@localhost:5432/pruebas

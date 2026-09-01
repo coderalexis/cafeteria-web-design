@@ -1,21 +1,23 @@
--- ============================================================
--- 29 · P8a — Hora de captura para la cola sin internet
---            (aplicada como p8_hora_de_captura)
--- ============================================================
--- `create_ticket` v12 acepta `p_captured_at timestamptz default null`.
--- Una venta capturada sin señal y subida después debe registrar la hora REAL
--- de la venta: si se quedara con la de la subida, el reporte por horas y el
--- «día de operación» mentirían (una venta de las 11 pm subida a las 8 am
--- caería en el día siguiente).
+-- 29_p8_hora_captura.sql — P8a: hora de captura para la cola sin internet
+-- (aplicada en producción como `p8_hora_de_captura`).
 --
--- Tres candados, porque una hora que manda el cliente es un vector:
---   · nada del futuro (>2 min de margen por relojes desfasados),
---   · nada de hace más de 24 h,
---   · nada anterior al turno de la caja ABIERTA — una venta de un corte ya
---     cerrado no puede colarse en el actual; se rechaza con mensaje claro y
---     el POS la manda a «necesita revisión» para recobrarla a mano.
+-- `create_ticket` v12 acepta `p_captured_at timestamptz default null`: la
+-- venta capturada sin internet y subida después registra la hora REAL de la
+-- venta, no la de la subida (si no, el reporte por horas y el día de
+-- operación mienten). Tres candados: nada del futuro, nada de hace más de
+-- 24 h, y nada anterior al turno abierto — una venta de un corte ya cerrado
+-- no puede colarse en el actual. Default null = compatible con todo.
 --
--- default null = todo lo existente sigue igual. Ensayado con rollback:
--- captura respetada, default now(), futuro y turno-anterior rechazados.
--- El cuerpo vive en la migración (parche por anclas sobre
--- pg_get_functiondef, cada ancla verificada exactamente una vez).
+-- ── Por qué este archivo no trae SQL ────────────────────────────────
+-- Esta migración y la 28 se aplicaron en producción por el conector, con
+-- parches sobre pg_get_functiondef, y en el repo quedaron solo como notas.
+-- La suite de pruebas (tests/sql), que reproduce las migraciones desde cero,
+-- lo detectó en su primera corrida: el replay producía un create_ticket sin
+-- `takeout_fee` ni `created_at`, y la 36 no encontraba su texto.
+--
+-- La definición v12 —que es la v11 más este parámetro— se rescató de la base
+-- viva y quedó completa en `28_p7_para_llevar.sql`, porque la v11 sola nunca
+-- se guardó y reconstruirla a ciegas sería inventar historia. Este archivo
+-- se conserva para que la numeración y el registro de lo aplicado sigan
+-- diciendo la verdad.
+select 1 where false; -- sin cambios: ver 28_p7_para_llevar.sql

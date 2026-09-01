@@ -6,7 +6,9 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run",
+    "test:sql": "bash tests/sql/run.sh"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -75,6 +77,7 @@
     "eslint-config-next": "^15.5.25",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }
