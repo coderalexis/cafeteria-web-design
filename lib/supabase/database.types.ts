@@ -865,6 +865,63 @@ export type Database = {
           },
         ]
       }
+      promotions: {
+        Row: {
+          business_id: string
+          category_id: string | null
+          created_at: string
+          end_hour: number
+          ends_on: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          min_ticket: number
+          name: string
+          scope: string
+          start_hour: number
+          starts_on: string | null
+          updated_at: string
+          value: number
+          weekdays: number[]
+        }
+        Insert: {
+          business_id?: string
+          category_id?: string | null
+          created_at?: string
+          end_hour: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          kind: string
+          min_ticket?: number
+          name: string
+          scope: string
+          start_hour: number
+          starts_on?: string | null
+          updated_at?: string
+          value: number
+          weekdays: number[]
+        }
+        Update: {
+          business_id?: string
+          category_id?: string | null
+          created_at?: string
+          end_hour?: number
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          min_ticket?: number
+          name?: string
+          scope?: string
+          start_hour?: number
+          starts_on?: string | null
+          updated_at?: string
+          value?: number
+          weekdays?: number[]
+        }
+        Relationships: []
+      }
       ticket_item_modifiers: {
         Row: {
           business_id: string
@@ -1011,6 +1068,7 @@ export type Database = {
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           prepared_at: string | null
+          promotion_id: string | null
           session_id: string
           status: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
@@ -1038,6 +1096,7 @@ export type Database = {
           notes?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           prepared_at: string | null
+          promotion_id: string | null
           session_id: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal: number
@@ -1065,6 +1124,7 @@ export type Database = {
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           prepared_at?: string | null
+          promotion_id?: string | null
           session_id?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subtotal?: number
@@ -1198,6 +1258,8 @@ export type Database = {
       }
       platform_overview: { Args: never; Returns: Json }
       profit_report: { Args: { p_month?: string }; Returns: Json }
+      promo_preview: { Args: { p_items: Json }; Returns: Json }
+      promotions_report: { Args: { p_days?: number }; Returns: Json }
       sales_insights: { Args: { p_from: string; p_to: string }; Returns: Json }
       sales_report: {
         Args: {

@@ -21,6 +21,7 @@ const SECTION_LABELS: Record<string, string> = {
   analisis: "Análisis",
   cortes: "Cortes de caja",
   gastos: "Gastos y utilidad",
+  promociones: "Promociones",
   lealtad: "Lealtad",
   equipo: "Equipo",
   actividad: "Actividad",

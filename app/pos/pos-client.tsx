@@ -76,6 +76,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile"
 import { logout } from "@/app/actions/auth"
 import { createTicket } from "@/app/actions/sales"
+import { previewPromotion } from "@/app/actions/promotions"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -1174,12 +1175,53 @@ export default function POSClient({
 
   const subtotal = cartSubtotal(lines)
   const discountAmount = computeDiscount(subtotal, discount)
+
+  /* ── Promoción viva ────────────────────────────────────────────────
+     Quien decide de verdad es el servidor al cobrar; esto es el espejo
+     para que la cajera se lo pueda decir al cliente ANTES. Se pregunta
+     solo cuando la venta no lleva ya un descuento a mano ni un premio de
+     lealtad, porque en ese caso el servidor tampoco la aplicaría. */
+  const [promo, setPromo] = useState<{ id: string; name: string; discount: number } | null>(null)
+  const promoItems = useMemo(
+    () =>
+      lines
+        .map((l) => ({
+          variant_id: getLineVariantId(l) ?? "",
+          quantity: l.quantity,
+          modifiers: l.modifiers.map((m) => m.id),
+        }))
+        .filter((i) => i.variant_id),
+    [lines],
+  )
+  const sinPromo = discount !== null || loyaltyRedeem || promoItems.length === 0
+  const promoClave = sinPromo ? "" : JSON.stringify(promoItems)
+  useEffect(() => {
+    if (!promoClave) {
+      setPromo(null)
+      return
+    }
+    let vigente = true
+    // Un respiro antes de preguntar: agregar tres productos seguidos no debe
+    // disparar tres viajes al servidor.
+    const t = setTimeout(async () => {
+      const r = await previewPromotion(JSON.parse(promoClave))
+      if (vigente) setPromo(r.success ? r.promo : null)
+    }, 400)
+    return () => {
+      vigente = false
+      clearTimeout(t)
+    }
+  }, [promoClave])
+
+  // El descuento que de verdad va a llevar el ticket: el de la promoción solo
+  // cuando no hay otro. Nunca se suman.
+  const promoDiscount = sinPromo ? 0 : Math.min(promo?.discount ?? 0, subtotal)
   // «Para llevar» activo = el ticket lleva el cargo del negocio. La bandera
   // sale del MISMO predicado que pinta el chip; el monto real lo pone el
   // servidor con sus ajustes — esto es solo el espejo en pantalla.
   const esParaLlevar = ticketNotes === "Para llevar" || ticketNotes.startsWith("Para llevar · ")
   const takeoutCharge = esParaLlevar && lines.length > 0 ? takeoutFee : 0
-  const total = Math.round((subtotal - discountAmount + takeoutCharge) * 100) / 100
+  const total = Math.round((subtotal - discountAmount - promoDiscount + takeoutCharge) * 100) / 100
   // Un descuento fijo mayor al subtotal (p.ej. tras quitar artículos) no se puede cobrar
   const discountInvalid = discount !== null && discount.type === "amount" && discount.value > subtotal && subtotal > 0
 
@@ -2475,6 +2517,18 @@ export default function POSClient({
                 <span className={discountInvalid ? "shrink-0 text-red-600 font-medium" : "shrink-0 text-amber-700"}>
                   {discountInvalid ? "Mayor al subtotal" : `-${formatCurrency(discountAmount)}`}
                 </span>
+              </div>
+            )}
+            {/* La promoción se ve ANTES de cobrar: es lo que la cajera le dice
+                al cliente («hoy los frappés están al 20»). El monto de verdad
+                lo recalcula el servidor al cerrar la venta. */}
+            {promoDiscount > 0 && promo && (
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex min-w-0 items-center gap-1.5 text-emerald-700">
+                  <Percent className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate font-medium">{promo.name}</span>
+                </span>
+                <span className="shrink-0 font-medium text-emerald-700">-{formatCurrency(promoDiscount)}</span>
               </div>
             )}
             <div className="flex justify-between items-center">
