@@ -25,6 +25,14 @@ echo "── Migraciones"
 for f in $(ls docs/supabase/[0-9][0-9]_*.sql | sort); do
   printf '   %s\n' "$(basename "$f")"
   "${PSQL[@]}" -f "$f"
+  # Gancho para lo que una base virgen necesita ENTRE migraciones (p. ej. el
+  # usuario operador que la 09 da por existente). Se nombra por la migración
+  # a la que sigue, para que se vea de un vistazo a qué pertenece.
+  gancho="tests/sql/despues_de_$(basename "$f")"
+  if [ -f "$gancho" ]; then
+    printf '   └ %s\n' "$(basename "$gancho")"
+    "${PSQL[@]}" -f "$gancho"
+  fi
 done
 
 echo "── Ayudantes de prueba"
