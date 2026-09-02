@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
+import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { checkExpectedBusiness, requireContext } from "@/lib/context"
 import { businessDayRange } from "@/lib/dates"

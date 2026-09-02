@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
+import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { checkExpectedBusiness } from "@/lib/context"
 import type { CashSessionSummary } from "@/lib/receipt"

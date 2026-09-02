@@ -1,6 +1,6 @@
 "use server"
 
-import { z } from "zod"
+import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext, requireRole } from "@/lib/context"
 import type { ActionResult } from "./types"
