@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import QRCode from "react-qr-code"
 import { toast } from "sonner"
 import { Copy, ExternalLink, Printer, QrCode } from "lucide-react"
@@ -20,7 +20,14 @@ export function MenuQrCard({
   slug: string
   active: boolean
 }) {
-  const [origin] = useState(() => (typeof window !== "undefined" ? window.location.origin : ""))
+  // El dominio se toma DESPUÉS de montar. En el servidor no hay `window`, así
+  // que el HTML llegaba con «/menu/slug» y el navegador lo hidrataba con
+  // «https://…/menu/slug»: textos distintos y React marcaba un error de
+  // hidratación (#418) cada vez que se abría esta página.
+  const [origin, setOrigin] = useState("")
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
   const url = `${origin}/menu/${slug}`
 
   const printPoster = () => {

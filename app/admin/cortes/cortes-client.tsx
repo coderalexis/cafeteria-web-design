@@ -113,7 +113,7 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
               </p>
               <p className="text-xs text-stone-500">
                 {openSession
-                  ? `Desde ${formatDate(openSession.openedAt)} ${formatTime(openSession.openedAt)} por ${openSession.openedByName} · fondo ${formatCurrency(openSession.openingFloat)}`
+                  ? `Desde ${formatDate(openSession.openedAt, business.timezone)} ${formatTime(openSession.openedAt, business.timezone)} por ${openSession.openedByName} · fondo ${formatCurrency(openSession.openingFloat)}`
                   : "La caja se abre y se cierra desde el POS."}
               </p>
             </div>
@@ -166,11 +166,11 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
                     return (
                       <tr key={s.id} className="border-b border-stone-100 last:border-0 hover:bg-amber-50/40">
                         <td className="px-4 py-3 text-stone-700">
-                          <p className="font-medium">{formatDate(s.openedAt)}</p>
+                          <p className="font-medium">{formatDate(s.openedAt, business.timezone)}</p>
                           <p className="text-xs text-stone-400">
-                            {formatTime(s.openedAt)} → {s.closedAt ? formatTime(s.closedAt) : "—"}
-                            {s.closedAt && formatDate(s.closedAt) !== formatDate(s.openedAt) && (
-                              <span> ({formatDate(s.closedAt)})</span>
+                            {formatTime(s.openedAt, business.timezone)} → {s.closedAt ? formatTime(s.closedAt, business.timezone) : "—"}
+                            {s.closedAt && formatDate(s.closedAt, business.timezone) !== formatDate(s.openedAt, business.timezone) && (
+                              <span> ({formatDate(s.closedAt, business.timezone)})</span>
                             )}
                           </p>
                         </td>

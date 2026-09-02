@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -61,11 +61,21 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
     receiptFooter: business.receiptFooter ?? "",
   })
 
+  // «Ahora» se toma DESPUÉS de montar. El servidor pinta esta página en un
+  // instante y el navegador la hidrata en otro: con `new Date()` en el render,
+  // la hora de la vista previa y la de «hora local» no coincidían entre los
+  // dos y React tiraba un error de hidratación (#418) en cada visita.
+  const [ahora, setAhora] = useState<Date | null>(null)
+  useEffect(() => {
+    setAhora(new Date())
+  }, [])
+
   const previewLines = useMemo(() => {
+    if (!ahora) return []
     const lines = buildTicketLines(
       {
         folio: 123,
-        date: new Date(),
+        date: ahora,
         paymentMethod: "efectivo",
         items: [{ label: "Latte (Grande)", quantity: 1, unitPrice: 55, lineTotal: 55 }],
         total: 55,
@@ -82,15 +92,16 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
       },
     )
     return lines
-  }, [preview, timezone, business.timezone])
+  }, [ahora, preview, timezone, business.timezone])
 
   const localNow = useMemo(() => {
+    if (!ahora) return ""
     try {
-      return timezone ? `${formatDateTime(new Date(), timezone)} · día de operación ${dateStringInTz(timezone)}` : ""
+      return timezone ? `${formatDateTime(ahora, timezone)} · día de operación ${dateStringInTz(timezone)}` : ""
     } catch {
       return "Zona horaria no reconocida"
     }
-  }, [timezone])
+  }, [ahora, timezone])
 
   function handleSubmit(formData: FormData) {
     formData.set("timezone", timezone)
