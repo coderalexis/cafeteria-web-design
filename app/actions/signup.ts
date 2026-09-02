@@ -1,6 +1,6 @@
 "use server"
 
-import { z } from "zod"
+import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getContext } from "@/lib/context"

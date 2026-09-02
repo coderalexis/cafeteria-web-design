@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
+import { z } from "@/lib/zod"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { runWeeklySummaries, type WeeklySendResult } from "@/lib/weekly-summary"
 import { createClient } from "@/lib/supabase/server"
