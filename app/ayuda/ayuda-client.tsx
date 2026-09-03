@@ -1036,7 +1036,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: SlidersHorizontal,
       titulo: "Opciones y extras (al vender)",
       palabras:
-        "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas productos vincular asignar opcion por omision deslactosada preguntar al tocar solo obligatorios en que productos va no aparece en el pos",
+        "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas productos vincular asignar opcion por omision deslactosada preguntar al tocar solo obligatorios en que productos va no aparece en el pos toda la categoria de un toque enganchar en todos",
       acciones: [{ etiqueta: "Opciones y extras", href: "/admin/modificadores", admin: true }, { etiqueta: "Crear una desde Nuevo producto", href: "/admin/productos", admin: true }, { etiqueta: "Cuándo preguntar: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -1157,6 +1157,11 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
+            <strong>Toda la categoría de un toque:</strong> en «¿En qué productos va?», cada categoría trae la casilla{" "}
+            <strong>Toda la categoría</strong>; así «Tipo de leche» entra en todas las bebidas calientes sin marcarlas una por
+            una (y se puede desmarcar alguna después).
+          </li>
+          <li>
             <strong>Comparativo</strong>: cada indicador del periodo se compara con el periodo anterior de la misma
             duración (p. ej. últimos 30 días vs. los 30 previos), con el % de cambio.
           </li>
@@ -1175,6 +1180,40 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             <strong>Productos sin movimiento</strong>, <strong>opciones y extras más pedidos</strong> y{" "}
             <strong>parejas que se compran juntas</strong> (ideas de combos).
+          </li>
+        </ul>
+      ),
+    },
+    {
+      id: "admin-promociones",
+      grupo: "admin",
+      icon: Percent,
+      titulo: "Promociones por horario",
+      palabras:
+        "promocion promociones oferta descuento por horario happy hour tarde de frappes dias hora porcentaje monto vista previa ejemplo empalme se acumulan compra minima apagar",
+      acciones: [
+        { etiqueta: "Promociones", href: "/admin/promociones", admin: true },
+        { etiqueta: "Ver mis horas flojas", href: "/admin/analisis", admin: true },
+      ],
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            Sirven para llenar las horas flojas: tú pones la regla (qué días, de qué hora a qué hora, cuánto y sobre
+            qué) y el descuento sale solo al cobrar. La cajera no tiene que acordarse de nada y el cliente lo ve en su
+            ticket.
+          </li>
+          <li>
+            <strong>Vista previa antes de guardar:</strong> el formulario te dice la regla en palabras y un ejemplo con
+            un producto real de esa categoría («un Frappé de mango de $65 quedará en $52»), te dice qué falta, y te
+            avisa si se empalma con otra promoción viva a la misma hora.
+          </li>
+          <li>
+            <strong>No se acumulan.</strong> Si dos caen a la misma hora se aplica la que más descuenta, y si la venta ya
+            lleva un descuento a mano o un premio de lealtad, la promoción no entra: un ticket lleva un solo descuento.
+          </li>
+          <li>
+            Cada promoción se puede apagar sin borrarla, y en la lista ves cuántas ventas cobró en los últimos 30 días y
+            cuánto descontó.
           </li>
         </ul>
       ),

@@ -32,7 +32,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
   { titulo: "Nuevo producto, de la mano (con precios y extras)", donde: "Menú → Productos → Nuevo producto", href: "/admin/productos", palabras: "nuevo producto crear producto agregar producto asistente paso a paso de la mano comida platillo guarniciones proteina porciones extras preguntas como agrego" },
   { titulo: "Costo de cada producto (para el margen)", donde: "Menú → Productos", href: "/admin/productos", palabras: "costo costos margen utilidad cuanto me cuesta ganancia" },
   { titulo: "Armar la carta con paquetes", donde: "Menú → Productos", href: "/admin/productos", palabras: "paquete paquetes carta plantilla menu inicial espresso frappes panaderia instalar" },
-  { titulo: "Opciones y extras (tipo de leche, shots)", donde: "Menú → Opciones y extras", href: "/admin/modificadores", palabras: "extras extra opciones modificadores grupo grupos leche shot jarabe pregunta al vender obligatorio minimo maximo cuantas en que productos va vincular asignar" },
+  { titulo: "Opciones y extras (tipo de leche, shots)", donde: "Menú → Opciones y extras", href: "/admin/modificadores", palabras: "extras extra opciones modificadores grupo grupos leche shot jarabe pregunta al vender obligatorio minimo maximo cuantas en que productos va vincular asignar toda la categoria de un toque enganchar en todos" },
   { titulo: "Opción por omisión de un grupo (p. ej. leche deslactosada)", donde: "Menú → Opciones y extras", href: "/admin/modificadores", palabras: "omision por defecto default deslactosada siempre la misma marcada sola no preguntar leche" },
 
   // ── Ventas ──
@@ -44,7 +44,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
   { titulo: "Gastos del mes", donde: "Gastos y utilidad", href: "/admin/gastos#variables", palabras: "gasto gastos compras reparaciones capturar gasto proveedores insumos" },
   { titulo: "Gastos fijos (renta, luz, sueldos)", donde: "Gastos y utilidad", href: "/admin/gastos#fijos", palabras: "renta luz agua internet sueldos nomina fijos cada mes lo mismo" },
   { titulo: "Punto de equilibrio: cuánto necesitas vender", donde: "Gastos y utilidad", href: "/admin/gastos#equilibrio", palabras: "punto de equilibrio cuanto necesito vender utilidad ganancia perdida meta minima" },
-  { titulo: "Promociones por horario", donde: "Promociones", href: "/admin/promociones", palabras: "promocion promociones oferta descuento por horario happy hour tarde de frappes dias semana porcentaje" },
+  { titulo: "Promociones por horario", donde: "Promociones", href: "/admin/promociones", palabras: "promocion promociones oferta descuento por horario happy hour tarde de frappes dias semana porcentaje vista previa ejemplo empalme" },
   { titulo: "Análisis: comparativos y patrones", donde: "Análisis", href: "/admin/analisis", palabras: "analisis comparativo dia de la semana mapa de calor hora pico por cajero descuentos cancelaciones sin movimiento se compran juntos extras mas pedidos margen" },
 
   // ── Personas ──

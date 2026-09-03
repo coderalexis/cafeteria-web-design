@@ -6,7 +6,21 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { BarChart3, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { deletePromotion, savePromotion, togglePromotion } from "@/app/actions/promotions"
-import { DIAS, cuandoLegible, queDaLegible, horaLegible, type AmbitoPromo, type Promocion, type TipoPromo } from "@/lib/promotions"
+import {
+  DIAS,
+  cuandoLegible,
+  ejemploPromo,
+  empalmeLegible,
+  horaLegible,
+  promosEmpalmadas,
+  queDaLegible,
+  validarPromo,
+  type AmbitoPromo,
+  type BorradorPromo,
+  type EjemploProducto,
+  type Promocion,
+  type TipoPromo,
+} from "@/lib/promotions"
 import { formatCurrency } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,10 +37,13 @@ export function PromocionesClient({
   promociones,
   categorias,
   resultado,
+  ejemplos,
 }: {
   promociones: Promocion[]
   categorias: Array<{ id: string; name: string }>
   resultado: ResultadoPromos | null
+  /** Un producto de muestra por categoría (id → nombre y precio), para la vista previa. */
+  ejemplos: Record<string, EjemploProducto>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -185,6 +202,8 @@ export function PromocionesClient({
       <DialogPromo
         valor={editando}
         categorias={categorias}
+        otras={promociones}
+        ejemplos={ejemplos}
         pendiente={isPending}
         onCerrar={() => setEditando(null)}
         onGuardar={guardar}
@@ -196,12 +215,16 @@ export function PromocionesClient({
 function DialogPromo({
   valor,
   categorias,
+  otras,
+  ejemplos,
   pendiente,
   onCerrar,
   onGuardar,
 }: {
   valor: Borrador | null
   categorias: Array<{ id: string; name: string }>
+  otras: Promocion[]
+  ejemplos: Record<string, EjemploProducto>
   pendiente: boolean
   onCerrar: () => void
   onGuardar: (d: Borrador) => void
@@ -220,6 +243,26 @@ function DialogPromo({
   }
 
   const dias = d.weekdays ?? []
+  // Lo que se va a guardar, dicho antes de guardarlo: la regla en palabras,
+  // un ejemplo con precio real, los empalmes con otras promociones vivas y
+  // lo primero que falta. Guardar se abre solo cuando ya no falta nada.
+  const borrador: BorradorPromo = {
+    id: d.id,
+    name: d.name ?? "",
+    kind: d.kind ?? "porcentaje",
+    value: d.value ?? 0,
+    scope: d.scope ?? "ticket",
+    categoryId: d.categoryId ?? null,
+    weekdays: dias,
+    startHour: d.startHour ?? 15,
+    endHour: d.endHour ?? 18,
+    minTicket: d.minTicket ?? 0,
+  }
+  const problema = validarPromo(borrador)
+  const ejemplo = ejemploPromo(borrador, ejemplos)
+  const empalmes = promosEmpalmadas(borrador, otras)
+  const categoriaNombre = categorias.find((c) => c.id === d.categoryId)?.name ?? null
+  const regla = `${cuandoLegible(borrador).toLowerCase()}${borrador.minTicket > 0 ? `, en compras desde ${formatCurrency(borrador.minTicket)}` : ""}`
 
   return (
     <Dialog open={valor != null} onOpenChange={(o) => !o && onCerrar()}>
@@ -390,28 +433,43 @@ function DialogPromo({
             <p className="text-xs text-stone-400">Déjalo en 0 si aplica sin importar cuánto lleve el cliente.</p>
           </div>
 
-          {/* La regla dicha en voz alta, para revisarla antes de guardar. */}
-          {dias.length > 0 && (d.value ?? 0) > 0 && (
-            <p className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600">
-              Queda así:{" "}
-              <strong className="text-stone-800">
-                {queDaLegible({
-                  kind: d.kind ?? "porcentaje",
-                  value: d.value ?? 0,
-                  scope: d.scope ?? "ticket",
-                  categoryName: categorias.find((c) => c.id === d.categoryId)?.name ?? null,
-                })}
-              </strong>
-              , {cuandoLegible({ weekdays: dias, startHour: d.startHour ?? 15, endHour: d.endHour ?? 18 }).toLowerCase()}
-            </p>
-          )}
+          {/* Vista previa: la regla en voz alta, un ejemplo con precio real,
+              los empalmes y lo que falta, todo antes de guardar. */}
+          <div className="space-y-1.5 rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600" data-promo-vista-previa>
+            {problema ? (
+              <p className="text-stone-500" role="status">
+                {problema}
+              </p>
+            ) : (
+              <p>
+                Queda así:{" "}
+                <strong className="text-stone-800">
+                  {queDaLegible({ kind: borrador.kind, value: borrador.value, scope: borrador.scope, categoryName: categoriaNombre })}
+                </strong>
+                , {regla}
+                {regla.endsWith(".") ? "" : "."}
+              </p>
+            )}
+            {ejemplo && (
+              <p data-promo-ejemplo>
+                Por ejemplo, {ejemplo.sujeto} quedará en <strong className="text-stone-800">{formatCurrency(ejemplo.despues)}</strong>{" "}
+                (ahorra {formatCurrency(ejemplo.ahorro)}).
+              </p>
+            )}
+            {empalmes.length > 0 && (
+              <p className="text-amber-800" data-promo-empalme>
+                Se empalma con {empalmes.map(empalmeLegible).join(" y ")}. No se acumulan: a esa hora se aplica la que más
+                descuente.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onCerrar}>
             Cancelar
           </Button>
-          <Button disabled={pendiente} onClick={() => onGuardar({ ...d, name: (d.name ?? "").trim() })}>
+          <Button disabled={pendiente || problema !== null} onClick={() => onGuardar({ ...d, name: (d.name ?? "").trim() })}>
             {pendiente && <Loader2 className="h-4 w-4 animate-spin" />}
             Guardar
           </Button>
