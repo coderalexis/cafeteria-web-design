@@ -21,6 +21,15 @@ export interface BusinessSettings {
   publicMenu: boolean
   /** Qué imprimir solo al cobrar, sin pasos extra del cajero. */
   autoPrint: "none" | "ticket" | "comanda" | "both"
+  /**
+   * Cuándo abrir la hoja de extras al tocar un producto. «required»: solo si
+   * algún grupo obliga a elegir (los opcionales se agregan desde «cambiar»
+   * en la línea del carrito); «always»: siempre que el producto tenga extras.
+   * Nació de una cafetería donde 31 de 43 productos tienen extras opcionales:
+   * la hoja salía en casi cada venta y el celular se sentía más lento que la
+   * libreta.
+   */
+  modifiersPrompt: "required" | "always"
   /** Módulo del POS: cuentas abiertas (se les suma cada ronda y se cobran al final). */
   parkedOrders: boolean
   /**
@@ -163,6 +172,8 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   weeklyEmail: true,
   publicMenu: false,
   autoPrint: "none",
+  // La venta común no lleva extras: que el toque la agregue y ya.
+  modifiersPrompt: "required",
   // Encendido por defecto: no asume hardware ni expone datos, y le sirve a
   // cualquier cafetería con fila.
   parkedOrders: true,
@@ -214,6 +225,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     if (r.auto_print === "ticket" || r.auto_print === "comanda" || r.auto_print === "both") {
       out.autoPrint = r.auto_print
     }
+    if (r.modifiers_prompt === "always") out.modifiersPrompt = "always"
     out.parkedOrders = r.parked_orders !== false
     const tope = Number(r.discount_max_cashier)
     if (Number.isFinite(tope) && tope >= 0 && tope <= 100) {
@@ -270,6 +282,7 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     weekly_email: s.weeklyEmail,
     public_menu: s.publicMenu,
     auto_print: s.autoPrint,
+    modifiers_prompt: s.modifiersPrompt,
     parked_orders: s.parkedOrders,
     discount_max_cashier: s.discountMaxCashier,
     menu_note: s.menuNote,

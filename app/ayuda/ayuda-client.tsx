@@ -163,9 +163,11 @@ export function AyudaClient({ ticket, corte }: Props) {
               cobrar.
             </Step>
             <Step n={2} title="Arma el pedido">
-              Toca un producto para agregarlo; si tiene tamaños, elige uno. El icono{" "}
-              <SlidersHorizontal className="inline h-3.5 w-3.5 align-text-bottom" /> abre las opciones (tipo de leche,
-              extras). Puedes buscar por nombre, y en la pestaña <strong>Todos</strong> aparece{" "}
+              Toca un producto para agregarlo; si tiene tamaños, elige uno. Los extras (tipo de leche, shots) solo
+              se preguntan cuando hay que elegir uno por fuerza; los opcionales se ponen tocando{" "}
+              <strong>cambiar</strong> en la línea del carrito. El icono{" "}
+              <SlidersHorizontal className="inline h-3.5 w-3.5 align-text-bottom" /> marca los productos que tienen
+              opciones. Puedes buscar por nombre, y en la pestaña <strong>Todos</strong> aparece{" "}
               <strong>Más vendidos</strong>: lo del último mes, a un toque.
             </Step>
           </ol>

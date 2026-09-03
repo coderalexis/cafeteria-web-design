@@ -208,6 +208,7 @@ export default async function POSPage() {
       cashierId={ctx.userId}
       lockMinutes={settings.lockMinutes}
       autoPrint={settings.autoPrint}
+      modifiersPrompt={settings.modifiersPrompt}
       parkedOrders={settings.parkedOrders}
       tableCount={settings.tableCount}
       accountLabels={settings.accountLabels}

@@ -92,6 +92,7 @@ import {
   getLineLabel,
   getLinePrice,
   getLineVariantId,
+  needsModifierPrompt,
   parseCash,
   type CartLine,
   type Category,
@@ -115,6 +116,8 @@ interface POSClientProps {
   favoriteVariantIds: string[]
   /** Qué imprimir en automático al cobrar (ajuste del negocio). */
   autoPrint: "none" | "ticket" | "comanda" | "both"
+  /** Cuándo abrir la hoja de extras al tocar un producto (ajuste del negocio). */
+  modifiersPrompt: "required" | "always"
   /** Módulo de cuentas abiertas activado para esta cafetería. */
   parkedOrders: boolean
   /** Cuántas mesas tiene: genera los chips «Mesa 1…N» al abrir una cuenta. */
@@ -149,6 +152,7 @@ export default function POSClient({
   hasPin,
   favoriteVariantIds,
   autoPrint,
+  modifiersPrompt,
   parkedOrders: parkedEnabled,
   tableCount,
   accountLabels,
@@ -896,18 +900,22 @@ export default function POSClient({
     }
   }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada])
 
-  /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
+  /**
+   * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
+   * preguntar siempre), abre la hoja; si no, directo al carrito. Los extras
+   * opcionales se agregan después desde «cambiar» en la línea.
+   */
   const chooseProduct = useCallback(
     (product: Product, size?: SizeOption) => {
       setSizePickerFor(null)
-      if (product.modifierGroups && product.modifierGroups.length > 0) {
+      if (needsModifierPrompt(product, modifiersPrompt)) {
         setPendingModifiers({ product, size })
       } else {
         addLine(product, size)
         vibra(12)
       }
     },
-    [addLine],
+    [addLine, modifiersPrompt],
   )
 
   // La actualización va en forma de función para NO depender de `sizePickerFor`:
