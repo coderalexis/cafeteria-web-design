@@ -7,6 +7,32 @@ import { BookOpen, Search, X } from "lucide-react"
 import { buscarAdmin, type DestinoAdmin } from "@/lib/admin-search"
 
 /**
+ * Ilumina la tarjeta destino cuando aparezca.
+ *
+ * El router de Next navega con pushState, y con pushState el navegador NO
+ * actualiza `:target` (solo lo hace en una navegación real de fragmento), así
+ * que el resaltado por CSS se quedaba sin disparar. Se espera a que la
+ * tarjeta exista en el DOM —la pantalla nueva tarda unos cuadros en pintarse—
+ * y se le pone la clase de la animación a mano.
+ */
+function destacar(id: string) {
+  let intentos = 0
+  const tick = () => {
+    const el = document.getElementById(id)
+    if (!el) {
+      if (++intentos < 40) setTimeout(tick, 100)
+      return
+    }
+    el.scrollIntoView({ block: "start", behavior: "smooth" })
+    el.classList.remove("admin-ancla-destacar")
+    void el.offsetWidth // reinicia la animación si se llega dos veces a la misma
+    el.classList.add("admin-ancla-destacar")
+    setTimeout(() => el.classList.remove("admin-ancla-destacar"), 2600)
+  }
+  setTimeout(tick, 50)
+}
+
+/**
  * El buscador del panel: escribe «impresora», «leche», «pin» y te lleva a la
  * tarjeta exacta. Vive en el menú lateral (y en el menú deslizable del
  * teléfono) porque la pregunta «¿dónde está…?» nace justo ahí, mirando la
@@ -44,6 +70,8 @@ export function AdminSearch({ onNavigate }: { onNavigate?: () => void }) {
     setAbierto(false)
     onNavigate?.()
     router.push(destino.href)
+    const ancla = destino.href.split("#")[1]
+    if (ancla) destacar(ancla)
   }
 
   const guiaHref = `/ayuda?q=${encodeURIComponent(consulta.trim())}`

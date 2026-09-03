@@ -83,7 +83,8 @@
 /* La tarjeta a la que llegaste desde el buscador del panel (o desde un
    enlace con #ancla) se ilumina un instante: en una pantalla larga, sin
    esto, uno no sabe si el salto ocurrió ni dónde mirar. */
-.admin-ancla:target {
+.admin-ancla:target,
+.admin-ancla-destacar {
   animation: admin-ancla-destacar 2.4s ease-out;
 }
 @keyframes admin-ancla-destacar {
