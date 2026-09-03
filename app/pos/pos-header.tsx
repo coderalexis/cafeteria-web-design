@@ -15,6 +15,7 @@ import {
   Lock,
   LogOut,
   MoreVertical,
+  Footprints,
   PauseCircle,
   Receipt,
   Search,
@@ -75,6 +76,8 @@ export interface PosHeaderProps {
   /** Modo práctica (ventas que no se registran) y cómo entrar/salir. */
   practica: boolean
   onTogglePractica: () => void
+  /** Recorrido de la primera venta: cinco pasos sobre el POS real, en práctica. */
+  onRecorrido: () => void
   /** «Instalar como app», cuando el navegador lo permite y aún no está instalada. */
   instalar: ReturnType<typeof useInstallPrompt>
   textSize: ReturnType<typeof usePosTextSize>
@@ -101,7 +104,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, instalar,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, onRecorrido, instalar,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -264,6 +267,10 @@ export function PosHeader(p: PosHeaderProps) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>
                       <Keyboard className="h-4 w-4 mr-2" /> Atajos de teclado
+                    </DropdownMenuItem>
+                    {/* La primera venta de la mano: avanza cuando la persona lo hace. */}
+                    <DropdownMenuItem onSelect={onRecorrido}>
+                      <Footprints className="h-4 w-4 mr-2" /> Recorrido: tu primera venta
                     </DropdownMenuItem>
                     {/* Aprender tocando, sin ensuciar las ventas reales. */}
                     <DropdownMenuItem onSelect={onTogglePractica}>

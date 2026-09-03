@@ -31,6 +31,7 @@ export const ProductCard = memo(function ProductCard({
   onMarcarOrigen,
   onElegir,
   onElegirTamano,
+  marcado,
 }: {
   product: Product
   accent: string | undefined
@@ -40,9 +41,11 @@ export const ProductCard = memo(function ProductCard({
   onMarcarOrigen: (e: React.MouseEvent<HTMLElement>) => void
   onElegir: (p: Product) => void
   onElegirTamano: (p: Product, size?: SizeOption) => void
+  /** El primero de la rejilla: el recorrido de la primera venta lo ilumina. */
+  marcado?: boolean
 }) {
   return (
-    <div className="relative">
+    <div className="relative" data-recorrido={marcado ? "producto" : undefined}>
       {/* La "i" va FUERA del botón del producto —un botón dentro de otro no es
           HTML válido— y encima de él con z-10, así que tocarla no agrega el
           producto. */}

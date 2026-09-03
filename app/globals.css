@@ -96,3 +96,26 @@
     box-shadow: 0 0 0 0 rgb(251 191 36 / 0);
   }
 }
+
+/* Recorrido de la primera venta: el elemento del paso lleva un aro violeta
+   que respira. Violeta porque es el color del modo práctica. */
+.recorrido-foco {
+  outline: 3px solid #7c3aed;
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+  animation: recorrido-respira 1.4s ease-in-out infinite;
+}
+@keyframes recorrido-respira {
+  0%,
+  100% {
+    outline-color: #7c3aed;
+  }
+  50% {
+    outline-color: #c4b5fd;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recorrido-foco {
+    animation: none;
+  }
+}

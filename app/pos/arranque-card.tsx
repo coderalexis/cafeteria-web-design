@@ -19,13 +19,14 @@ const KEY = "pos-arranque-visto"
 export function ArranqueCard({
   mostrar,
   tieneFavoritos,
-  onPracticar,
+  onRecorrido,
   instalar,
 }: {
   mostrar: boolean
   /** Ya hay fila «Más vendidos»: vale la pena señalarla. */
   tieneFavoritos: boolean
-  onPracticar: () => void
+  /** Empieza el recorrido de la primera venta (cinco pasos, en práctica). */
+  onRecorrido: () => void
   instalar: { puede: boolean; esIOS: boolean; instalar: () => void }
 }) {
   // Hasta leer localStorage se asume visto: así no parpadea en quien ya lo cerró.
@@ -79,11 +80,11 @@ export function ArranqueCard({
           size="sm"
           className="gap-1.5 bg-violet-700 text-white hover:bg-violet-800"
           onClick={() => {
-            onPracticar()
+            onRecorrido()
             cerrar()
           }}
         >
-          <GraduationCap className="h-4 w-4" /> Practicar sin registrar
+          <GraduationCap className="h-4 w-4" /> Hazlo una vez conmigo (1 min)
         </Button>
         <Button asChild size="sm" variant="outline" className="gap-1.5">
           <Link href="/ayuda" target="_blank">

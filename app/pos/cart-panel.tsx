@@ -141,6 +141,8 @@ export interface CartPanelProps {
   setShowCashDialog: (open: boolean) => void
   /** Modo práctica: se puede «cobrar» sin caja abierta y nada se registra. */
   practica: boolean
+  /** Tarjeta del recorrido de la primera venta, cuando el paso ocurre aquí. */
+  recorrido?: React.ReactNode
 }
 
 /**
@@ -369,6 +371,7 @@ export function CartPanel(p: CartPanelProps) {
       {/* Cart items */}
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-3 py-4">
+          {p.recorrido}
           {lines.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-stone-300">
               <ShoppingBag className="h-14 w-14 mb-3 opacity-40" />
@@ -401,7 +404,7 @@ export function CartPanel(p: CartPanelProps) {
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
-              {lines.map((line) => (
+              {lines.map((line, i) => (
                 <m.div
                   key={line.lineId}
                   layout
@@ -409,6 +412,7 @@ export function CartPanel(p: CartPanelProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
                   transition={{ duration: 0.2 }}
+                  data-recorrido={i === 0 ? "linea" : undefined}
                   className="relative border-b border-stone-100"
                 >
                   {/* Debajo de la tarjeta viven las pistas del gesto: al
@@ -732,7 +736,7 @@ export function CartPanel(p: CartPanelProps) {
               así que arriba va lo de cada venta (método y efectivo) y abajo
               lo ocasional (propina, para llevar, nota). */}
           {/* Payment method selector */}
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-recorrido="pago">
             {PAYMENT_METHOD_KEYS.map((key, index) => {
               const info = PAYMENT_METHODS[key]
               const Icon = info.icon
@@ -1018,6 +1022,7 @@ export function CartPanel(p: CartPanelProps) {
               size="lg"
               disabled={!canCharge}
               onClick={finalizeSale}
+              data-recorrido="cobrar"
             >
               {isProcessing
                 ? "Procesando..."
