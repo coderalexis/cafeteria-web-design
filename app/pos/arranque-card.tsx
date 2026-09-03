@@ -70,7 +70,8 @@ export function ArranqueCard({
         </li>
       </ol>
       <p className="mt-2 text-xs text-stone-500">
-        Los extras solo se preguntan cuando hay que elegir uno; para agregar otro, toca «cambiar» en la línea.
+        Si el producto tiene extras (leche, shots), se preguntan al tocarlo; también se cambian después desde la línea del
+        carrito.
         {tieneFavoritos && " Arriba, en «Más vendidos», está lo de siempre a un toque."}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">

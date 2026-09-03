@@ -108,7 +108,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     weeklyEmail: formData.get("weekly_email") ?? "on",
     publicMenu: formData.get("public_menu") ?? "off",
     autoPrint: formData.get("auto_print") ?? "none",
-    modifiersPrompt: formData.get("modifiers_prompt") ?? "required",
+    modifiersPrompt: formData.get("modifiers_prompt") ?? "always",
     parkedOrders: formData.get("parked_orders") ?? "on",
     // Campo vacío = 0 mesas, que es una respuesta válida (se trabaja por
     // nombre) y no un «usa el valor por omisión».
