@@ -26,6 +26,7 @@ import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
 import { RecorridoTarjeta } from "./recorrido-tarjeta"
 import { useRecorrido } from "./use-recorrido"
+import { AprenderDialog } from "./aprender-dialog"
 import { ArranqueCard } from "./arranque-card"
 import { useInstallPrompt } from "./use-install-prompt"
 import { TrialBanner } from "@/components/trial-banner"
@@ -221,6 +222,7 @@ export default function POSClient({
   const [showTickets, setShowTickets] = useState(false)
   const [showRecent, setShowRecent] = useState(false)
   const [showCashDialog, setShowCashDialog] = useState(false)
+  const [showAprender, setShowAprender] = useState(false)
   const [showDiscount, setShowDiscount] = useState(false)
   // La propina se elige al cobrar y NO se guarda con el carrito: una propina
   // vieja restaurada de otra venta cobraría de más sin que nadie lo note.
@@ -1225,7 +1227,7 @@ export default function POSClient({
           textSize={textSize}
           practica={practica}
           onTogglePractica={togglePractica}
-          onRecorrido={empezarRecorrido}
+          onAprender={() => setShowAprender(true)}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
@@ -1460,6 +1462,16 @@ export default function POSClient({
         onOpenChange={setShowQueueReview}
         state={cola.state}
         onQuitar={cola.quitar}
+      />
+      <AprenderDialog
+        open={showAprender}
+        onOpenChange={setShowAprender}
+        recorridoHecho={recorrido.hecho}
+        practica={practica}
+        parkedEnabled={parkedEnabled}
+        loyaltyEnabled={loyaltyEnabled}
+        onRecorrido={empezarRecorrido}
+        onPracticar={togglePractica}
       />
       <CashSessionDialog
         open={showCashDialog}
