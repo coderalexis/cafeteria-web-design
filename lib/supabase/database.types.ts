@@ -1345,6 +1345,7 @@ export type Database = {
         Args: { p_counted_cash: number; p_notes?: string }
         Returns: Json
       }
+      create_product_guided: { Args: { p: Json }; Returns: Json }
       create_ticket: {
         Args: {
           p_captured_at?: string

@@ -20,7 +20,7 @@ export default async function ProductosPage() {
       .order("sort_order"),
     supabase
       .from("modifier_groups")
-      .select("id, name, is_active, sort_order, modifiers(id)")
+      .select("id, name, is_active, sort_order, min_select, max_select, modifiers(id, name, price_delta, sort_order, is_active)")
       .order("sort_order")
       .order("name"),
   ])
@@ -73,6 +73,15 @@ export default async function ProductosPage() {
     name: g.name,
     isActive: g.is_active,
     optionCount: (g.modifiers ?? []).length,
+    minSelect: g.min_select,
+    maxSelect: g.max_select,
+    // El asistente de producto enseña las opciones al elegir una pregunta
+    // existente: «Tipo de leche: Deslactosada, Vegetal +$10» dice más que el
+    // puro nombre.
+    options: [...(g.modifiers ?? [])]
+      .filter((m) => m.is_active)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .map((m) => ({ name: m.name, priceDelta: m.price_delta })),
   }))
 
   return (

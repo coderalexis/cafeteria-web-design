@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react"
 import {
-  createProduct,
   updateProduct,
   deleteProduct,
   toggleProductActive,
@@ -16,6 +15,7 @@ import { formatCurrency } from "@/lib/format"
 import { ActionForm } from "@/components/action-form"
 import { BulkPricesButton, ReorderButton } from "./tools"
 import { MenuPackDialog } from "@/components/menu-pack-dialog"
+import { AsistenteProducto } from "./asistente-producto"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -82,6 +82,10 @@ export interface ModifierGroupOption {
   name: string
   isActive: boolean
   optionCount: number
+  minSelect: number
+  maxSelect: number | null
+  /** Opciones vivas, para enseñarlas al elegir la pregunta en el asistente. */
+  options: { name: string; priceDelta: number }[]
 }
 
 interface ProductosClientProps {
@@ -364,8 +368,9 @@ export default function ProductosClient({
           className="w-full sm:max-w-lg p-0 flex flex-col"
         >
           {isCreating ? (
-            <CreateProductSheet
+            <AsistenteProducto
               categories={categories}
+              groups={modifierGroups}
               onClose={() => setSheetOpen(false)}
             />
           ) : selectedProduct ? (
@@ -842,86 +847,6 @@ function EditProductSheet({
 /* ================================================================== */
 /*  Create Product Sheet                                               */
 /* ================================================================== */
-function CreateProductSheet({
-  categories,
-}: {
-  categories: Category[]
-  onClose: () => void
-}) {
-  return (
-    <>
-      <SheetHeader className="px-6 pt-6 pb-4 border-b border-stone-200 shrink-0">
-        <SheetTitle className="text-lg flex items-center gap-2">
-          <Plus className="h-5 w-5 text-emerald-600" />
-          Nuevo producto
-        </SheetTitle>
-        <SheetDescription className="text-sm">
-          Crea un producto y después agrega sus variantes
-        </SheetDescription>
-      </SheetHeader>
-
-      <ScrollArea className="flex-1">
-        <div className="px-6 py-5 space-y-6">
-          <ActionForm action={createProduct} className="space-y-4" successMessage="Producto creado">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">
-                Nombre *
-              </label>
-              <Input
-                name="name"
-                placeholder="Nombre del producto"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">
-                Categoría *
-              </label>
-              <select
-                name="category_id"
-                className="w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm"
-                required
-              >
-                <option value="">Selecciona una categoría...</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">
-                Descripción
-              </label>
-              <Input
-                name="description"
-                placeholder="Descripción del producto (opcional)"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
-            >
-              Crear producto
-            </Button>
-          </ActionForm>
-
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-            <p className="text-sm text-amber-800">
-              <strong>Tip:</strong> Después de crear el producto, haz clic en
-              él en el grid para agregar variantes (tamaños y precios).
-            </p>
-          </div>
-        </div>
-      </ScrollArea>
-    </>
-  )
-}
-
 /* ================================================================== */
 /*  Toggle Variant Active Inline Button                                */
 /* ================================================================== */
