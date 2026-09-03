@@ -24,6 +24,8 @@ import {
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
+import { ArranqueCard } from "./arranque-card"
+import { useInstallPrompt } from "./use-install-prompt"
 import { TrialBanner } from "@/components/trial-banner"
 import { colorClasses } from "@/lib/category-colors"
 import { Button } from "@/components/ui/button"
@@ -769,6 +771,8 @@ export default function POSClient({
   }, [practica, lines.length, openAccount, clearCart, clearTip])
   // Practicando no se abren cuentas: también viven en el servidor.
   const cuentasActivas = parkedEnabled && !practica
+  // «Ponlo en tu pantalla de inicio»: la tarjeta de arranque y el menú ⋮ lo ofrecen.
+  const instalar = useInstallPrompt()
 
   // Efectivo recibido / cambio (solo aplica al pago en efectivo)
   const cashReceived = paymentMethod === "efectivo" ? parseCash(cashReceivedInput) : null
@@ -1159,6 +1163,7 @@ export default function POSClient({
           textSize={textSize}
           practica={practica}
           onTogglePractica={togglePractica}
+          instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
           cuentasVisibles={cuentasVisibles}
@@ -1173,6 +1178,15 @@ export default function POSClient({
         {/* Product grid */}
         <ScrollArea ref={gridScrollRef} className="flex-1 min-h-0">
           <div className={`p-4 space-y-6 ${isMobile ? "pb-24" : ""}`}>
+            {/* Los dos pasos de una venta, solo la primera vez en un celular. */}
+            <ArranqueCard
+              mostrar={isMobile === true && products.length > 0}
+              tieneFavoritos={favorites.length > 0}
+              onPracticar={() => {
+                if (!practica) togglePractica()
+              }}
+              instalar={instalar}
+            />
             {products.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-stone-400">
                 <Coffee className="h-12 w-12 mb-3 opacity-40" />
