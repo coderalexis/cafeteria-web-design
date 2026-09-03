@@ -138,6 +138,91 @@ export async function createProduct(formData: FormData) {
   return { success: true }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Asistente «Nuevo producto»: todo en una transacción                */
+/* ------------------------------------------------------------------ */
+const guiadoSchema = z.object({
+  name: z.string().trim().min(2, "Escribe el nombre del producto.").max(80, "El nombre es demasiado largo."),
+  description: z.string().trim().max(300, "La descripción es demasiado larga.").optional(),
+  category: z.union([
+    z.object({ id: z.uuid("Categoría inválida.") }),
+    z.object({ name: z.string().trim().min(2, "Escribe el nombre de la categoría.").max(60) }),
+  ]),
+  variants: z
+    .array(
+      z.object({
+        name: z.string().trim().max(40).optional(),
+        size_label: z.string().trim().max(20).optional(),
+        price: z.number().min(0, "El precio no puede ser negativo.").max(99_999),
+        cost: z.number().min(0).max(99_999).optional(),
+      }),
+    )
+    .min(1, "Ponle al menos un precio.")
+    .max(12, "Demasiados tamaños."),
+  groups: z
+    .array(
+      z.union([
+        z.object({ id: z.uuid() }),
+        z.object({
+          name: z.string().trim().min(2, "Cada pregunta necesita un nombre.").max(60),
+          min_select: z.number().int().min(0).max(20),
+          max_select: z.number().int().min(1).max(20).nullable(),
+          options: z
+            .array(
+              z.object({
+                name: z.string().trim().min(1, "Una opción no tiene nombre.").max(60),
+                price_delta: z.number().min(0, "El costo extra no puede ser negativo.").max(9_999),
+                is_default: z.boolean().optional(),
+              }),
+            )
+            .min(1, "Cada pregunta necesita al menos una opción.")
+            .max(20),
+        }),
+      ]),
+    )
+    .max(8, "Demasiadas preguntas para un producto."),
+})
+
+/**
+ * Crea el producto con sus precios, sus preguntas nuevas y los enganches a
+ * preguntas existentes en UNA transacción (RPC `create_product_guided`,
+ * migración 43): o entra todo o no entra nada. Aquí solo se valida la forma,
+ * se calcula el identificador de una categoría nueva y se traduce el error.
+ */
+export async function createProductGuided(
+  payload: unknown,
+): Promise<{ success: true; productId: string } | { error: string }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+
+  const parsed = guiadoSchema.safeParse(payload)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
+  const v = parsed.data
+
+  const supabase = await createClient()
+  let category: { id: string } | { name: string; slug: string }
+  if ("id" in v.category) {
+    category = { id: v.category.id }
+  } else {
+    // Mismo criterio que crear una categoría a mano: identificador legible y
+    // único dentro de la cafetería («comidas», «comidas-2»).
+    const { data: existentes } = await supabase.from("menu_categories").select("slug")
+    const slug = slugDisponible(v.category.name, new Set((existentes ?? []).map((c) => c.slug)))
+    if (!slug) return { error: "No se pudo crear un identificador para esa categoría; prueba otro nombre." }
+    category = { name: v.category.name, slug }
+  }
+
+  const { data, error } = await supabase.rpc("create_product_guided", {
+    p: { ...v, category } as never,
+  })
+  if (error) return { error: dbErrorMessage(error) }
+  const productId = (data as { product_id?: string } | null)?.product_id
+  if (!productId) return { error: "El producto no se creó; intenta de nuevo." }
+
+  revalidateAll()
+  return { success: true, productId }
+}
+
 export async function updateProduct(formData: FormData) {
   const { error: authError } = await requireAdmin()
   if (authError) return { error: authError }
