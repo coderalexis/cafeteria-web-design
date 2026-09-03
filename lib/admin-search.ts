@@ -47,6 +47,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
 
   // ── Personas ──
   { titulo: "Equipo: cajeros y accesos", donde: "Equipo", href: "/admin/equipo", palabras: "equipo cajero cajeros usuario usuarios acceso accesos contrasena restablecer rol administrador dueno invitar dar de alta baja desactivar pin de caja" },
+  { titulo: "Qué puede hacer cada rol (cajero, administrador, dueño)", donde: "Equipo → ¿Qué puede hacer cada rol?", href: "/admin/equipo#roles", palabras: "roles rol permisos alcance que puede hacer cajero administrador dueno diferencia quien puede cancelar descuento ver ventas panel" },
   { titulo: "Lealtad: clientes y sellos", donde: "Lealtad", href: "/admin/lealtad", palabras: "lealtad sellos clientes telefono premio tarjeta canje puntos frecuentes" },
   { titulo: "Actividad (bitácora de cambios)", donde: "Actividad", href: "/admin/actividad", palabras: "actividad bitacora historial quien cambio que auditoria registro" },
 

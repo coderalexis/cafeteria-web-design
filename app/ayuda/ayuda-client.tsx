@@ -1231,8 +1231,25 @@ export function AyudaClient({ ticket, corte }: Props) {
             cuenta, se crea con una contraseña temporal que verás una sola vez.
           </li>
           <li>
-            Roles: <em>Cajero</em> (solo POS), <em>Administrador</em> (POS + panel) y <em>Dueño</em> (todo; solo un
-            dueño nombra o quita dueños, y siempre debe quedar al menos uno).
+            <strong>Roles.</strong> La tabla completa está en Equipo, bajo «¿Qué puede hacer cada rol?», y son reglas
+            que aplica el servidor, no solo la pantalla:
+            <ul className="mt-1.5 ml-4 list-disc space-y-1">
+              <li>
+                <em>Cajero</em>: solo el punto de venta (cobrar, caja, movimientos, cuentas abiertas, Por preparar,
+                sellos). Ve únicamente sus propias ventas, cancela solo las suyas y mientras la caja siga abierta, y sus
+                descuentos topan en lo que fijes en Datos y ajustes (0 = ninguno). No entra al panel.
+              </li>
+              <li>
+                <em>Administrador</em>: lo mismo que el cajero, más todo el panel (menú, precios y costos, extras,
+                promociones, gastos, análisis, cortes, actividad, datos y ajustes), ventas de todos, cancelar
+                cualquiera, sin tope de descuento, y en Equipo agrega y edita cajeros y administradores. Recibe el
+                resumen semanal.
+              </li>
+              <li>
+                <em>Dueño</em>: todo lo del administrador y, además, nombra o quita dueños y cambia su correo. Siempre
+                debe quedar al menos un dueño.
+              </li>
+            </ul>
           </li>
           <li>
             <strong>¿Le quedó mal el correo a alguien?</strong> Toca a esa persona y corrige su{" "}
