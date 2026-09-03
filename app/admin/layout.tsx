@@ -12,6 +12,7 @@ import { TextSizeProvider } from "@/components/text-size-provider"
 import { NavScrollArea } from "@/components/nav-scroll-area"
 import { TrialBanner } from "@/components/trial-banner"
 import { AdminNav } from "./admin-nav"
+import { AdminSearch } from "@/components/admin-search"
 import { AdminMobileNav } from "./mobile-nav"
 
 export default async function AdminLayout({
@@ -74,6 +75,12 @@ export default async function AdminLayout({
                 <BusinessSwitcher memberships={ctx.memberships} activeId={business.id} className="w-full max-w-none justify-between" />
               </div>
             )}
+            {/* «¿Dónde está…?»: los ajustes viven en una docena de pantallas y
+                la pregunta más común no es cómo sino dónde. Va aquí, mirando
+                la lista de pantallas, que es donde nace la duda. */}
+            <div className="mt-3">
+              <AdminSearch />
+            </div>
           </div>
 
           {/* Navigation */}

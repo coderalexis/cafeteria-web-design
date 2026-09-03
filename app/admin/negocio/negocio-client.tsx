@@ -161,7 +161,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <form action={handleSubmit} className="space-y-6">
-          <Card>
+          <Card id="datos" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Datos generales</CardTitle>
               <CardDescription>El nombre aparece en el POS, el panel y los tickets.</CardDescription>
@@ -212,7 +212,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="zona-horaria" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-700" />
@@ -252,7 +252,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="ticket" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Printer className="h-4 w-4 text-amber-700" />
@@ -292,7 +292,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="metas" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Target className="h-4 w-4 text-amber-700" />
@@ -336,7 +336,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="modulos" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <PauseCircle className="h-4 w-4 text-amber-700" />
@@ -515,7 +515,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="impresion" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Printer className="h-4 w-4 text-amber-700" />
@@ -587,7 +587,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card className={currentSettings.closingTime ? "" : "border-amber-200"}>
+          <Card id="cierre" className={`admin-ancla scroll-mt-20 ${currentSettings.closingTime ? "" : "border-amber-200"}`}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-700" />
@@ -629,7 +629,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="para-llevar" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <HandCoins className="h-4 w-4 text-amber-700" />
@@ -684,7 +684,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="lealtad" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Stamp className="h-4 w-4 text-amber-700" />
@@ -740,7 +740,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="menu-publico" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-amber-700" />
@@ -787,7 +787,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="resumen-semanal" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Mail className="h-4 w-4 text-amber-700" />
@@ -811,7 +811,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="seguridad" className="admin-ancla scroll-mt-20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <LockKeyhole className="h-4 w-4 text-amber-700" />

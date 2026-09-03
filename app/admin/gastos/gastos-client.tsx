@@ -237,7 +237,7 @@ export function GastosClient({
 
       {/* ── Punto de equilibrio ─────────────────────────────────── */}
       {reporte && (
-        <Card className="border-amber-200 bg-amber-50/40">
+        <Card id="equilibrio" className="admin-ancla scroll-mt-20 border-amber-200 bg-amber-50/40">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Target className="h-5 w-5 text-amber-700" />
@@ -288,7 +288,7 @@ export function GastosClient({
       )}
 
       {/* ── Gastos fijos ────────────────────────────────────────── */}
-      <Card>
+      <Card id="fijos" className="admin-ancla scroll-mt-20">
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-3">
           <div>
             <CardTitle className="text-lg">Cada mes pagas lo mismo</CardTitle>
@@ -379,7 +379,7 @@ export function GastosClient({
       </Card>
 
       {/* ── Gastos del mes ──────────────────────────────────────── */}
-      <Card>
+      <Card id="variables" className="admin-ancla scroll-mt-20">
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-3">
           <div>
             <CardTitle className="text-lg">Gastos de este mes</CardTitle>

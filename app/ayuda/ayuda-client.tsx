@@ -112,6 +112,13 @@ function Tecla({ children }: { children: React.ReactNode }) {
 
 export function AyudaClient({ ticket, corte }: Props) {
   const [busqueda, setBusqueda] = useState("")
+  // `/ayuda?q=impresora` llega con la búsqueda puesta (así manda aquí el
+  // buscador del panel). Se lee DESPUÉS de montar y no en el estado inicial:
+  // el servidor no ve la URL y pintaría otra cosa que el navegador.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q")
+    if (q) setBusqueda(q)
+  }, [])
   const [activo, setActivo] = useState("entrar")
 
   const SECCIONES: SeccionDef[] = [
@@ -785,7 +792,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Settings,
       titulo: "Cómo está organizado el panel",
       palabras:
-        "menu lateral secciones donde esta como llego navegar perdido no encuentro tu menu tu dinero tu negocio resumen cuenta salir guia",
+        "menu lateral secciones donde esta como llego navegar perdido no encuentro tu menu tu dinero tu negocio resumen cuenta salir guia buscador buscar ajuste opcion ctrl k",
       href: "/admin",
       nodo: (
         <>
@@ -815,6 +822,12 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
           </ul>
           <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>¿No sabes dónde está un ajuste?</strong> Escríbelo en el buscador de arriba del menú («impresora»,
+              «leche», «pin», «metas») y te lleva a la tarjeta exacta, que se ilumina un instante al llegar. Con
+              teclado, <strong>Ctrl+K</strong> lo enfoca desde cualquier pantalla. Si el panel no lo tiene, el último
+              renglón busca lo mismo en esta guía.
+            </li>
             <li>
               Esta <strong>guía</strong> está arriba del todo, junto al nombre de tu cafetería. Se abre en otra
               pestaña, para que no pierdas lo que estabas haciendo.
