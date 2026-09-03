@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import {
   ArrowLeft,
   ArrowUpRight,
   AArrowUp,
+  ChevronDown,
+  Menu,
   Ban,
   BookOpen,
   CalendarClock,
@@ -120,6 +123,10 @@ export function AyudaClient({ ticket, corte }: Props) {
     if (q) setBusqueda(q)
   }, [])
   const [activo, setActivo] = useState("entrar")
+  // Índice: qué grupos abrió o cerró la persona a mano (los demás siguen a la
+  // sección activa), y si el panel del índice del teléfono está abierto.
+  const [gruposAbiertos, setGruposAbiertos] = useState<Partial<Record<Grupo, boolean>>>({})
+  const [indiceAbierto, setIndiceAbierto] = useState(false)
 
   const SECCIONES: SeccionDef[] = [
     {
@@ -1431,47 +1438,78 @@ export function AyudaClient({ ticket, corte }: Props) {
 
   const porGrupo = (g: Grupo) => visibles.filter((s) => s.grupo === g)
 
-  const NavLista = ({ enColumna }: { enColumna: boolean }) => (
+  /**
+   * El índice, plegado por grupo. Con 27 secciones, la lista entera medía
+   * 890 px en una laptop de 720 de alto y, al estar fija, las últimas ocho
+   * quedaban cortadas sin forma de llegar a ellas. Ahora solo el grupo de la
+   * sección en la que vas está abierto (sigue al desplazamiento hasta que la
+   * persona toque un grupo a mano); con una búsqueda se ven todos.
+   *
+   * `onNavigate` es para el panel del teléfono: ahí el enlace no puede
+   * confiar en el salto nativo, porque el panel bloquea el scroll del cuerpo
+   * mientras está abierto — se cierra primero y se desplaza después.
+   */
+  const grupoActivo: Grupo = SECCIONES.find((s) => s.id === activo)?.grupo ?? "cajero"
+  const NavLista = ({ onNavigate }: { onNavigate?: (id: string) => void }) => (
     <>
       {(["cajero", "admin"] as const).map((g) => {
         const items = porGrupo(g)
         if (items.length === 0) return null
+        const abierto = q !== "" || (gruposAbiertos[g] ?? g === grupoActivo)
         return (
-          <div key={g} className={enColumna ? "" : "flex items-center gap-1.5"}>
-            {enColumna && (
-              <p className="mb-1.5 mt-4 px-2 text-[11px] font-bold uppercase tracking-wider text-stone-400 first:mt-0">
+          <div key={g}>
+            <button
+              type="button"
+              onClick={() => setGruposAbiertos((cur) => ({ ...cur, [g]: !abierto }))}
+              aria-expanded={abierto}
+              className="mb-1 mt-3 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[11px] font-bold uppercase tracking-wider text-stone-500 hover:bg-stone-100 first:mt-0"
+            >
+              <span>
                 {GRUPOS[g].titulo}
-              </p>
+                <span className="ml-1.5 font-normal normal-case tracking-normal text-stone-400">({items.length})</span>
+              </span>
+              <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${abierto ? "rotate-180" : ""}`} />
+            </button>
+            {abierto && (
+              <div className="space-y-0.5">
+                {items.map((s) => (
+                  <a
+                    key={s.id}
+                    href={`#${s.id}`}
+                    onClick={
+                      onNavigate
+                        ? (e) => {
+                            e.preventDefault()
+                            onNavigate(s.id)
+                          }
+                        : undefined
+                    }
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${
+                      activo === s.id && q === ""
+                        ? "bg-amber-100 font-medium text-amber-900"
+                        : "text-stone-600 hover:bg-stone-100"
+                    }`}
+                  >
+                    <s.icon className="h-4 w-4 shrink-0 opacity-60" />
+                    <span className="truncate">{s.titulo}</span>
+                  </a>
+                ))}
+              </div>
             )}
-            <div className={enColumna ? "space-y-0.5" : "flex gap-1.5"}>
-              {items.map((s) => (
-                <a
-                  key={s.id}
-                  href={`#${s.id}`}
-                  className={
-                    enColumna
-                      ? `flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${
-                          activo === s.id && q === ""
-                            ? "bg-amber-100 font-medium text-amber-900"
-                            : "text-stone-600 hover:bg-stone-100"
-                        }`
-                      : `shrink-0 rounded-full border px-3 py-1 text-xs transition-colors ${
-                          activo === s.id && q === ""
-                            ? "border-amber-300 bg-amber-100 font-medium text-amber-900"
-                            : "border-stone-200 bg-white text-stone-600"
-                        }`
-                  }
-                >
-                  {enColumna && <s.icon className="h-4 w-4 shrink-0 opacity-60" />}
-                  <span className="truncate">{s.titulo}</span>
-                </a>
-              ))}
-            </div>
           </div>
         )
       })}
     </>
   )
+
+  /** Teléfono: cerrar el panel del índice y, ya sin el bloqueo de scroll, ir a la sección. */
+  const irDesdeIndice = (id: string) => {
+    setIndiceAbierto(false)
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ block: "start" })
+      history.replaceState(null, "", `#${id}`)
+    }, 250)
+  }
 
   return (
     <div className="min-h-screen bg-stone-50 print:bg-white">
@@ -1509,6 +1547,16 @@ export function AyudaClient({ ticket, corte }: Props) {
               </button>
             )}
           </div>
+          {/* El índice, en teléfono y tablet vertical: un botón que abre el panel. */}
+          <button
+            type="button"
+            onClick={() => setIndiceAbierto(true)}
+            aria-label="Abrir el índice de la guía"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 text-sm text-stone-600 hover:border-amber-200 hover:text-amber-700 lg:hidden print:hidden"
+          >
+            <Menu className="h-4 w-4" />
+            <span className="hidden sm:inline">Índice</span>
+          </button>
           <div className="hidden shrink-0 items-center gap-1 sm:flex print:hidden">
             <button
               type="button"
@@ -1527,17 +1575,31 @@ export function AyudaClient({ ticket, corte }: Props) {
             </Link>
           </div>
         </div>
-        {/* Navegación móvil: chips deslizables */}
-        <div className="scrollbar-hide flex gap-1.5 overflow-x-auto border-t border-stone-100 px-4 py-2 lg:hidden print:hidden">
-          <NavLista enColumna={false} />
-        </div>
       </header>
+
+      {/* ── Índice en teléfono: panel lateral ─────────────────────
+          Antes era una tira de chips que se deslizaba de lado: con 27
+          secciones no se veía completa, no se podía recorrer con la vista y
+          no mostraba los grupos. El panel lateral es el mismo patrón que usa
+          el menú de administración en teléfono. */}
+      <Sheet open={indiceAbierto} onOpenChange={setIndiceAbierto}>
+        <SheetContent side="left" className="flex w-80 flex-col p-0">
+          <SheetTitle className="border-b border-stone-200 px-5 py-4 text-base font-bold text-stone-800">
+            Índice de la guía
+          </SheetTitle>
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            <NavLista onNavigate={irDesdeIndice} />
+          </nav>
+        </SheetContent>
+      </Sheet>
 
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 lg:grid-cols-[230px_1fr]">
         {/* ── Navegación lateral (escritorio) ───────────────────── */}
         <aside className="hidden lg:block print:hidden">
-          <nav className="sticky top-24">
-            <NavLista enColumna />
+          {/* Fija, pero con su propio scroll dentro de la ventana: una lista
+              fija más alta que la pantalla deja secciones inalcanzables. */}
+          <nav className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pr-1">
+            <NavLista />
           </nav>
         </aside>
 
