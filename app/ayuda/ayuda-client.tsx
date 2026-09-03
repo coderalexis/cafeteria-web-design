@@ -61,6 +61,18 @@ const GRUPOS: Record<Grupo, { titulo: string; chip: string }> = {
   admin: { titulo: "Para el dueño o administrador", chip: "bg-indigo-100 text-indigo-700" },
 }
 
+interface Accion {
+  etiqueta: string
+  href: string
+  /** Solo dueños y administradores (el cajero no entra al panel). */
+  admin?: boolean
+}
+
+interface Sesion {
+  role: "owner" | "admin" | "cajero"
+  isTemplate: boolean
+}
+
 interface SeccionDef {
   id: string
   grupo: Grupo
@@ -68,9 +80,37 @@ interface SeccionDef {
   titulo: string
   /** Sinónimos para el buscador (además del título). */
   palabras: string
-  /** Pantalla a la que se refiere esta sección. */
-  href?: string
+  /**
+   * «Hacerlo ahora»: a dónde ir para hacer lo que explica la sección. Solo se
+   * enseñan con sesión, y las marcadas `admin` no a un cajero.
+   */
+  acciones?: Accion[]
   nodo: React.ReactNode
+}
+
+/**
+ * Los botones «Hacerlo ahora» de una sección. Enlaces normales (no del
+ * router): así la tarjeta destino del panel llega con su ancla y se ilumina.
+ */
+function Acciones({ lista, sesion }: { lista?: Accion[]; sesion: Sesion | null }) {
+  if (!sesion || !lista?.length) return null
+  const visibles = lista.filter((a) => (!a.admin || sesion.role !== "cajero") && !(sesion.isTemplate && a.href.startsWith("/pos")))
+  if (visibles.length === 0) return null
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-1.5 print:hidden">
+      <span className="text-xs font-medium text-stone-500">Hacerlo ahora:</span>
+      {visibles.map((a) => (
+        <a
+          key={a.href + a.etiqueta}
+          href={a.href}
+          className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
+        >
+          {a.etiqueta}
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </a>
+      ))}
+    </div>
+  )
 }
 
 function normalizar(texto: string): string {
@@ -127,6 +167,21 @@ export function AyudaClient({ ticket, corte }: Props) {
   // sección activa), y si el panel del índice del teléfono está abierto.
   const [gruposAbiertos, setGruposAbiertos] = useState<Partial<Record<Grupo, boolean>>>({})
   const [indiceAbierto, setIndiceAbierto] = useState(false)
+  // ¿Quién lee? Con sesión, cada sección ofrece «Hacerlo ahora» con destino
+  // exacto y según el rol. La guía es estática: se pregunta ya cargada.
+  const [sesion, setSesion] = useState<Sesion | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/sesion", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (vivo && j?.ok) setSesion({ role: j.role, isTemplate: !!j.isTemplate })
+      })
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [])
 
   const SECCIONES: SeccionDef[] = [
     {
@@ -135,6 +190,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Users,
       titulo: "Entrar al sistema",
       palabras: "login sesion contrasena olvide usuario cafe correo selector cuenta",
+      acciones: [{ etiqueta: "Mi cuenta", href: "/cuenta" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -168,7 +224,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Abrir el turno y vender",
       palabras:
         "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir cantidad para llevar mas opciones descuento extras leche opcion por omision aviso celular",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
           <ol className="space-y-3">
@@ -228,7 +284,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: GraduationCap,
       titulo: "Practicar sin registrar (modo práctica)",
       palabras: "practica practicar ensayar aprender probar sin registrar sin miedo modo practica franja violeta",
-      href: "/pos",
+      acciones: [{ etiqueta: "Practicar ahora", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -260,7 +316,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "La línea del carrito: toca, desliza, mantén",
       palabras:
         "gestos deslizar arrastrar duplicar quitar eliminar mantener presionado nota detalle ventana tocar linea articulo tres puntos",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -301,7 +357,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Si se cae el internet",
       palabras:
         "sin internet offline conexion cola ventas pendientes subir provisional se cayo la senal wifi datos guardadas",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -358,7 +414,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Cuentas abiertas",
       palabras:
         "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -455,7 +511,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Por preparar: la comanda en pantalla",
       palabras:
         "comanda cocina barra preparar pendientes impresora termica sin impresora pantalla listo marcar ultimos pedidos consultar que pidio",
-      href: "/pos/preparar",
+      acciones: [{ etiqueta: "Abrir Por preparar", href: "/pos/preparar" }, { etiqueta: "Ritmo: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -511,7 +567,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Wallet,
       titulo: "Efectivo, propinas y descuentos",
       palabras: "cambio recibido teclado billete propina porcentaje descuento motivo",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Tope de descuento: Módulos del POS", href: "/admin/negocio#modulos", admin: true }, { etiqueta: "Para llevar y comisión", href: "/admin/negocio#para-llevar", admin: true }],
       nodo: (
         <>
           <ul className="space-y-2 text-sm text-stone-600">
@@ -551,7 +607,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Ban,
       titulo: "Cancelar una venta o reimprimir",
       palabras: "tickets reimprimir cancelacion motivo error equivocacion",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Ventas del panel", href: "/admin/ventas", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -575,7 +631,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Stamp,
       titulo: "Tarjeta de sellos (lealtad)",
       palabras: "lealtad sellos tarjeta cliente telefono premio canjear gratis fidelidad puntos",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar la lealtad", href: "/admin/negocio#lealtad", admin: true }, { etiqueta: "Clientes y sellos", href: "/admin/lealtad", admin: true }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -621,7 +677,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Cerrar el turno (corte de caja)",
       palabras:
         "corte cierre cerrar cierro efectivo dinero caja esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre",
-      href: "/pos",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Cortes en el panel", href: "/admin/cortes", admin: true }, { etiqueta: "Hora de cierre", href: "/admin/negocio#cierre", admin: true }],
       nodo: (
         <>
           <ol className="space-y-3">
@@ -673,6 +729,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "En tablet o celular",
       palabras:
         "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -719,6 +776,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: AArrowUp,
       titulo: "Tamaño de letra",
       palabras: "letra tamano texto grande chico compacto vista ver mejor tablet zoom acercar accesibilidad panel administracion",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -765,6 +823,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Keyboard,
       titulo: "Atajos de teclado",
       palabras: "teclado fisico rapido shortcuts f2 f4 enter",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
           <p className="mb-3 text-sm text-stone-600">
@@ -800,7 +859,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Cómo está organizado el panel",
       palabras:
         "menu lateral secciones donde esta como llego navegar perdido no encuentro tu menu tu dinero tu negocio resumen cuenta salir guia buscador buscar ajuste opcion ctrl k",
-      href: "/admin",
+      acciones: [{ etiqueta: "Ir al panel", href: "/admin", admin: true }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -857,7 +916,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Coffee,
       titulo: "Menú: categorías, productos y precios",
       palabras: "categorias colores variantes tamanos costo margen precios lote orden desactivar sin precio no aparece nota carta publica nuevo producto asistente de la mano paso a paso crear producto comida guarniciones proteina porciones",
-      href: "/admin/productos",
+      acciones: [{ etiqueta: "Nuevo producto", href: "/admin/productos", admin: true }, { etiqueta: "Categorías", href: "/admin/categorias", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -926,6 +985,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PackagePlus,
       titulo: "Armar tu carta con paquetes",
       palabras: "paquete plantilla menu inicial arrancar productos ejemplo cafe frappes panaderia crear carta",
+      acciones: [{ etiqueta: "Armar la carta", href: "/admin/productos", admin: true }],
       nodo: (
         <>
           <ul className="space-y-2 text-sm text-stone-600">
@@ -962,7 +1022,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Opciones y extras (al vender)",
       palabras:
         "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas productos vincular asignar opcion por omision deslactosada preguntar al tocar solo obligatorios en que productos va no aparece en el pos",
-      href: "/admin/modificadores",
+      acciones: [{ etiqueta: "Opciones y extras", href: "/admin/modificadores", admin: true }, { etiqueta: "Crear una desde Nuevo producto", href: "/admin/productos", admin: true }, { etiqueta: "Cuándo preguntar: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
           <ul className="space-y-2 text-sm text-stone-600">
@@ -1078,7 +1138,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Receipt,
       titulo: "Análisis (comparativos y patrones)",
       palabras: "margen costo comparativo semana mapa calor horas cajero propinas descuentos cancelaciones combos sin movimiento",
-      href: "/admin/analisis",
+      acciones: [{ etiqueta: "Análisis", href: "/admin/analisis", admin: true }, { etiqueta: "Costos: Productos", href: "/admin/productos", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -1111,7 +1171,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Datos y ajustes: negocio, metas y menú con QR",
       palabras:
         "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto",
-      href: "/admin/negocio",
+      acciones: [{ etiqueta: "Datos y ajustes", href: "/admin/negocio", admin: true }, { etiqueta: "Metas", href: "/admin/negocio#metas", admin: true }, { etiqueta: "Menú público (QR)", href: "/admin/negocio#menu-publico", admin: true }, { etiqueta: "Impresión", href: "/admin/negocio#impresion", admin: true }, { etiqueta: "Módulos del POS", href: "/admin/negocio#modulos", admin: true }, { etiqueta: "Seguridad de caja", href: "/admin/negocio#seguridad", admin: true }],
       nodo: (
         <>
           <ul className="space-y-2 text-sm text-stone-600">
@@ -1205,6 +1265,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: CalendarClock,
       titulo: "Tu prueba gratis",
       palabras: "prueba gratis dias trial vencimiento suspension banner rojo pagar continuar caja abierta cierre automatico",
+      acciones: [{ etiqueta: "Resumen", href: "/admin", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -1245,7 +1306,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Users,
       titulo: "Equipo y accesos",
       palabras: "cajero usuario correo contrasena restablecer pin roles dueno administrador desactivar actividad bitacora",
-      href: "/admin/equipo",
+      acciones: [{ etiqueta: "Equipo", href: "/admin/equipo", admin: true }, { etiqueta: "¿Qué puede hacer cada rol?", href: "/admin/equipo#roles", admin: true }, { etiqueta: "Mi cuenta", href: "/cuenta" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -1299,7 +1360,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Receipt,
       titulo: "Ventas y reportes",
       palabras: "historial periodo filtro folio buscar csv excel exportar detalle",
-      href: "/admin/ventas",
+      acciones: [{ etiqueta: "Ventas", href: "/admin/ventas", admin: true }, { etiqueta: "Análisis", href: "/admin/analisis", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -1326,7 +1387,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Unlock,
       titulo: "Cortes de caja",
       palabras: "historial turnos esperado contado diferencia cuadre reimprimir parcial propinas cierre automatico sin arqueo nadie conto",
-      href: "/admin/cortes",
+      acciones: [{ etiqueta: "Cortes de caja", href: "/admin/cortes", admin: true }, { etiqueta: "Hora de cierre", href: "/admin/negocio#cierre", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
@@ -1350,7 +1411,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       titulo: "Por cobrar (lo que te deben)",
       palabras:
         "fiado deuda deben por cobrar sin pagar condonar perdonar cliente moroso telefono cuanto me deben",
-      href: "/admin/por-cobrar",
+      acciones: [{ etiqueta: "Por cobrar", href: "/admin/por-cobrar", admin: true }, { etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
@@ -1659,16 +1720,8 @@ export function AyudaClient({ ticket, corte }: Props) {
                             <s.icon className="h-[18px] w-[18px]" />
                           </span>
                           <h2 className="min-w-0 flex-1 text-lg font-bold text-stone-800">{s.titulo}</h2>
-                          {s.href && (
-                            <Link
-                              href={s.href}
-                              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-500 hover:border-amber-300 hover:text-amber-700 print:hidden"
-                            >
-                              Abrir
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            </Link>
-                          )}
                         </div>
+                        <Acciones lista={s.acciones} sesion={sesion} />
                         {s.nodo}
                       </section>
                     ))}
