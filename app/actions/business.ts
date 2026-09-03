@@ -73,6 +73,7 @@ const settingsSchema = z.object({
   weeklyEmail: z.enum(["on", "off"]).transform((v) => v === "on"),
   publicMenu: z.enum(["on", "off"]).transform((v) => v === "on"),
   autoPrint: z.enum(["none", "ticket", "comanda", "both"]),
+  modifiersPrompt: z.enum(["required", "always"]),
   parkedOrders: z.enum(["on", "off"]).transform((v) => v === "on"),
   tableCount: z.coerce.number().int().min(0).max(TABLE_COUNT_MAX),
   accountLabels: z.string().max(200).transform(parseAccountLabels),
@@ -107,6 +108,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
     weeklyEmail: formData.get("weekly_email") ?? "on",
     publicMenu: formData.get("public_menu") ?? "off",
     autoPrint: formData.get("auto_print") ?? "none",
+    modifiersPrompt: formData.get("modifiers_prompt") ?? "required",
     parkedOrders: formData.get("parked_orders") ?? "on",
     // Campo vacío = 0 mesas, que es una respuesta válida (se trabaja por
     // nombre) y no un «usa el valor por omisión».
@@ -148,6 +150,7 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
       weeklyEmail: v.weeklyEmail,
       publicMenu: v.publicMenu,
       autoPrint: v.autoPrint,
+      modifiersPrompt: v.modifiersPrompt,
       parkedOrders: v.parkedOrders,
       tableCount: v.tableCount,
       accountLabels: v.accountLabels,
@@ -207,6 +210,9 @@ export async function updateBusinessSettings(formData: FormData): Promise<Action
   if (prevSettings.loyalty !== v.loyalty) cambios.push(v.loyalty ? "lealtad activada" : "lealtad desactivada")
   if (prevSettings.loyaltyTarget !== v.loyaltyTarget) cambios.push(`meta de sellos: ${v.loyaltyTarget}`)
   if (prevSettings.autoPrint !== v.autoPrint) cambios.push("impresión automática")
+  if (prevSettings.modifiersPrompt !== v.modifiersPrompt) {
+    cambios.push(v.modifiersPrompt === "always" ? "extras: preguntar siempre" : "extras: solo obligatorios")
+  }
   if (prevSettings.parkedOrders !== v.parkedOrders) cambios.push("módulo de cuentas abiertas")
   if (
     prevSettings.tableCount !== v.tableCount ||

@@ -297,3 +297,18 @@ export function rehydrateCart(
     lines,
   }
 }
+
+/**
+ * ¿Hay que abrir la hoja de extras al tocar este producto?
+ *
+ * Con «required» solo cuando algún grupo obliga a elegir (mínimo > 0): un
+ * Americano con leches opcionales entra al carrito de un toque y los extras
+ * se agregan desde «cambiar» en la línea. Con «always», como antes: siempre
+ * que el producto tenga extras. Sin grupos, nunca.
+ */
+export function needsModifierPrompt(product: Product, mode: "required" | "always"): boolean {
+  const groups = product.modifierGroups ?? []
+  if (groups.length === 0) return false
+  if (mode === "always") return true
+  return groups.some((g) => g.minSelect > 0)
+}

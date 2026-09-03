@@ -6,6 +6,8 @@ import {
   AArrowUp,
   BookOpen,
   ChefHat,
+  GraduationCap,
+  Smartphone,
   ChevronRight,
   Coffee,
   History,
@@ -37,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { logout } from "@/app/actions/auth"
 import { POS_LOCK_EVENT } from "./lock-screen"
+import type { useInstallPrompt } from "./use-install-prompt"
 import type { OpenSession } from "./cash-session-dialog"
 import type { ParkedOrder } from "./parked"
 import type { Category } from "./cart"
@@ -69,6 +72,11 @@ export interface PosHeaderProps {
   setShowRecent: (open: boolean) => void
   setShowTickets: (open: boolean) => void
   setShowShortcuts: (open: boolean) => void
+  /** Modo práctica (ventas que no se registran) y cómo entrar/salir. */
+  practica: boolean
+  onTogglePractica: () => void
+  /** «Instalar como app», cuando el navegador lo permite y aún no está instalada. */
+  instalar: ReturnType<typeof useInstallPrompt>
   textSize: ReturnType<typeof usePosTextSize>
   // Cuentas abiertas
   parkedEnabled: boolean
@@ -93,7 +101,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, instalar,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -257,6 +265,18 @@ export function PosHeader(p: PosHeaderProps) {
                     <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>
                       <Keyboard className="h-4 w-4 mr-2" /> Atajos de teclado
                     </DropdownMenuItem>
+                    {/* Aprender tocando, sin ensuciar las ventas reales. */}
+                    <DropdownMenuItem onSelect={onTogglePractica}>
+                      <GraduationCap className="h-4 w-4 mr-2" />
+                      {practica ? "Salir del modo práctica" : "Practicar sin registrar"}
+                    </DropdownMenuItem>
+                    {/* Solo cuando el navegador lo ofrece (Android/Chrome) y
+                        aún se abre desde el navegador. */}
+                    {instalar.puede && (
+                      <DropdownMenuItem onSelect={() => void instalar.instalar()}>
+                        <Smartphone className="h-4 w-4 mr-2" /> Instalar como app
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onSelect={() => setShowCashDialog(true)}>
                       {openSession ? <Unlock className="h-4 w-4 mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
                       {openSession ? "Caja · corte y movimientos" : "Abrir caja"}

@@ -6,6 +6,7 @@ import {
   cartSubtotal,
   getLinePrice,
   mergeKey,
+  needsModifierPrompt,
   rehydrateCart,
   serializeCart,
   type CartLine,
@@ -126,5 +127,28 @@ describe("guardar y recuperar el carrito", () => {
     expect(rehydrateCart(null, [latte], ahora)).toBeNull()
     expect(rehydrateCart({ v: 0, lines: [] }, [latte], ahora)).toBeNull()
     expect(rehydrateCart({ v: 1, lines: [], savedAt: "ayer" }, [latte], ahora)).toBeNull()
+  })
+})
+
+describe("needsModifierPrompt", () => {
+  // Un grupo que OBLIGA a elegir (mínimo 1): la hoja debe salir siempre.
+  const conObligatorio: Product = {
+    ...latte,
+    modifierGroups: [{ id: "g-tipo", name: "Tipo de leche", minSelect: 1, maxSelect: 1, options: [avena, shot] }],
+  }
+
+  it("sin extras nunca pregunta", () => {
+    expect(needsModifierPrompt(croissant, "required")).toBe(false)
+    expect(needsModifierPrompt(croissant, "always")).toBe(false)
+  })
+
+  it("extras opcionales: de un toque con «required», hoja con «always»", () => {
+    expect(needsModifierPrompt(latte, "required")).toBe(false)
+    expect(needsModifierPrompt(latte, "always")).toBe(true)
+  })
+
+  it("un grupo obligatorio pregunta en los dos modos", () => {
+    expect(needsModifierPrompt(conObligatorio, "required")).toBe(true)
+    expect(needsModifierPrompt(conObligatorio, "always")).toBe(true)
   })
 })

@@ -23,6 +23,9 @@ import {
 } from "lucide-react"
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
+import { PracticeBanner } from "./practice-banner"
+import { ArranqueCard } from "./arranque-card"
+import { useInstallPrompt } from "./use-install-prompt"
 import { TrialBanner } from "@/components/trial-banner"
 import { colorClasses } from "@/lib/category-colors"
 import { Button } from "@/components/ui/button"
@@ -92,6 +95,7 @@ import {
   getLineLabel,
   getLinePrice,
   getLineVariantId,
+  needsModifierPrompt,
   parseCash,
   type CartLine,
   type Category,
@@ -115,6 +119,8 @@ interface POSClientProps {
   favoriteVariantIds: string[]
   /** Qué imprimir en automático al cobrar (ajuste del negocio). */
   autoPrint: "none" | "ticket" | "comanda" | "both"
+  /** Cuándo abrir la hoja de extras al tocar un producto (ajuste del negocio). */
+  modifiersPrompt: "required" | "always"
   /** Módulo de cuentas abiertas activado para esta cafetería. */
   parkedOrders: boolean
   /** Cuántas mesas tiene: genera los chips «Mesa 1…N» al abrir una cuenta. */
@@ -149,6 +155,7 @@ export default function POSClient({
   hasPin,
   favoriteVariantIds,
   autoPrint,
+  modifiersPrompt,
   parkedOrders: parkedEnabled,
   tableCount,
   accountLabels,
@@ -737,6 +744,36 @@ export default function POSClient({
     setTipCustomInput("")
   }, [])
 
+  // ── Modo práctica ──
+  // Para aprender el POS tocando, sin miedo a ensuciar las ventas reales:
+  // «siento que es más rápido en la libreta» casi siempre es falta de
+  // práctica, y nadie practica con dinero de verdad. Solo entra con el
+  // carrito vacío y sin cuenta abierta, y al salir se vacía: lo que se armó
+  // practicando no debe poder cobrarse de verdad un toque después. No se
+  // guarda en ningún lado: recargar la página lo apaga.
+  const [practica, setPractica] = useState(false)
+  const togglePractica = useCallback(() => {
+    if (practica) {
+      clearCart()
+      clearTip()
+      setLoyaltyCustomer(null)
+      setLoyaltyRedeem(false)
+      setPractica(false)
+      toast.info("Saliste del modo práctica. El carrito se vació.")
+      return
+    }
+    if (lines.length > 0 || openAccount) {
+      toast.info("Vacía el carrito (o cobra la cuenta abierta) antes de practicar.")
+      return
+    }
+    setPractica(true)
+    toast.success("Modo práctica: cobra lo que quieras, nada se registra.")
+  }, [practica, lines.length, openAccount, clearCart, clearTip])
+  // Practicando no se abren cuentas: también viven en el servidor.
+  const cuentasActivas = parkedEnabled && !practica
+  // «Ponlo en tu pantalla de inicio»: la tarjeta de arranque y el menú ⋮ lo ofrecen.
+  const instalar = useInstallPrompt()
+
   // Efectivo recibido / cambio (solo aplica al pago en efectivo)
   const cashReceived = paymentMethod === "efectivo" ? parseCash(cashReceivedInput) : null
   const changeDue = cashReceived !== null ? cashReceived - due : null
@@ -752,8 +789,9 @@ export default function POSClient({
     .filter(Boolean)
     .join(" · ")
 
+  // Practicando no hace falta caja abierta: no se registra nada.
   const canCharge =
-    lines.length > 0 && !isProcessing && !!openSession && !cashInsufficient && !discountInvalid
+    lines.length > 0 && !isProcessing && (practica || !!openSession) && !cashInsufficient && !discountInvalid
 
   /**
    * La cuenta ya se cobró: se borra del servidor y se suelta el puntero.
@@ -770,6 +808,23 @@ export default function POSClient({
 
   const finalizeSale = useCallback(async () => {
     if (!canCharge) return
+    if (practica) {
+      // Nada viaja al servidor: ni ticket, ni cola, ni sellos, ni cuenta. Se
+      // dice el mismo resultado que en una venta real para que el ensayo
+      // enseñe lo que va a pasar de verdad.
+      const cambio = changeDue !== null && changeDue > 0 ? ` · Cambio ${formatCurrency(changeDue)}` : ""
+      toast.success(`Práctica: ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}${cambio}`, {
+        description: "No se registró nada. Así se cobra de verdad.",
+        duration: 5000,
+      })
+      vibra(30)
+      clearTip()
+      setLoyaltyCustomer(null)
+      setLoyaltyRedeem(false)
+      resetAfterSale()
+      setCartOpen(false)
+      return
+    }
     setIsProcessing(true)
 
     try {
@@ -795,7 +850,7 @@ export default function POSClient({
       })
 
       if (result.success) {
-        setCompletedSale({
+        const venta: CompletedSale = {
           ticketId: result.ticketId,
           folio: result.folio,
           lines: [...lines],
@@ -813,7 +868,25 @@ export default function POSClient({
           loyalty: result.loyalty
             ? { stamps: result.loyalty.stamps, target: result.loyalty.target, redeemed: result.loyalty.redeemed }
             : null,
-        })
+        }
+        // En celular, sin impresora ni QR, el diálogo del recibo solo era un
+        // toque más («Nueva venta») entre una venta y la siguiente. Un aviso
+        // con folio, monto y cambio dice lo mismo sin estorbar, y «Ver ticket»
+        // abre el recibo completo (imprimir, compartir) cuando sí hace falta.
+        // Con impresión automática o QR el diálogo se queda: ahí pasa algo.
+        if (isMobile && autoPrint === "none" && !publicReceipt) {
+          const cambio =
+            result.changeDue != null && result.changeDue > 0 ? ` · Cambio ${formatCurrency(result.changeDue)}` : ""
+          toast.success(
+            `Venta #${result.folio} · ${formatCurrency(result.total + result.tip)} · ${paymentLabel(paymentMethod)}${cambio}`,
+            {
+              duration: cambio ? 8000 : 5000,
+              action: { label: "Ver ticket", onClick: () => setCompletedSale(venta) },
+            },
+          )
+        } else {
+          setCompletedSale(venta)
+        }
         if (result.loyalty) {
           const quien = result.loyalty.name || formatPhone(result.loyalty.phone)
           if (result.loyalty.redeemed) {
@@ -894,20 +967,24 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, publicReceipt, practica, due, changeDue])
 
-  /** Producto/tamaño elegido: si tiene modificadores, pregunta; si no, al carrito. */
+  /**
+   * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
+   * preguntar siempre), abre la hoja; si no, directo al carrito. Los extras
+   * opcionales se agregan después desde «cambiar» en la línea.
+   */
   const chooseProduct = useCallback(
     (product: Product, size?: SizeOption) => {
       setSizePickerFor(null)
-      if (product.modifierGroups && product.modifierGroups.length > 0) {
+      if (needsModifierPrompt(product, modifiersPrompt)) {
         setPendingModifiers({ product, size })
       } else {
         addLine(product, size)
         vibra(12)
       }
     },
-    [addLine],
+    [addLine, modifiersPrompt],
   )
 
   // La actualización va en forma de función para NO depender de `sizePickerFor`:
@@ -973,7 +1050,8 @@ export default function POSClient({
       setPendingModifiers={setPendingModifiers}
       lastSale={lastSale}
       setConfirmClear={setConfirmClear}
-      parkedEnabled={parkedEnabled}
+      parkedEnabled={cuentasActivas}
+      practica={practica}
       openAccount={openAccount}
       cuentasVisibles={cuentasVisibles}
       saveToOpenAccount={saveToOpenAccount}
@@ -1038,6 +1116,7 @@ export default function POSClient({
     <div className="flex h-[100dvh] flex-col bg-stone-50 overflow-hidden">
       {/* Aviso de fin de prueba: arriba de todo, para que nadie lo descubra con la caja abierta. */}
       <TrialBanner trialEndsAt={appCtx.business?.trialEndsAt ?? null} />
+      {practica && <PracticeBanner onExit={togglePractica} />}
       {/* Ventas por subir: arriba de todo y sin forma de descartarlo — una
           cola olvidada es dinero cobrado que no está registrado. */}
       <QueueBanner
@@ -1082,7 +1161,10 @@ export default function POSClient({
           setShowTickets={setShowTickets}
           setShowShortcuts={setShowShortcuts}
           textSize={textSize}
-          parkedEnabled={parkedEnabled}
+          practica={practica}
+          onTogglePractica={togglePractica}
+          instalar={instalar}
+          parkedEnabled={cuentasActivas}
           openAccount={openAccount}
           cuentasVisibles={cuentasVisibles}
           chipsCuentas={chipsCuentas}
@@ -1096,6 +1178,15 @@ export default function POSClient({
         {/* Product grid */}
         <ScrollArea ref={gridScrollRef} className="flex-1 min-h-0">
           <div className={`p-4 space-y-6 ${isMobile ? "pb-24" : ""}`}>
+            {/* Los dos pasos de una venta, solo la primera vez en un celular. */}
+            <ArranqueCard
+              mostrar={isMobile === true && products.length > 0}
+              tieneFavoritos={favorites.length > 0}
+              onPracticar={() => {
+                if (!practica) togglePractica()
+              }}
+              instalar={instalar}
+            />
             {products.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-stone-400">
                 <Coffee className="h-12 w-12 mb-3 opacity-40" />
@@ -1236,7 +1327,7 @@ export default function POSClient({
                     Cobrar sigue siendo el botón grande y a la derecha porque
                     es, de lejos, lo más frecuente: degradarlo para acelerar lo
                     ocasional saldría carísimo. */}
-                {parkedEnabled && (
+                {cuentasActivas && (
                   <Button
                     className="h-12 shrink-0 rounded-xl bg-amber-600 px-3 text-base font-bold text-white hover:bg-amber-700"
                     onClick={() => (openAccount ? void saveToOpenAccount() : setShowPark(true))}
@@ -1249,7 +1340,7 @@ export default function POSClient({
                     {openAccount ? "Guardar" : "Cuenta"}
                   </Button>
                 )}
-                {openSession ? (
+                {openSession || practica ? (
                   <Button
                     className={`h-12 shrink-0 rounded-xl px-4 text-base font-bold text-white ${
                       paymentMethod === "efectivo"
@@ -1262,7 +1353,7 @@ export default function POSClient({
                     onClick={finalizeSale}
                     title={`Cobrar · ${paymentLabel(paymentMethod)}`}
                   >
-                    {isProcessing ? "Procesando…" : `Cobrar ${formatCurrency(due)}`}
+                    {isProcessing ? "Procesando…" : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)}`}
                   </Button>
                 ) : (
                   <Button

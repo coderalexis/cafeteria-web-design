@@ -366,6 +366,30 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 se registra como venta hasta que se cobra.
               </p>
 
+              {/* Nació en una cafetería donde 31 de 43 productos tienen extras
+                  opcionales: la hoja salía en casi cada venta y el celular se
+                  sentía más lento que la libreta. Lo obligatorio se sigue
+                  preguntando siempre; esto solo decide qué pasa con lo opcional. */}
+              <div className="mt-3 border-t border-stone-100 pt-3">
+                <label htmlFor="modifiers_prompt" className="text-sm font-medium text-stone-700">
+                  Extras al tocar un producto
+                </label>
+                <select
+                  id="modifiers_prompt"
+                  name="modifiers_prompt"
+                  defaultValue={currentSettings.modifiersPrompt}
+                  className="mt-1.5 h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                >
+                  <option value="required">Preguntar solo si hay que elegir uno (más rápido)</option>
+                  <option value="always">Preguntar siempre que el producto tenga extras</option>
+                </select>
+                <p className="mt-1 text-xs text-stone-400">
+                  Con «solo si hay que elegir», un producto con extras opcionales entra al carrito de un toque; para
+                  ponerle leche de avena o un shot se toca «cambiar» en su línea. Los grupos obligatorios (por ejemplo
+                  «elige el tipo de leche») se preguntan siempre.
+                </p>
+              </div>
+
               {/* Los botones de un toque al abrir una cuenta. Eran fijos en
                   código («Mesa 1..4, Para llevar, Mostrador») e iguales para
                   toda cafetería: la del gym veía dos mesas que no tiene, y una
