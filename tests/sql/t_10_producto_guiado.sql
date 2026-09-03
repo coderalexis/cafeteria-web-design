@@ -67,7 +67,8 @@ begin
     'la categoría nueva existe');
   select id into v_variant from public.menu_variants where product_id = v_prod;
   perform pruebas.espera(
-    (select name || '|' || price || '|' || cost from public.menu_variants where product_id = v_prod) = 'Único|120|40',
+    (select count(*) from public.menu_variants where product_id = v_prod) = 1
+    and (select name = 'Único' and price = 120 and cost = 40 from public.menu_variants where product_id = v_prod),
     'un solo precio → variante «Único» a 120 con costo 40');
   perform pruebas.espera(
     (select count(*) from public.product_modifier_groups where product_id = v_prod) = 5, 'cinco enganches');
