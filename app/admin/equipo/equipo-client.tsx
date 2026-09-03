@@ -33,6 +33,7 @@ import { adminSetMemberPin } from "@/app/actions/security"
 import { useAppContext } from "@/components/business-provider"
 import { ROLE_LABELS, type BusinessRole } from "@/lib/context-shape"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { RoleHint, RoleLegend } from "./role-legend"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -242,6 +243,9 @@ export default function EquipoClient({ members }: Props) {
         </Button>
       </div>
 
+      {/* Qué significa cada rol, aquí donde se asigna. */}
+      <RoleLegend />
+
       {/* List */}
       <Card>
         <CardHeader>
@@ -389,6 +393,7 @@ export default function EquipoClient({ members }: Props) {
                       Rol
                     </label>
                     <RoleSelect id="new-role" name="role" defaultValue="cajero" callerRole={callerRole} />
+                    <RoleHint />
                   </div>
                   <Button type="submit" disabled={isPending} className="w-full bg-indigo-600 hover:bg-indigo-700">
                     {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -418,6 +423,7 @@ export default function EquipoClient({ members }: Props) {
                       Rol
                     </label>
                     <RoleSelect id="add-role" name="role" defaultValue="admin" callerRole={callerRole} />
+                    <RoleHint />
                   </div>
                   <Button type="submit" disabled={isPending} className="w-full bg-indigo-600 hover:bg-indigo-700">
                     {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -478,6 +484,7 @@ export default function EquipoClient({ members }: Props) {
                     disabled={selectedIsOwnerLocked || selectedIsSelf}
                     key={selected.id + "-role"}
                   />
+                  <RoleHint />
                   {selectedIsOwnerLocked && (
                     <p className="text-xs text-stone-400">Solo el dueño puede cambiar el rol de otro dueño.</p>
                   )}
