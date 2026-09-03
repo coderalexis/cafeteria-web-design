@@ -6,6 +6,7 @@ import {
   AArrowUp,
   BookOpen,
   ChefHat,
+  GraduationCap,
   ChevronRight,
   Coffee,
   History,
@@ -69,6 +70,9 @@ export interface PosHeaderProps {
   setShowRecent: (open: boolean) => void
   setShowTickets: (open: boolean) => void
   setShowShortcuts: (open: boolean) => void
+  /** Modo práctica (ventas que no se registran) y cómo entrar/salir. */
+  practica: boolean
+  onTogglePractica: () => void
   textSize: ReturnType<typeof usePosTextSize>
   // Cuentas abiertas
   parkedEnabled: boolean
@@ -93,7 +97,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -256,6 +260,11 @@ export function PosHeader(p: PosHeaderProps) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>
                       <Keyboard className="h-4 w-4 mr-2" /> Atajos de teclado
+                    </DropdownMenuItem>
+                    {/* Aprender tocando, sin ensuciar las ventas reales. */}
+                    <DropdownMenuItem onSelect={onTogglePractica}>
+                      <GraduationCap className="h-4 w-4 mr-2" />
+                      {practica ? "Salir del modo práctica" : "Practicar sin registrar"}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setShowCashDialog(true)}>
                       {openSession ? <Unlock className="h-4 w-4 mr-2" /> : <Lock className="h-4 w-4 mr-2" />}

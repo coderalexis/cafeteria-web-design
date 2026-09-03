@@ -139,6 +139,8 @@ export interface CartPanelProps {
   isProcessing: boolean
   finalizeSale: () => void | Promise<void>
   setShowCashDialog: (open: boolean) => void
+  /** Modo práctica: se puede «cobrar» sin caja abierta y nada se registra. */
+  practica: boolean
 }
 
 /**
@@ -166,7 +168,7 @@ export function CartPanel(p: CartPanelProps) {
     moreOpen, toggleMore, extrasResumen, ticketNotes, setTicketNotes, takeoutFee,
     discount, setDiscount, setShowDiscount,
     subtotal, discountAmount, discountInvalid, promo, promoDiscount, takeoutCharge, total, due,
-    openSession, canCharge, isProcessing, finalizeSale, setShowCashDialog,
+    openSession, canCharge, isProcessing, finalizeSale, setShowCashDialog, practica,
   } = p
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
   // ── Gestos sobre las líneas del carrito ──
@@ -1004,7 +1006,7 @@ export function CartPanel(p: CartPanelProps) {
               {openAccount ? `Guardar en ${openAccount.name}` : "Abrir cuenta"}
             </Button>
           )}
-          {openSession ? (
+          {openSession || practica ? (
             <Button
               className={`relative w-full py-6 text-lg font-bold rounded-xl text-white transition-colors ${
                 paymentMethod === "efectivo"
@@ -1017,7 +1019,9 @@ export function CartPanel(p: CartPanelProps) {
               disabled={!canCharge}
               onClick={finalizeSale}
             >
-              {isProcessing ? "Procesando..." : `Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
+              {isProcessing
+                ? "Procesando..."
+                : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
               <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
             </Button>
           ) : (
