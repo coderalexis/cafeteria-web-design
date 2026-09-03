@@ -11,6 +11,7 @@ import { AdminUserMenu } from "@/components/admin-user-menu"
 import { NavScrollArea } from "@/components/nav-scroll-area"
 import type { Membership } from "@/lib/context-shape"
 import { AdminNav } from "./admin-nav"
+import { AdminSearch } from "@/components/admin-search"
 
 /** Mismos nombres que en `admin-nav.tsx`; si cambias uno, cambia el otro. */
 const SECTION_LABELS: Record<string, string> = {
@@ -91,6 +92,10 @@ export function AdminMobileNav({
                 />
               </div>
             )}
+            {/* El mismo buscador que en escritorio; al elegir, el menú se cierra. */}
+            <div className="mt-3">
+              <AdminSearch onNavigate={() => setOpen(false)} />
+            </div>
           </div>
           <div onClick={() => setOpen(false)} className="contents">
             <NavScrollArea className="px-3 py-2 space-y-0.5">

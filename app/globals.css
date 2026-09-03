@@ -80,3 +80,18 @@
     @apply bg-background text-foreground;
   }
 }
+/* La tarjeta a la que llegaste desde el buscador del panel (o desde un
+   enlace con #ancla) se ilumina un instante: en una pantalla larga, sin
+   esto, uno no sabe si el salto ocurrió ni dónde mirar. */
+.admin-ancla:target {
+  animation: admin-ancla-destacar 2.4s ease-out;
+}
+@keyframes admin-ancla-destacar {
+  0%,
+  55% {
+    box-shadow: 0 0 0 3px rgb(251 191 36 / 0.85);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(251 191 36 / 0);
+  }
+}

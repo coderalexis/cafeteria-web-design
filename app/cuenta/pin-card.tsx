@@ -30,7 +30,7 @@ export function PinCard({ hasPin, businessName }: { hasPin: boolean; businessNam
   }
 
   return (
-    <Card>
+    <Card id="pin" className="admin-ancla scroll-mt-20">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <LockKeyhole className="h-4 w-4 text-amber-700" />

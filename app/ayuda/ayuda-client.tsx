@@ -112,6 +112,13 @@ function Tecla({ children }: { children: React.ReactNode }) {
 
 export function AyudaClient({ ticket, corte }: Props) {
   const [busqueda, setBusqueda] = useState("")
+  // `/ayuda?q=impresora` llega con la búsqueda puesta (así manda aquí el
+  // buscador del panel). Se lee DESPUÉS de montar y no en el estado inicial:
+  // el servidor no ve la URL y pintaría otra cosa que el navegador.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q")
+    if (q) setBusqueda(q)
+  }, [])
   const [activo, setActivo] = useState("entrar")
 
   const SECCIONES: SeccionDef[] = [

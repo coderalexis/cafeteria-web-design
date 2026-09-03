@@ -27,7 +27,7 @@ export function ChangePasswordCard() {
   }
 
   return (
-    <Card>
+    <Card id="contrasena" className="admin-ancla scroll-mt-20">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-amber-700" />
