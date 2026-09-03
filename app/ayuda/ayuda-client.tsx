@@ -288,10 +288,12 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Tu primera venta, de la mano:</strong> menú <strong>⋮</strong> →{" "}
-            <strong>Recorrido: tu primera venta</strong> (en celular, también desde la tarjeta de la primera vez). Son
-            cinco pasos sobre el POS real, en práctica: toca un producto, mira tu línea, di cómo paga, cobra. Cada paso
-            avanza cuando lo haces, y al final te dice en cuántos segundos vendiste.
+            <strong>Tu primera venta, de la mano:</strong> menú <strong>⋮</strong> → <strong>Aprender</strong> →{" "}
+            <strong>Tu primera venta</strong> (en celular, también desde la tarjeta de la primera vez). Son cinco pasos
+            sobre el POS real, en práctica: toca un producto, mira tu línea, di cómo paga, cobra. Cada paso avanza
+            cuando lo haces, y al final te dice en cuántos segundos vendiste. Se puede repetir las veces que quieras,
+            por ejemplo cuando entra alguien nuevo a la caja; en <strong>Aprender</strong> también están la práctica y
+            lecturas de un minuto.
           </li>
           <li>
             Para aprender el POS tocando, sin miedo a ensuciar las ventas reales: menú <strong>⋮</strong> →{" "}

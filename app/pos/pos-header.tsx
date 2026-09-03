@@ -76,8 +76,8 @@ export interface PosHeaderProps {
   /** Modo práctica (ventas que no se registran) y cómo entrar/salir. */
   practica: boolean
   onTogglePractica: () => void
-  /** Recorrido de la primera venta: cinco pasos sobre el POS real, en práctica. */
-  onRecorrido: () => void
+  /** «Aprender»: recorrido de la primera venta, práctica y lecturas cortas. */
+  onAprender: () => void
   /** «Instalar como app», cuando el navegador lo permite y aún no está instalada. */
   instalar: ReturnType<typeof useInstallPrompt>
   textSize: ReturnType<typeof usePosTextSize>
@@ -104,7 +104,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, onRecorrido, instalar,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, onAprender, instalar,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -268,9 +268,11 @@ export function PosHeader(p: PosHeaderProps) {
                     <DropdownMenuItem onSelect={() => setShowShortcuts(true)}>
                       <Keyboard className="h-4 w-4 mr-2" /> Atajos de teclado
                     </DropdownMenuItem>
-                    {/* La primera venta de la mano: avanza cuando la persona lo hace. */}
-                    <DropdownMenuItem onSelect={onRecorrido}>
-                      <Footprints className="h-4 w-4 mr-2" /> Recorrido: tu primera venta
+                    {/* Un solo lugar para aprender: el recorrido de la primera
+                        venta (se repite cuando haga falta), la práctica y
+                        lecturas de un minuto. */}
+                    <DropdownMenuItem onSelect={onAprender}>
+                      <Footprints className="h-4 w-4 mr-2" /> Aprender: recorrido y práctica
                     </DropdownMenuItem>
                     {/* Aprender tocando, sin ensuciar las ventas reales. */}
                     <DropdownMenuItem onSelect={onTogglePractica}>
