@@ -27,7 +27,7 @@ export default async function PromocionesPage() {
   if (ctx.role === "cajero") redirect("/pos")
 
   const supabase = await createClient()
-  const [{ data: promos }, { data: categorias }, { data: resultado }] = await Promise.all([
+  const [{ data: promos }, { data: categorias }, { data: resultado }, { data: productos }] = await Promise.all([
     supabase
       .from("promotions")
       .select("id, name, kind, value, scope, category_id, weekdays, start_hour, end_hour, starts_on, ends_on, min_ticket, is_active, menu_categories(name)")
@@ -35,7 +35,25 @@ export default async function PromocionesPage() {
       .order("name"),
     supabase.from("menu_categories").select("id, name").eq("is_active", true).order("sort_order"),
     supabase.rpc("promotions_report", { p_days: 30 }),
+    // Un producto de muestra por categoría, para que la vista previa hable
+    // con precios reales («un Frappé de mango de $65 quedará en $52»).
+    supabase
+      .from("menu_products")
+      .select("id, name, category_id, sort_order, is_active, menu_variants(price, is_active)")
+      .eq("is_active", true)
+      .order("sort_order"),
   ])
+
+  const ejemplos = new Map<string, { nombre: string; precio: number }>()
+  for (const p of productos ?? []) {
+    if (ejemplos.has(p.category_id)) continue
+    const precios = (p.menu_variants ?? [])
+      .filter((v) => v.is_active)
+      .map((v) => Number(v.price))
+      .filter((n) => n > 0)
+    if (precios.length === 0) continue
+    ejemplos.set(p.category_id, { nombre: p.name, precio: Math.min(...precios) })
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -75,6 +93,7 @@ export default async function PromocionesPage() {
         })}
         categorias={(categorias ?? []).map((c) => ({ id: c.id, name: c.name }))}
         resultado={(resultado as unknown as ResultadoPromos | null) ?? null}
+        ejemplos={Object.fromEntries(ejemplos)}
       />
     </div>
   )
