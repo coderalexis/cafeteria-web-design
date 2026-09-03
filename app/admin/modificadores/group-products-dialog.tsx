@@ -67,6 +67,18 @@ export function GroupProductsDialog({
     })
   }
 
+  /** Toda la categoría de un toque: «Tipo de leche» va en las 20 bebidas calientes, no una por una. */
+  const alternarTodos = (ids: string[], marcar: boolean) => {
+    setElegidos((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (marcar) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  }
+
   const guardar = async () => {
     setGuardando(true)
     try {
@@ -95,7 +107,8 @@ export function GroupProductsDialog({
         <DialogHeader className="shrink-0 border-b border-stone-200 px-5 pt-5 pb-4">
           <DialogTitle className="text-lg">¿En qué productos va?</DialogTitle>
           <DialogDescription>
-            Al vender uno de estos, el POS preguntará <strong>«{groupName}»</strong>.
+            Al vender uno de estos, el POS preguntará <strong>«{groupName}»</strong>. Marca «Toda la categoría» para
+            engancharla a todos los de esa categoría de un toque.
           </DialogDescription>
         </DialogHeader>
 
@@ -122,9 +135,29 @@ export function GroupProductsDialog({
             <div className="space-y-4">
               {porCategoria.map(([categoria, productos]) => (
                 <div key={categoria}>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-                    {categoria}
-                  </p>
+                  {(() => {
+                    const ids = productos.map((p) => p.id)
+                    const marcados = ids.filter((id) => elegidos.has(id)).length
+                    const todos = marcados === ids.length
+                    return (
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">{categoria}</p>
+                        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-stone-600">
+                          <input
+                            type="checkbox"
+                            checked={todos}
+                            ref={(el) => {
+                              if (el) el.indeterminate = !todos && marcados > 0
+                            }}
+                            onChange={() => alternarTodos(ids, !todos)}
+                            aria-label={`Toda la categoría ${categoria}`}
+                            className="h-4 w-4 rounded border-stone-300 accent-amber-600"
+                          />
+                          Toda la categoría{marcados > 0 && !todos ? ` (${marcados} de ${ids.length})` : ""}
+                        </label>
+                      </div>
+                    )
+                  })()}
                   <div className="space-y-1">
                     {productos.map((p) => {
                       const on = elegidos.has(p.id)
