@@ -28,7 +28,8 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
 
   // ── Menú ──
   { titulo: "Categorías del menú", donde: "Menú → Categorías", href: "/admin/categorias", palabras: "categoria categorias seccion color colores orden nota de categoria letra chica" },
-  { titulo: "Productos, precios y tamaños", donde: "Menú → Productos", href: "/admin/productos", palabras: "producto productos precio precios tamano tamanos variante variantes costo margen activar desactivar ocultar orden descripcion nuevo producto precios en lote" },
+  { titulo: "Productos, precios y tamaños", donde: "Menú → Productos", href: "/admin/productos", palabras: "producto productos precio precios tamano tamanos variante variantes costo margen activar desactivar ocultar orden descripcion precios en lote" },
+  { titulo: "Nuevo producto, de la mano (con precios y extras)", donde: "Menú → Productos → Nuevo producto", href: "/admin/productos", palabras: "nuevo producto crear producto agregar producto asistente paso a paso de la mano comida platillo guarniciones proteina porciones extras preguntas como agrego" },
   { titulo: "Costo de cada producto (para el margen)", donde: "Menú → Productos", href: "/admin/productos", palabras: "costo costos margen utilidad cuanto me cuesta ganancia" },
   { titulo: "Armar la carta con paquetes", donde: "Menú → Productos", href: "/admin/productos", palabras: "paquete paquetes carta plantilla menu inicial espresso frappes panaderia instalar" },
   { titulo: "Opciones y extras (tipo de leche, shots)", donde: "Menú → Opciones y extras", href: "/admin/modificadores", palabras: "extras extra opciones modificadores grupo grupos leche shot jarabe pregunta al vender obligatorio minimo maximo cuantas en que productos va vincular asignar" },

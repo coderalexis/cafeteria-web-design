@@ -856,10 +856,21 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Coffee,
       titulo: "Menú: categorías, productos y precios",
-      palabras: "categorias colores variantes tamanos costo margen precios lote orden desactivar sin precio no aparece nota carta publica",
+      palabras: "categorias colores variantes tamanos costo margen precios lote orden desactivar sin precio no aparece nota carta publica nuevo producto asistente de la mano paso a paso crear producto comida guarniciones proteina porciones",
       href: "/admin/productos",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Nuevo producto, de la mano.</strong> El botón <strong>Nuevo producto</strong> te lleva en cuatro
+            pasos con una sola pregunta cada uno: <em>¿qué vendes?</em> (nombre, categoría o una nueva ahí mismo, qué
+            lleva), <em>¿cuánto cuesta?</em> (un solo precio, o por tamaño o porción con plantillas como Chico/Grande
+            o 1/2 porciones), <em>¿se pregunta algo al cobrar?</em> (engancha preguntas que ya tienes o crea nuevas
+            desde ejemplos que ya vienen llenos: proteína a elegir, 1 o 2 porciones con costo, guarniciones incluidas,
+            guarnición extra con costo, tipo de leche) y <em>así se verá</em>, con el resumen exacto y desde cuánto
+            sale. Cada paso te dice qué falta. Ejemplo: una comida con pescado o pollo, 2 porciones a +$45, dos
+            guarniciones incluidas y guarnición extra a +$20 se arma en un minuto y queda lista para cobrar. Todo entra
+            junto: no hay forma de dejar el producto sin precio ni la pregunta sin enganchar.
+          </li>
           <li>
             <strong>Categorías</strong>: son las pestañas del POS. La pantalla es una lista; <strong>toca una</strong>{" "}
             para editarla y <strong>Nueva categoría</strong> para agregar. De cada una puedes cambiar su nombre, su{" "}
@@ -959,6 +970,11 @@ export function AyudaClient({ ticket, corte }: Props) {
               Un <strong>grupo</strong> es una pregunta que el POS le hace al cajero al vender un producto: «¿tipo de
               leche?», «¿con pollo o con huevo?». Cada respuesta es una <strong>opción</strong>, y puede costar extra
               («Leche de avena +$12») o no costar nada («Estrellado»).
+            </li>
+            <li>
+              <strong>Lo más fácil</strong> es crear la pregunta desde <strong>Nuevo producto</strong> (paso 3), donde
+              ya viene enganchada al producto y con ejemplos llenos. Esta pantalla es para revisarlas, corregirlas y
+              reusarlas en otros productos.
             </li>
             <li>
               Se arma en tres pasos: <strong>1)</strong> creas el grupo y dices cuántas puede elegir el cajero,{" "}
