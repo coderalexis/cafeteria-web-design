@@ -7,6 +7,12 @@ const config = {
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
+    // `lib` también: los colores de categoría (lib/category-colors.ts) se
+    // escriben como clases completas y viven SOLO ahí. Sin esta ruta, Tailwind
+    // no las ve y las borra todas menos las que por casualidad se usan en
+    // `app` —el POS es ámbar por todos lados—, así que la única categoría que
+    // salía con color era la ámbar.
+    "./lib/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
