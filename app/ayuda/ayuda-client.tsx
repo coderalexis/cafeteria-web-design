@@ -1523,7 +1523,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 print:hidden">
               {visibles.length === 0
                 ? `Nada sobre «${busqueda.trim()}». Intenta con otra palabra (p. ej. propina, corte, QR).`
-                : `${visibles.length} sección${visibles.length === 1 ? "" : "es"} sobre «${busqueda.trim()}»:`}
+                : `${visibles.length} ${visibles.length === 1 ? "sección" : "secciones"} sobre «${busqueda.trim()}»:`}
             </p>
           )}
 
