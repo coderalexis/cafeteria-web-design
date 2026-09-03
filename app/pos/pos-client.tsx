@@ -799,7 +799,7 @@ export default function POSClient({
       })
 
       if (result.success) {
-        setCompletedSale({
+        const venta: CompletedSale = {
           ticketId: result.ticketId,
           folio: result.folio,
           lines: [...lines],
@@ -817,7 +817,25 @@ export default function POSClient({
           loyalty: result.loyalty
             ? { stamps: result.loyalty.stamps, target: result.loyalty.target, redeemed: result.loyalty.redeemed }
             : null,
-        })
+        }
+        // En celular, sin impresora ni QR, el diálogo del recibo solo era un
+        // toque más («Nueva venta») entre una venta y la siguiente. Un aviso
+        // con folio, monto y cambio dice lo mismo sin estorbar, y «Ver ticket»
+        // abre el recibo completo (imprimir, compartir) cuando sí hace falta.
+        // Con impresión automática o QR el diálogo se queda: ahí pasa algo.
+        if (isMobile && autoPrint === "none" && !publicReceipt) {
+          const cambio =
+            result.changeDue != null && result.changeDue > 0 ? ` · Cambio ${formatCurrency(result.changeDue)}` : ""
+          toast.success(
+            `Venta #${result.folio} · ${formatCurrency(result.total + result.tip)} · ${paymentLabel(paymentMethod)}${cambio}`,
+            {
+              duration: cambio ? 8000 : 5000,
+              action: { label: "Ver ticket", onClick: () => setCompletedSale(venta) },
+            },
+          )
+        } else {
+          setCompletedSale(venta)
+        }
         if (result.loyalty) {
           const quien = result.loyalty.name || formatPhone(result.loyalty.phone)
           if (result.loyalty.redeemed) {
@@ -898,7 +916,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, publicReceipt])
 
   /**
    * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
