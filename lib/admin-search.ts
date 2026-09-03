@@ -72,6 +72,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
 
   // ── Fuera del panel ──
   { titulo: "Ir al punto de venta", donde: "POS", href: "/pos", palabras: "pos punto de venta cobrar vender caja" },
+  { titulo: "Recorrido de la primera venta (1 minuto, en práctica)", donde: "POS → ⋮ → Recorrido", href: "/pos?recorrido=1", palabras: "recorrido tutorial aprender primera venta practica paso a paso ensenar cajero nuevo como se vende" },
   { titulo: "Por preparar (comanda en pantalla)", donde: "POS → ⋮ → Por preparar", href: "/pos/preparar", palabras: "por preparar comanda pantalla cocina barra pedidos listo" },
 ]
 

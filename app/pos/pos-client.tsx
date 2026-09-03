@@ -24,6 +24,8 @@ import {
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
+import { RecorridoTarjeta } from "./recorrido-tarjeta"
+import { useRecorrido } from "./use-recorrido"
 import { ArranqueCard } from "./arranque-card"
 import { useInstallPrompt } from "./use-install-prompt"
 import { TrialBanner } from "@/components/trial-banner"
@@ -753,6 +755,8 @@ export default function POSClient({
   // practicando no debe poder cobrarse de verdad un toque después. No se
   // guarda en ningún lado: recargar la página lo apaga.
   const [practica, setPractica] = useState(false)
+  // Cobros de práctica desde que se abrió el POS: el recorrido termina con el siguiente.
+  const [ventasPractica, setVentasPractica] = useState(0)
   const togglePractica = useCallback(() => {
     if (practica) {
       clearCart()
@@ -819,6 +823,7 @@ export default function POSClient({
         duration: 5000,
       })
       vibra(30)
+      setVentasPractica((n) => n + 1)
       clearTip()
       setLoyaltyCustomer(null)
       setLoyaltyRedeem(false)
@@ -1034,6 +1039,55 @@ export default function POSClient({
   /* ---------------------------------------------------------------- */
   const itemCount = cartItemCount(lines)
 
+  // ── Recorrido de la primera venta ──
+  // Cinco pasos sobre el POS real, en práctica, que avanzan cuando la persona
+  // hace cada cosa (no cuando lee). Lo que está pasando se le pasa como
+  // señales; la máquina (lib/recorrido-pos.ts) decide el paso y la tarjeta.
+  const recorrido = useRecorrido({
+    lineas: lines.length,
+    articulos: itemCount,
+    eligiendoTamano: sizePickerFor !== null,
+    preguntaAbierta: pendingModifiers !== null,
+    esMovil: isMobile === true,
+    carritoAbierto: cartOpen,
+    efectivoEscrito: cashReceivedInput.trim() !== "",
+    ventasPractica,
+  })
+  const empezarRecorrido = useCallback(() => {
+    if (lines.length > 0 || openAccount) {
+      toast.info("Vacía el carrito (o cobra la cuenta abierta) antes del recorrido.")
+      return
+    }
+    if (!practica) togglePractica()
+    setCartOpen(false)
+    recorrido.iniciar()
+  }, [lines.length, openAccount, practica, togglePractica, recorrido])
+  // /pos?recorrido=1 (desde la guía): empieza solo, ya restaurado el carrito
+  // guardado; si no estaba vacío, el aviso de arriba lo dice.
+  const empezarRef = useRef(empezarRecorrido)
+  empezarRef.current = empezarRecorrido
+  useEffect(() => {
+    if (!cart.hydrated) return
+    const u = new URL(window.location.href)
+    if (u.searchParams.get("recorrido") !== "1") return
+    u.searchParams.delete("recorrido")
+    window.history.replaceState(null, "", u.toString())
+    empezarRef.current()
+  }, [cart.hydrated])
+  const tarjetaRecorrido = recorrido.tarjeta ? (
+    <RecorridoTarjeta
+      tarjeta={recorrido.tarjeta}
+      esMovil={isMobile === true}
+      onSiguiente={recorrido.siguiente}
+      onCerrar={recorrido.cerrar}
+      onVender={() => {
+        recorrido.cerrar()
+        if (practica) togglePractica()
+      }}
+      onOtraVez={() => recorrido.iniciar()}
+    />
+  ) : null
+
   /* Panel del carrito (header + líneas + cobro). Se monta una sola vez:
      como columna derecha en escritorio o dentro de una hoja inferior en
      móvil, para que refs y foco apunten al panel visible. */
@@ -1055,6 +1109,7 @@ export default function POSClient({
       setConfirmClear={setConfirmClear}
       parkedEnabled={cuentasActivas}
       practica={practica}
+      recorrido={recorrido.tarjeta?.donde === "carrito" ? tarjetaRecorrido : undefined}
       openAccount={openAccount}
       cuentasVisibles={cuentasVisibles}
       saveToOpenAccount={saveToOpenAccount}
@@ -1120,6 +1175,7 @@ export default function POSClient({
       {/* Aviso de fin de prueba: arriba de todo, para que nadie lo descubra con la caja abierta. */}
       <TrialBanner trialEndsAt={appCtx.business?.trialEndsAt ?? null} />
       {practica && <PracticeBanner onExit={togglePractica} />}
+      {recorrido.tarjeta?.donde === "flotante" && tarjetaRecorrido}
       {/* Ventas por subir: arriba de todo y sin forma de descartarlo — una
           cola olvidada es dinero cobrado que no está registrado. */}
       <QueueBanner
@@ -1166,6 +1222,7 @@ export default function POSClient({
           textSize={textSize}
           practica={practica}
           onTogglePractica={togglePractica}
+          onRecorrido={empezarRecorrido}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
@@ -1185,9 +1242,7 @@ export default function POSClient({
             <ArranqueCard
               mostrar={isMobile === true && products.length > 0}
               tieneFavoritos={favorites.length > 0}
-              onPracticar={() => {
-                if (!practica) togglePractica()
-              }}
+              onRecorrido={empezarRecorrido}
               instalar={instalar}
             />
             {products.length === 0 && (
@@ -1234,7 +1289,7 @@ export default function POSClient({
               </div>
             )}
 
-            {Object.entries(grouped).map(([subcategory, items]) => (
+            {Object.entries(grouped).map(([subcategory, items], gi) => (
               <div key={subcategory}>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1">
                   {subcategory}
@@ -1246,9 +1301,10 @@ export default function POSClient({
                     pantallas grandes sí caben 6 columnas, donde antes el
                     grid-cols-4 fijo desperdiciaba el ancho. */}
                 <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(9rem,1fr))]">
-                  {items.map((product) => (
+                  {items.map((product, pi) => (
                     <ProductCard
                       key={product.id}
+                      marcado={gi === 0 && pi === 0}
                       product={product}
                       accent={colorClasses(categoryColor[product.category])?.accent}
                       subcategory={subcategory}
@@ -1302,6 +1358,7 @@ export default function POSClient({
               <div className="flex gap-2">
                 <Button
                   ref={barTargetRef}
+                  data-recorrido="carrito-barra"
                   className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
                   onClick={() => setCartOpen(true)}
                 >
@@ -1355,6 +1412,7 @@ export default function POSClient({
                     disabled={!canCharge}
                     onClick={finalizeSale}
                     title={`Cobrar · ${paymentLabel(paymentMethod)}`}
+                    data-recorrido="cobrar"
                   >
                     {isProcessing ? "Procesando…" : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)}`}
                   </Button>
