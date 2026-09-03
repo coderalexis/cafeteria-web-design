@@ -13,6 +13,7 @@ import {
   Cloud,
   Coffee,
   Hand,
+  GraduationCap,
   Keyboard,
   Lock,
   PauseCircle,
@@ -152,7 +153,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Coffee,
       titulo: "Abrir el turno y vender",
       palabras:
-        "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir cantidad para llevar mas opciones descuento",
+        "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir cantidad para llevar mas opciones descuento extras leche opcion por omision aviso celular",
       href: "/pos",
       nodo: (
         <>
@@ -187,7 +188,10 @@ export function AyudaClient({ ticket, corte }: Props) {
               Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, tócala antes de cobrar.
               Pulsa <strong>Cobrar</strong>: aparece el ticket registrado con su <strong>folio</strong>; desde ahí
               imprimes el <strong>Ticket</strong> para el cliente y la <strong>Comanda</strong> (sin precios) para quien
-              prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp — útil si no hay impresora.
+              prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp — útil si no hay impresora. En{" "}
+              <strong>celular</strong>, si no imprimes en automático ni usas la nota QR, en vez del ticket sale un{" "}
+              <strong>aviso</strong> con folio, monto, método y cambio, y sigues vendiendo; <strong>Ver ticket</strong>{" "}
+              lo abre si lo necesitas.
             </Step>
             <Step n={5} title="Atajos del carrito">
               Tocando las <strong>opciones</strong> de una línea (el renglón «+ leche de avena») las cambias sin
@@ -202,6 +206,37 @@ export function AyudaClient({ ticket, corte }: Props) {
           </ol>
           <TicketImpreso lineas={ticket} titulo="Un ticket de este sistema, tal cual sale de la impresora" />
         </>
+      ),
+    },
+    {
+      id: "practica",
+      grupo: "cajero",
+      icon: GraduationCap,
+      titulo: "Practicar sin registrar (modo práctica)",
+      palabras: "practica practicar ensayar aprender probar sin registrar sin miedo modo practica franja violeta",
+      href: "/pos",
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            Para aprender el POS tocando, sin miedo a ensuciar las ventas reales: menú <strong>⋮</strong> →{" "}
+            <strong>Practicar sin registrar</strong> (en celular, también desde el botón <strong>Practicar</strong> de
+            la tarjeta de la primera vez). Solo entra con el carrito vacío y sin una cuenta abierta.
+          </li>
+          <li>
+            Mientras dura, una <strong>franja violeta</strong> arriba dice «Modo práctica. Nada se registra». Puedes
+            armar pedidos y <strong>cobrar sin abrir la caja</strong>; cada cobro responde con el mismo aviso que una
+            venta real, marcado como práctica.
+          </li>
+          <li>
+            <strong>Nada viaja al servidor</strong>: ni ticket, ni folio, ni cola sin internet, ni sellos de lealtad;
+            las cuentas abiertas se ocultan mientras practicas. El total del día no se mueve.
+          </li>
+          <li>
+            Sales con <strong>Salir</strong> en la franja (o desde ⋮). Al salir el carrito se vacía, para que lo que
+            armaste practicando no pueda cobrarse de verdad un toque después. Si recargas la página, el modo práctica
+            se apaga solo.
+          </li>
+        </ul>
       ),
     },
     {
@@ -623,9 +658,14 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Smartphone,
       titulo: "En tablet o celular",
       palabras:
-        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa",
+        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket",
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>La primera vez en un celular</strong> aparece una tarjeta con los dos pasos de una venta (toca el
+            producto, toca Cobrar) y tres botones: <strong>Practicar sin registrar</strong>, <strong>Ver la guía</strong>{" "}
+            y <strong>Entendido</strong>. Se va con un toque y no vuelve a salir en ese aparato.
+          </li>
           <li>
             En celular el carrito vive en la <strong>barra inferior</strong>, partida en dos: la izquierda muestra los
             artículos (y anuncia lo recién agregado: «+ Latte · Grande $50», con una vibración) y la derecha es{" "}
@@ -635,7 +675,9 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             <strong>Ejemplo completo en celular</strong>: toca Espresso → toca Chico → el punto vuela al carrito y la
             barra dice qué entró → toca <strong>Cobrar</strong>. Dos artículos en efectivo exacto son{" "}
-            <strong>tres toques</strong>.
+            <strong>tres toques</strong>. Al cobrar no se abre el ticket: sale un <strong>aviso</strong> con el folio,
+            el monto y el cambio, y ya puedes seguir con el siguiente cliente (<strong>Ver ticket</strong> lo abre si
+            hace falta). Si tu café imprime en automático o usa la nota QR, el ticket sí aparece, como en tablet.
           </li>
           <li>
             Al abrir el carrito queda una <strong>rendija</strong> arriba: tócala para minimizarlo (también está la{" "}
@@ -644,13 +686,15 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             En cualquier tamaño, a la vista arriba queda solo el <strong>estado de la caja</strong>; lo demás (Tickets,
-            Administrar, tamaño de letra, atajos, Mi cuenta, cerrar sesión) está en el menú <strong>⋮</strong> de la
-            derecha. Así el encabezado no le tapa el nombre ni el total del día.
+            Últimos pedidos, Por preparar, tamaño de letra, atajos, <strong>Practicar sin registrar</strong>, Instalar
+            como app, Administrar, Mi cuenta, cerrar sesión) está en el menú <strong>⋮</strong> de la derecha. Así el
+            encabezado no le tapa el nombre ni el total del día.
           </li>
           <li>
-            <strong>Instalar como app</strong>: en Chrome/Android o Safari/iPad abre el sitio y elige{" "}
-            <em>Agregar a pantalla de inicio</em>. Se abre a pantalla completa con su propio ícono. Sigue necesitando
-            internet.
+            <strong>Instalar como app</strong>: abre a pantalla completa con su propio ícono, sin barra de direcciones.
+            En Android/Chrome el POS te lo ofrece solo (en la tarjeta de la primera vez y en <strong>⋮ → Instalar como
+            app</strong>). En iPhone o iPad: <strong>Compartir → Agregar a pantalla de inicio</strong>. Sigue
+            necesitando internet.
           </li>
         </ul>
       ),
@@ -886,7 +930,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: SlidersHorizontal,
       titulo: "Opciones y extras (al vender)",
       palabras:
-        "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas productos vincular asignar en que productos va no aparece en el pos",
+        "leche extras opciones grupos modificadores minimo maximo precio adicional obligatorio elegir cuantas productos vincular asignar opcion por omision deslactosada preguntar al tocar solo obligatorios en que productos va no aparece en el pos",
       href: "/admin/modificadores",
       nodo: (
         <>
@@ -964,6 +1008,29 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               Una opción usada en ventas no se puede borrar, para no romper tickets viejos:{" "}
               <strong>desactívala</strong> y deja de aparecer en el POS.
+            </li>
+          </ul>
+
+          <p className="mt-4 text-sm font-medium text-stone-700">Cuándo se pregunta, y qué se propone solo</p>
+          <ul className="mt-2 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Opción por omisión</strong>: cada grupo puede traer una opción ya marcada. Si casi todos tus
+              clientes piden leche deslactosada, márcala como «Opción por omisión» en el grupo «Tipo de leche»: la hoja
+              de extras se abre con ella puesta y basta confirmar; el cajero la cambia cuando alguien pida otra. Si la
+              opción cuesta extra, se cobra. <strong>Ninguna</strong> vuelve a elegir en cada venta.
+            </li>
+            <li>
+              <strong>Cuándo preguntar</strong>: en <strong>Negocio → Módulos del POS → «Extras al tocar un
+              producto»</strong> eliges entre <em>preguntar al tocar el producto</em> (lo normal: la leche se pregunta
+              cuando el cliente pide, no al final) y <em>preguntar solo si hay que elegir uno</em>, para el café donde
+              casi nadie cambia nada: el producto entra al carrito de un toque, con su opción por omisión si la tiene,
+              y los extras opcionales se ponen desde <strong>cambiar</strong> en la línea. Los grupos obligatorios se
+              preguntan siempre.
+            </li>
+            <li>
+              <strong>Engancha cada grupo solo donde de verdad aplica.</strong> «Tipo de leche» va en lattes,
+              capuchinos, chai o matcha; no en un té, un americano o una soda. Cada producto de más es una pregunta
+              inútil en cada venta, y es la razón número uno de que «el celular se sienta más lento que la libreta».
             </li>
           </ul>
         </>
@@ -1053,9 +1120,10 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
               <strong>Cuentas abiertas</strong>; define cuántas <strong>mesas</strong> tienes y qué otros botones
-              salen al abrir una cuenta; ajusta cada cuánto se actualiza <strong>«Por preparar»</strong>; y pone el{" "}
-              <strong>descuento máximo en caja</strong> (dueños y administradores no tienen tope). Ese límite se
-              aplica en el servidor, no solo en la pantalla.
+              salen al abrir una cuenta; decide cuándo se preguntan los <strong>extras</strong> al tocar un producto
+              (al tocarlo, o solo si hay que elegir uno); ajusta cada cuánto se actualiza{" "}
+              <strong>«Por preparar»</strong>; y pone el <strong>descuento máximo en caja</strong> (dueños y
+              administradores no tienen tope). Ese límite se aplica en el servidor, no solo en la pantalla.
             </li>
             <li>
               <strong>Impresión al cobrar</strong>: elige qué imprimir en automático al registrar cada venta (ticket,
@@ -1455,7 +1523,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 print:hidden">
               {visibles.length === 0
                 ? `Nada sobre «${busqueda.trim()}». Intenta con otra palabra (p. ej. propina, corte, QR).`
-                : `${visibles.length} sección${visibles.length === 1 ? "" : "es"} sobre «${busqueda.trim()}»:`}
+                : `${visibles.length} ${visibles.length === 1 ? "sección" : "secciones"} sobre «${busqueda.trim()}»:`}
             </p>
           )}
 
