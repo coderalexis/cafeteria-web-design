@@ -24,6 +24,12 @@ export interface ModifierGroup {
   minSelect: number
   maxSelect: number | null
   options: ModifierOption[]
+  /**
+   * Opción que la pantalla propone sola: marcada al abrir la hoja, o puesta
+   * sin preguntar cuando la hoja no se abre. Siempre es una de `options`
+   * (la base lo garantiza y el POS lo vuelve a comprobar al cargar).
+   */
+  defaultOptionId?: string | null
 }
 
 export interface Product {
@@ -311,4 +317,20 @@ export function needsModifierPrompt(product: Product, mode: "required" | "always
   if (groups.length === 0) return false
   if (mode === "always") return true
   return groups.some((g) => g.minSelect > 0)
+}
+
+/**
+ * Los extras que el producto trae «de fábrica»: la opción por omisión de cada
+ * grupo que la tenga. Es lo que se marca al abrir la hoja y lo que lleva la
+ * línea cuando la hoja no se abre («¿su leche? deslactosada, siempre»).
+ * Una opción por omisión que ya no esté entre las opciones vivas se ignora.
+ */
+export function defaultModifiers(product: Product): ModifierOption[] {
+  const out: ModifierOption[] = []
+  for (const g of product.modifierGroups ?? []) {
+    if (!g.defaultOptionId) continue
+    const opt = g.options.find((o) => o.id === g.defaultOptionId)
+    if (opt) out.push(opt)
+  }
+  return out
 }

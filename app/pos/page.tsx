@@ -73,7 +73,7 @@ export default async function POSPage() {
          menu_variants(id, name, size_label, price, sort_order, is_active),
          product_modifier_groups(
            modifier_groups(id, name, min_select, max_select, is_required, sort_order, is_active,
-             modifiers(id, name, price_delta, sort_order, is_active))
+             modifiers(id, name, price_delta, sort_order, is_active, is_default))
          )`
       )
       .eq("is_active", true)
@@ -165,11 +165,20 @@ export default async function POSPage() {
         options: [...(g.modifiers ?? [])]
           .filter((m) => m.is_active)
           .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-          .map((m) => ({ id: m.id, name: m.name, priceDelta: m.price_delta })),
+          .map((m) => ({ id: m.id, name: m.name, priceDelta: m.price_delta, isDefault: m.is_default })),
       }))
       .filter((g) => g.options.length > 0)
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((g) => ({ id: g.id, name: g.name, minSelect: g.minSelect, maxSelect: g.maxSelect, options: g.options }))
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        minSelect: g.minSelect,
+        maxSelect: g.maxSelect,
+        options: g.options.map(({ id, name, priceDelta }) => ({ id, name, priceDelta })),
+        // La opción marcada «por omisión» en Menú → Modificadores. Solo entre
+        // las vivas: una desactivada no se propone.
+        defaultOptionId: g.options.find((o) => o.isDefault)?.id ?? null,
+      }))
 
     const base = {
       id: p.id,

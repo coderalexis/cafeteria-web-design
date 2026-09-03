@@ -42,8 +42,24 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
   // Al abrir: en blanco para un producto nuevo, o sembrada con lo ya elegido
   // cuando se edita una línea del carrito.
   useEffect(() => {
-    if (!pending?.initial?.length) {
+    if (!pending) {
       setSelection({})
+      return
+    }
+    if (!pending.initial?.length) {
+      // Producto nuevo: nace con la opción por omisión de cada grupo ya
+      // marcada («deslactosada, siempre»), lista para confirmar de un toque.
+      // Al corregir una línea que quedó sin extras no se vuelve a proponer:
+      // quitarla fue una decisión.
+      const semilla: Selection = {}
+      if (!pending.editing) {
+        for (const g of pending.product.modifierGroups ?? []) {
+          if (g.defaultOptionId && g.options.some((o) => o.id === g.defaultOptionId)) {
+            semilla[g.id] = [g.defaultOptionId]
+          }
+        }
+      }
+      setSelection(semilla)
       return
     }
     const semilla: Selection = {}

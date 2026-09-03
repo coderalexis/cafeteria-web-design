@@ -28,6 +28,8 @@ export interface ModifierGroupRecord {
   maxSelect: number | null
   isRequired: boolean
   isActive: boolean
+  /** Opción que el POS propone sola (null = ninguna). */
+  defaultOptionId: string | null
   options: Array<{ id: string; name: string; priceDelta: number; isActive: boolean }>
   products: Array<{ id: string; name: string }>
 }
@@ -125,6 +127,33 @@ export default function ModificadoresClient({
                 optionCount={g.options.filter((o) => o.isActive).length}
                 compact
               />
+              {/* «Que no se pregunte porque siempre será deslactosado»: la
+                  opción que el POS marca sola al abrir la hoja, o que pone sin
+                  preguntar cuando la cafetería eligió «solo obligatorios». */}
+              <div className="space-y-1.5">
+                <label htmlFor={`omision-${g.id}`} className="text-xs font-medium text-stone-500">
+                  Opción por omisión
+                </label>
+                <select
+                  id={`omision-${g.id}`}
+                  name="default_modifier_id"
+                  defaultValue={g.defaultOptionId ?? ""}
+                  className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                >
+                  <option value="">Ninguna: se elige en cada venta</option>
+                  {g.options
+                    .filter((o) => o.isActive)
+                    .map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                        {o.priceDelta > 0 ? ` (+${formatCurrency(o.priceDelta)})` : ""}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-stone-400">
+                  Sale ya marcada al vender; si tiene costo extra, se cobra. El cajero la puede cambiar en cada venta.
+                </p>
+              </div>
               <div className="sm:col-span-2">
                 <Button type="submit" variant="secondary" size="sm">
                   Guardar cambios

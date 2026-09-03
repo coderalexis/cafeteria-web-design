@@ -86,6 +86,32 @@ export async function updateModifierGroup(formData: FormData): Promise<ActionRes
     .eq("id", id)
   if (error) return { error: dbErrorMessage(error) }
 
+  // Opción por omisión: vive en la opción (modifiers.is_default; el trigger
+  // desmarca a las hermanas, así que marcar es UNA sentencia). Vacío =
+  // ninguna. El filtro por group_id es lo que impide colar una opción ajena:
+  // si no es de este grupo, no hay fila que marcar.
+  const defaultRaw = String(formData.get("default_modifier_id") ?? "").trim()
+  if (defaultRaw) {
+    if (!z.uuid().safeParse(defaultRaw).success) return { error: "Opción por omisión inválida." }
+    const { data: marcada, error: e2 } = await supabase
+      .from("modifiers")
+      .update({ is_default: true })
+      .eq("id", defaultRaw)
+      .eq("group_id", id)
+      .select("id")
+    if (e2) return { error: dbErrorMessage(e2) }
+    if (!marcada || marcada.length === 0) {
+      return { error: "La opción por omisión tiene que ser una de las de este grupo." }
+    }
+  } else {
+    const { error: e3 } = await supabase
+      .from("modifiers")
+      .update({ is_default: false })
+      .eq("group_id", id)
+      .eq("is_default", true)
+    if (e3) return { error: dbErrorMessage(e3) }
+  }
+
   await logAudit("grupo.editado", g.name)
   revalidateAll()
   return { success: true }

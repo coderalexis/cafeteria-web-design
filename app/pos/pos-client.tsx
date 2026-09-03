@@ -88,6 +88,7 @@ import {
   cartItemCount,
   cartSubtotal,
   computeDiscount,
+  defaultModifiers,
   findVariant,
   rehydrateCart,
   serializeCart,
@@ -980,7 +981,9 @@ export default function POSClient({
       if (needsModifierPrompt(product, modifiersPrompt)) {
         setPendingModifiers({ product, size })
       } else {
-        addLine(product, size)
+        // Sin hoja, la línea nace con las opciones por omisión de sus grupos
+        // («deslactosada, siempre»); se cambian desde la línea si hace falta.
+        addLine(product, size, defaultModifiers(product))
         vibra(12)
       }
     },
