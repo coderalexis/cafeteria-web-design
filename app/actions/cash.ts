@@ -64,6 +64,10 @@ export async function openCashSession(
 const closeSchema = z.object({
   countedCash: moneySchema,
   notes: notesSchema,
+  /** Conteo por denominación (P27): el servidor exige que sume lo contado. */
+  countDetail: z.array(z.object({ value: z.number().positive(), qty: z.number().int().nonnegative() })).max(20).optional(),
+  /** Lo que se deja en el cajón para el siguiente turno (P27). */
+  nextFloat: moneySchema.optional(),
   expectedBusinessId: expectedBusinessSchema,
 })
 
@@ -84,6 +88,8 @@ export async function closeCashSession(
   const { data, error } = await supabase.rpc("close_cash_session", {
     p_counted_cash: parsed.data.countedCash,
     p_notes: parsed.data.notes || undefined,
+    p_count_detail: parsed.data.countDetail,
+    p_next_float: parsed.data.nextFloat,
   })
 
   if (error) {

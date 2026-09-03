@@ -146,6 +146,8 @@ interface POSClientProps {
   cardFeePct: number
   initialTotalSales: number
   openSession: OpenSession | null
+  /** Lo que se dejó de fondo en el último corte (P27): se sugiere al abrir caja. */
+  suggestedFloat: number | null
 }
 
 export default function POSClient({
@@ -171,6 +173,7 @@ export default function POSClient({
   cardFeePct,
   initialTotalSales,
   openSession,
+  suggestedFloat,
 }: POSClientProps) {
   const appCtx = useAppContext()
   const businessName = appCtx.business?.name ?? "Cafecito POS"
@@ -1462,6 +1465,7 @@ export default function POSClient({
         open={showCashDialog}
         onOpenChange={setShowCashDialog}
         session={openSession}
+        suggestedFloat={suggestedFloat}
         parkedCount={parkedEnabled ? cuentasVisibles.length : 0}
         parkedOld={parkedEnabled ? cuentasViejas : []}
         cardFeePct={cardFeePct}

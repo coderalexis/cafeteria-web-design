@@ -92,6 +92,17 @@ export default async function POSPage() {
 
   const session = barrido.session
 
+  // Lo que se dejó de fondo en el último corte: se sugiere al abrir caja (P27).
+  const { data: ultimoCorte } = await supabase
+    .from("cash_sessions")
+    .select("next_float")
+    .eq("business_id", businessId)
+    .eq("status", "cerrada")
+    .not("next_float", "is", null)
+    .order("closed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   /* ── Transform categories ───────────────────────────────────────── */
   const categories = [
     { id: "todos", label: "Todos", color: null as string | null },
@@ -236,6 +247,7 @@ export default async function POSPage() {
           ? { id: session.id, openedAt: session.opened_at, openingFloat: session.opening_float }
           : null
       }
+      suggestedFloat={ultimoCorte?.next_float ?? null}
     />
   )
 }

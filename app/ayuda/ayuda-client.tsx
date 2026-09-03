@@ -682,7 +682,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Lock,
       titulo: "Cerrar el turno (corte de caja)",
       palabras:
-        "corte cierre cerrar cierro efectivo dinero caja esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre",
+        "corte cierre cerrar cierro efectivo dinero caja esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre billetes monedas denominacion contar contado fondo siguiente turno retiro me llevo",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Cortes en el panel", href: "/admin/cortes", admin: true }, { etiqueta: "Hora de cierre", href: "/admin/negocio#cierre", admin: true }],
       nodo: (
         <>
@@ -697,12 +697,19 @@ export function AyudaClient({ ticket, corte }: Props) {
               compra de leche), con monto y motivo. Hazlo en el momento: así el corte cuadra y queda quién y cuándo. Un
               movimiento no se borra; si te equivocas, registra el contrario.
             </Step>
-            <Step n={3} title="Cuenta el efectivo y escríbelo">
-              El sistema marca la diferencia al momento: <em>cuadró</em>, <em>sobrante</em> o <em>faltante</em>. Puedes
-              agregar una nota de cierre.
+            <Step n={3} title="Cuenta billete por billete">
+              Escribe cuántos hay de cada billete y moneda y el total sale solo (si ya lo sumaste, elige{" "}
+              <strong>Escribir el total</strong>). El sistema te dice al momento si <em>cuadra</em>, si <em>sobra</em> o
+              si <em>falta</em>, y qué revisar antes de cerrar: casi siempre es una salida de efectivo sin registrar. Si
+              no encuentras la razón, anótala y cierra; la diferencia queda guardada.
             </Step>
-            <Step n={4} title="Cerrar e imprimir">
-              Imprime el corte para tu archivo. Quedan guardados en el panel (Cortes de caja) y se pueden reimprimir.
+            <Step n={4} title="Di cuánto dejas de fondo">
+              Lo que se queda en el cajón para el siguiente turno (por omisión, lo mismo con lo que abriste hoy); el
+              resto es lo que te llevas. Al abrir la caja siguiente, ese fondo ya viene sugerido.
+            </Step>
+            <Step n={5} title="Cerrar e imprimir">
+              El corte impreso trae el conteo («3 × $500») y el fondo que quedó. Quedan guardados en el panel (Cortes de
+              caja) y se pueden reimprimir.
             </Step>
           </ol>
           <DemoDiferencia />

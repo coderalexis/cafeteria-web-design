@@ -39,6 +39,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
   { titulo: "Ventas y tickets", donde: "Ventas", href: "/admin/ventas", palabras: "ventas tickets folio buscar folio cancelar cancelacion reimprimir csv exportar excel reporte por dia por hora por cajero periodo fechas" },
   { titulo: "Exportar ventas (CSV)", donde: "Ventas", href: "/admin/ventas", palabras: "csv excel exportar descargar hoja de calculo" },
   { titulo: "Cortes de caja", donde: "Cortes de caja", href: "/admin/cortes", palabras: "corte cortes caja turno arqueo diferencia faltante sobrante efectivo esperado cerrar caja abrir caja fondo" },
+  { titulo: "Cerrar caja contando billetes y dejar fondo", donde: "POS → Caja abierta → Cerrar caja", href: "/pos", palabras: "contar billetes monedas denominacion conteo corte fondo siguiente turno retiro cuadra falta sobra me llevo" },
   { titulo: "Por cobrar (fiados)", donde: "Por cobrar", href: "/admin/por-cobrar", palabras: "fiado fiados por cobrar deben deuda cuenta pendiente cobrar despues perdonar" },
   { titulo: "Gastos del mes", donde: "Gastos y utilidad", href: "/admin/gastos#variables", palabras: "gasto gastos compras reparaciones capturar gasto proveedores insumos" },
   { titulo: "Gastos fijos (renta, luz, sueldos)", donde: "Gastos y utilidad", href: "/admin/gastos#fijos", palabras: "renta luz agua internet sueldos nomina fijos cada mes lo mismo" },

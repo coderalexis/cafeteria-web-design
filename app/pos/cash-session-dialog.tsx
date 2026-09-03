@@ -18,6 +18,17 @@ import {
 import { addCashMovement, closeCashSession, getCashSessionSummary, openCashSession } from "@/app/actions/cash"
 import { formatCurrency, formatTime, paymentLabel } from "@/lib/format"
 import { buildCorteLines, printLines, receiptBusinessFrom, type CashSessionSummary } from "@/lib/receipt"
+import {
+  DENOMINACIONES,
+  conteoVacio,
+  detalleConteo,
+  explicarDiferencia,
+  hayConteo,
+  retiro,
+  totalConteo,
+  validarFondo,
+  type Conteo,
+} from "@/lib/conteo-caja"
 import { useBusiness } from "@/components/business-provider"
 
 export interface OpenSession {
@@ -30,6 +41,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   session: OpenSession | null
+  /** Lo que se dejó de fondo en el último corte: se sugiere al abrir (P27). */
+  suggestedFloat?: number | null
   /** Cuentas abiertas sin cobrar, solo para avisar al cerrar. */
   parkedCount?: number
   /**
@@ -51,14 +64,14 @@ function parseMoney(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
-export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0, parkedOld = [], cardFeePct = 0, pendingUploads = 0 }: Props) {
+export function CashSessionDialog({ open, onOpenChange, session, suggestedFloat = null, parkedCount = 0, parkedOld = [], cardFeePct = 0, pendingUploads = 0 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         {session ? (
           <CloseSessionForm session={session} parkedCount={parkedCount} parkedOld={parkedOld} cardFeePct={cardFeePct} pendingUploads={pendingUploads} onDone={() => onOpenChange(false)} />
         ) : (
-          <OpenSessionForm onDone={() => onOpenChange(false)} />
+          <OpenSessionForm onDone={() => onOpenChange(false)} suggestedFloat={suggestedFloat} />
         )}
       </DialogContent>
     </Dialog>
@@ -68,10 +81,11 @@ export function CashSessionDialog({ open, onOpenChange, session, parkedCount = 0
 /* ------------------------------------------------------------------ */
 /*  Abrir caja                                                         */
 /* ------------------------------------------------------------------ */
-function OpenSessionForm({ onDone }: { onDone: () => void }) {
+function OpenSessionForm({ onDone, suggestedFloat }: { onDone: () => void; suggestedFloat: number | null }) {
   const router = useRouter()
   const business = useBusiness()
-  const [floatValue, setFloatValue] = useState("")
+  // Arranca con lo que se dejó anoche: casi siempre es exactamente eso.
+  const [floatValue, setFloatValue] = useState(suggestedFloat != null ? String(suggestedFloat) : "")
   const [notes, setNotes] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -138,6 +152,12 @@ function OpenSessionForm({ onDone }: { onDone: () => void }) {
           </div>
         </div>
 
+        {suggestedFloat != null && (
+          <p className="text-xs text-stone-500" data-fondo-sugerido>
+            Sugerido: {formatCurrency(suggestedFloat)}, lo que se dejó de fondo en el último corte.
+          </p>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="opening-notes">Nota (opcional)</Label>
           <Input
@@ -184,6 +204,19 @@ function CloseSessionForm({
   const [summary, setSummary] = useState<CashSessionSummary | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [countedValue, setCountedValue] = useState("")
+  // ── Contar billete por billete ──
+  // El número «efectivo contado» sale de contar, no de adivinar: por omisión
+  // se cuenta por denominación y el total se arma solo; «Escribir el total»
+  // queda para quien ya lo sumó.
+  const [modoConteo, setModoConteo] = useState<"contar" | "total">("contar")
+  const [conteo, setConteo] = useState<Conteo>(conteoVacio)
+  const ajustarConteo = (key: string, delta: number) =>
+    setConteo((c) => ({ ...c, [key]: Math.max(0, (c[key] ?? 0) + delta) }))
+  const fijarConteo = (key: string, valor: string) =>
+    setConteo((c) => ({ ...c, [key]: Math.max(0, Math.floor(Number(valor) || 0)) }))
+  // Lo que se deja de fondo para el siguiente turno: por omisión, lo mismo
+  // con lo que abrió hoy.
+  const [fondoValue, setFondoValue] = useState(String(session.openingFloat))
   const [notes, setNotes] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Movimiento de efectivo en captura
@@ -216,8 +249,15 @@ function CloseSessionForm({
   // físicamente en la caja: cuentan para el esperado (igual que en el RPC).
   const cashTips = summary?.cash_tips ?? 0
   const expected = summary ? summary.opening_float + summary.cash_sales + cashTips + movIn - movOut : null
-  const counted = parseMoney(countedValue)
-  const difference = expected !== null && counted !== null ? counted - expected : null
+  const counted = modoConteo === "contar" ? (hayConteo(conteo) ? totalConteo(conteo) : null) : parseMoney(countedValue)
+  const fondo = fondoValue.trim() === "" ? null : parseMoney(fondoValue)
+  const fondoInvalido = fondoValue.trim() !== "" && fondo === null
+  const errorFondo = fondoInvalido
+    ? "Escribe un monto válido o déjalo vacío."
+    : counted !== null
+      ? validarFondo(fondo, counted)
+      : null
+  const explicacion = expected !== null && counted !== null ? explicarDiferencia(expected, counted) : null
 
   const movementAmountNum = parseMoney(movementAmount)
   const canSaveMovement =
@@ -247,9 +287,12 @@ function CloseSessionForm({
   const submit = async (print: boolean) => {
     if (counted === null || isSubmitting) return
     setIsSubmitting(true)
+    if (errorFondo) return
     const result = await closeCashSession({
       countedCash: counted,
       notes: notes.trim() || undefined,
+      countDetail: modoConteo === "contar" ? detalleConteo(conteo) : undefined,
+      nextFloat: fondo ?? undefined,
       expectedBusinessId: business.id,
     })
     setIsSubmitting(false)
@@ -498,52 +541,133 @@ function CloseSessionForm({
             </div>
           )}
 
-          {/* Conteo */}
-          <div className="space-y-2">
-            <Label htmlFor="counted-cash">Efectivo contado en caja</Label>
-            <div className="flex gap-2">
-              <Input
-                id="counted-cash"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={countedValue}
-                onChange={(e) => setCountedValue(e.target.value)}
-                className="text-lg font-semibold h-11"
-                autoFocus
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 shrink-0"
-                onClick={() => setCountedValue(String(expected ?? 0))}
-              >
-                = Esperado
-              </Button>
+          {/* 1 · Contar. Por omisión billete por billete: el total se arma
+              solo y queda guardado con el corte, que es lo que permite
+              explicar una diferencia después. «Escribir el total» queda para
+              quien ya lo sumó. */}
+          <div className="space-y-2" data-corte-paso="1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-sm font-bold text-stone-800">1 · Cuenta lo que hay en la caja</Label>
+              <div className="flex rounded-lg border border-stone-200 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setModoConteo("contar")}
+                  className={`rounded-md px-2.5 py-1 font-semibold ${modoConteo === "contar" ? "bg-stone-800 text-white" : "text-stone-500 hover:bg-stone-100"}`}
+                >
+                  Billete por billete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoConteo("total")}
+                  className={`rounded-md px-2.5 py-1 font-semibold ${modoConteo === "total" ? "bg-stone-800 text-white" : "text-stone-500 hover:bg-stone-100"}`}
+                >
+                  Escribir el total
+                </button>
+              </div>
             </div>
-            {difference !== null && (
-              <p
-                className={`text-sm font-semibold rounded-md px-3 py-2 ${
-                  difference === 0
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : difference > 0
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
-                }`}
-              >
-                {difference === 0
-                  ? "Cuadra exacto"
-                  : difference > 0
-                  ? `Sobrante: ${formatCurrency(difference)}`
-                  : `Faltante: ${formatCurrency(-difference)}`}
-              </p>
+            {modoConteo === "contar" ? (
+              <div className="rounded-lg border border-stone-200 bg-white">
+                <p className="px-3 pt-2 text-xs text-stone-500">Escribe cuántos hay de cada uno; el total sale solo.</p>
+                <div className="px-3 py-2">
+                  {(["billete", "moneda"] as const).map((tipo) => (
+                    <div key={tipo}>
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                        {tipo === "billete" ? "Billetes" : "Monedas"}
+                      </p>
+                      {DENOMINACIONES.filter((d) => d.tipo === tipo).map((d) => {
+                        const qty = conteo[d.key] ?? 0
+                        return (
+                          <div key={d.key} className="flex items-center gap-2 py-1">
+                            <span className="w-20 shrink-0 text-sm font-semibold text-stone-700">{formatCurrency(d.valor)}</span>
+                            <button
+                              type="button"
+                              aria-label={`Un ${d.tipo} de ${formatCurrency(d.valor)} menos`}
+                              onClick={() => ajustarConteo(d.key, -1)}
+                              disabled={qty === 0}
+                              className="h-8 w-8 shrink-0 rounded-md border border-stone-200 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+                            >
+                              −
+                            </button>
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min="0"
+                              step="1"
+                              placeholder="0"
+                              value={qty === 0 ? "" : String(qty)}
+                              onChange={(e) => fijarConteo(d.key, e.target.value)}
+                              aria-label={`Cuántos de ${formatCurrency(d.valor)} (${d.tipo})`}
+                              className="h-8 w-16 text-center text-sm font-semibold"
+                            />
+                            <button
+                              type="button"
+                              aria-label={`Un ${d.tipo} de ${formatCurrency(d.valor)} más`}
+                              onClick={() => ajustarConteo(d.key, 1)}
+                              className="h-8 w-8 shrink-0 rounded-md border border-stone-200 text-stone-600 hover:bg-stone-100"
+                            >
+                              +
+                            </button>
+                            <span className="ml-auto text-sm tabular-nums text-stone-500">{qty > 0 ? formatCurrency(qty * d.valor) : ""}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between border-t border-stone-200 px-3 py-2">
+                  <span className="text-sm font-medium text-stone-600">Total contado</span>
+                  <span className="text-xl font-bold text-stone-900" data-corte-total>
+                    {formatCurrency(counted ?? 0)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  id="counted-cash"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={countedValue}
+                  onChange={(e) => setCountedValue(e.target.value)}
+                  className="text-lg font-semibold h-11"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 shrink-0"
+                  onClick={() => setCountedValue(String(expected ?? 0))}
+                >
+                  = Esperado
+                </Button>
+              </div>
             )}
           </div>
 
+          {/* 2 · ¿Cuadra? En palabras, y con qué revisar antes de cerrar. */}
+          {explicacion && (
+            <div
+              data-corte-paso="2"
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                explicacion.tono === "ok"
+                  ? "border-green-200 bg-green-50 text-green-800"
+                  : explicacion.tono === "sobra"
+                    ? "border-blue-200 bg-blue-50 text-blue-800"
+                    : "border-red-200 bg-red-50 text-red-800"
+              }`}
+            >
+              <p className="font-bold">2 · {explicacion.titulo}</p>
+              <p className="mt-0.5 text-xs opacity-90">{explicacion.texto}</p>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="closing-notes">Nota de cierre (opcional)</Label>
+            <Label htmlFor="closing-notes">
+              {explicacion && explicacion.tono !== "ok" ? "¿Sabes por qué? Anótalo (opcional)" : "Nota de cierre (opcional)"}
+            </Label>
             <Input
               id="closing-notes"
               placeholder="ej. Faltó cambio de $50 que se prestó"
@@ -552,6 +676,49 @@ function CloseSessionForm({
               maxLength={300}
             />
           </div>
+
+          {/* 3 · El fondo de mañana sale de lo contado; lo demás se retira.
+              Guardarlo hace que la apertura siguiente ya lo sugiera. */}
+          {counted !== null && (
+            <div className="space-y-2" data-corte-paso="3">
+              <Label htmlFor="next-float" className="text-sm font-bold text-stone-800">
+                3 · ¿Cuánto dejas de fondo para el siguiente turno?
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="next-float"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={fondoValue}
+                  onChange={(e) => setFondoValue(e.target.value)}
+                  className={`h-11 text-lg font-semibold ${errorFondo ? "border-red-400" : ""}`}
+                />
+                <Button type="button" variant="outline" className="h-11 shrink-0" onClick={() => setFondoValue(String(session.openingFloat))}>
+                  Lo de hoy
+                </Button>
+                <Button type="button" variant="outline" className="h-11 shrink-0" onClick={() => setFondoValue("0")}>
+                  Nada
+                </Button>
+              </div>
+              {errorFondo ? (
+                <p className="text-sm text-red-600">{errorFondo}</p>
+              ) : (
+                <p className="text-sm text-stone-600" data-corte-retiro>
+                  {fondo === null ? (
+                    "Si lo dejas vacío, no se guarda cuánto quedó."
+                  ) : (
+                    <>
+                      Te llevas <strong>{formatCurrency(retiro(counted, fondo) ?? 0)}</strong> y en el cajón quedan{" "}
+                      {formatCurrency(fondo)} para empezar el siguiente turno.
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Con ventas sin subir el corte se BLOQUEA: si se cerrara ahora,
               esas ventas caerían en el turno siguiente y este corte quedaría
@@ -573,14 +740,14 @@ function CloseSessionForm({
             <Button
               variant="outline"
               className="flex-1 h-11"
-              disabled={counted === null || isSubmitting || pendingUploads > 0}
+              disabled={counted === null || errorFondo !== null || isSubmitting || pendingUploads > 0}
               onClick={() => submit(false)}
             >
               Cerrar sin imprimir
             </Button>
             <Button
               className="flex-1 h-11 bg-red-600 hover:bg-red-700 text-white gap-2"
-              disabled={counted === null || isSubmitting || pendingUploads > 0}
+              disabled={counted === null || errorFondo !== null || isSubmitting || pendingUploads > 0}
               onClick={() => submit(true)}
             >
               <Printer className="h-4 w-4" />

@@ -317,10 +317,12 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           closing_notes: string | null
+          count_detail: Json | null
           counted_cash: number | null
           difference: number | null
           expected_cash: number | null
           id: string
+          next_float: number | null
           opened_at: string
           opened_by: string
           opening_float: number
@@ -333,10 +335,12 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closing_notes?: string | null
+          count_detail?: Json | null
           counted_cash?: number | null
           difference?: number | null
           expected_cash?: number | null
           id?: string
+          next_float?: number | null
           opened_at?: string
           opened_by: string
           opening_float: number
@@ -349,10 +353,12 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closing_notes?: string | null
+          count_detail?: Json | null
           counted_cash?: number | null
           difference?: number | null
           expected_cash?: number | null
           id?: string
+          next_float?: number | null
           opened_at?: string
           opened_by?: string
           opening_float?: number
@@ -1342,7 +1348,7 @@ export type Database = {
         Returns: Json
       }
       close_cash_session: {
-        Args: { p_counted_cash: number; p_notes?: string }
+        Args: { p_count_detail?: Json; p_counted_cash: number; p_next_float?: number; p_notes?: string }
         Returns: Json
       }
       create_product_guided: { Args: { p: Json }; Returns: Json }

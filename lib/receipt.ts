@@ -358,6 +358,10 @@ export interface CashSessionSummary {
   expected_cash: number | null
   counted_cash: number | null
   difference: number | null
+  /** Conteo por denominación al cerrar (P27); nulo si se escribió el total. */
+  count_detail?: Array<{ value: number; qty: number }> | null
+  /** Lo que se dejó en el cajón como fondo del siguiente turno (P27). */
+  next_float?: number | null
   tickets_count: number
   revenue: number
   cash_sales: number
@@ -433,6 +437,16 @@ export function buildCorteLines(s: CashSessionSummary, biz: ReceiptBusiness): st
     const diff = s.difference ?? 0
     const sign = diff > 0 ? "+" : ""
     lines.push(row("Diferencia", `${sign}${formatCurrency(diff)}`))
+  }
+  // El conteo billete por billete y el fondo que quedó: es lo que permite
+  // revisar una diferencia al día siguiente sin volver a contar.
+  if (s.count_detail && s.count_detail.length > 0) {
+    lines.push("", THIN, "CONTEO")
+    for (const d of s.count_detail) lines.push(row(`${d.qty} x ${formatCurrency(d.value)}`, formatCurrency(d.qty * d.value)))
+  }
+  if (s.next_float != null && s.counted_cash != null) {
+    lines.push(row("Queda de fondo", formatCurrency(s.next_float)))
+    lines.push(row("Retiro", formatCurrency(Math.round((s.counted_cash - s.next_float) * 100) / 100)))
   }
   if (s.opening_notes) lines.push("", `Nota apertura: ${s.opening_notes}`)
   if (s.closing_notes) lines.push(`Nota cierre: ${s.closing_notes}`)
