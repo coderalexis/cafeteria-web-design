@@ -4,6 +4,7 @@ import {
   addUnit,
   cartItemCount,
   cartSubtotal,
+  defaultModifiers,
   getLinePrice,
   mergeKey,
   needsModifierPrompt,
@@ -150,5 +151,37 @@ describe("needsModifierPrompt", () => {
   it("un grupo obligatorio pregunta en los dos modos", () => {
     expect(needsModifierPrompt(conObligatorio, "required")).toBe(true)
     expect(needsModifierPrompt(conObligatorio, "always")).toBe(true)
+  })
+})
+
+describe("defaultModifiers", () => {
+  const conOmision: Product = {
+    ...latte,
+    modifierGroups: [
+      { id: "g-leche", name: "Leche", minSelect: 0, maxSelect: 1, options: [avena, shot], defaultOptionId: avena.id },
+      { id: "g-extra", name: "Extra", minSelect: 0, maxSelect: 1, options: [shot] },
+    ],
+  }
+
+  it("trae la opción por omisión de cada grupo que la tenga", () => {
+    expect(defaultModifiers(conOmision).map((m) => m.id)).toEqual([avena.id])
+  })
+
+  it("sin opciones por omisión no propone nada", () => {
+    expect(defaultModifiers(latte)).toEqual([])
+    expect(defaultModifiers(croissant)).toEqual([])
+  })
+
+  it("una opción por omisión que ya no está viva se ignora", () => {
+    const rota: Product = { ...conOmision, modifierGroups: [{ ...conOmision.modifierGroups![0], options: [shot] }] }
+    expect(defaultModifiers(rota)).toEqual([])
+  })
+
+  it("la línea que nace con la opción por omisión se junta con otra igual", () => {
+    let lines = addUnit([], conOmision, conOmision.sizes![0], defaultModifiers(conOmision), nuevoId)
+    lines = addUnit(lines, conOmision, conOmision.sizes![0], [avena], nuevoId)
+    expect(lines).toHaveLength(1)
+    expect(lines[0].quantity).toBe(2)
+    expect(getLinePrice(lines[0])).toBe(40 + 12)
   })
 })

@@ -814,6 +814,7 @@ export type Database = {
           group_id: string
           id: string
           is_active: boolean
+          is_default: boolean
           name: string
           price_delta: number
           sort_order: number
@@ -825,6 +826,7 @@ export type Database = {
           group_id: string
           id?: string
           is_active?: boolean
+          is_default?: boolean
           name: string
           price_delta?: number
           sort_order?: number
@@ -836,6 +838,7 @@ export type Database = {
           group_id?: string
           id?: string
           is_active?: boolean
+          is_default?: boolean
           name?: string
           price_delta?: number
           sort_order?: number

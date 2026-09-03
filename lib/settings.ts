@@ -22,12 +22,12 @@ export interface BusinessSettings {
   /** Qué imprimir solo al cobrar, sin pasos extra del cajero. */
   autoPrint: "none" | "ticket" | "comanda" | "both"
   /**
-   * Cuándo abrir la hoja de extras al tocar un producto. «required»: solo si
-   * algún grupo obliga a elegir (los opcionales se agregan desde «cambiar»
-   * en la línea del carrito); «always»: siempre que el producto tenga extras.
-   * Nació de una cafetería donde 31 de 43 productos tienen extras opcionales:
-   * la hoja salía en casi cada venta y el celular se sentía más lento que la
-   * libreta.
+   * Cuándo abrir la hoja de extras al tocar un producto. «always»: siempre
+   * que el producto tenga extras, que es cuando el cliente está pidiendo
+   * («¿la leche deslactosada?» se pregunta al principio, no al final);
+   * «required»: solo si algún grupo obliga a elegir, y lo opcional se agrega
+   * desde «cambiar» en la línea del carrito. Para no preguntar lo que casi
+   * siempre se contesta igual está la opción por omisión de cada grupo.
    */
   modifiersPrompt: "required" | "always"
   /** Módulo del POS: cuentas abiertas (se les suma cada ronda y se cobran al final). */
@@ -172,8 +172,8 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   weeklyEmail: true,
   publicMenu: false,
   autoPrint: "none",
-  // La venta común no lleva extras: que el toque la agregue y ya.
-  modifiersPrompt: "required",
+  // Se pregunta cuando el cliente pide; el dueño lo quita si le estorba.
+  modifiersPrompt: "always",
   // Encendido por defecto: no asume hardware ni expone datos, y le sirve a
   // cualquier cafetería con fila.
   parkedOrders: true,
@@ -225,7 +225,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     if (r.auto_print === "ticket" || r.auto_print === "comanda" || r.auto_print === "both") {
       out.autoPrint = r.auto_print
     }
-    if (r.modifiers_prompt === "always") out.modifiersPrompt = "always"
+    if (r.modifiers_prompt === "required") out.modifiersPrompt = "required"
     out.parkedOrders = r.parked_orders !== false
     const tope = Number(r.discount_max_cashier)
     if (Number.isFinite(tope) && tope >= 0 && tope <= 100) {

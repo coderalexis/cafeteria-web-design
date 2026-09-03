@@ -7,7 +7,7 @@ export default async function ModificadoresPage() {
   const [{ data: groups }, { data: links }, { data: allProducts }] = await Promise.all([
     supabase
       .from("modifier_groups")
-      .select("id, name, min_select, max_select, is_required, sort_order, is_active, modifiers(id, name, price_delta, sort_order, is_active)")
+      .select("id, name, min_select, max_select, is_required, sort_order, is_active, modifiers(id, name, price_delta, sort_order, is_active, is_default)")
       .order("sort_order")
       .order("name"),
     supabase
@@ -36,6 +36,7 @@ export default async function ModificadoresPage() {
     maxSelect: g.max_select,
     isRequired: g.is_required,
     isActive: g.is_active,
+    defaultOptionId: (g.modifiers ?? []).find((m) => m.is_default)?.id ?? null,
     options: [...(g.modifiers ?? [])]
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name))
       .map((m) => ({ id: m.id, name: m.name, priceDelta: m.price_delta, isActive: m.is_active })),
