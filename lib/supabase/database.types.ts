@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
       app_errors: {
@@ -1348,7 +1343,12 @@ export type Database = {
         Returns: Json
       }
       close_cash_session: {
-        Args: { p_count_detail?: Json; p_counted_cash: number; p_next_float?: number; p_notes?: string }
+        Args: {
+          p_count_detail?: Json
+          p_counted_cash: number
+          p_next_float?: number
+          p_notes?: string
+        }
         Returns: Json
       }
       create_product_guided: { Args: { p: Json }; Returns: Json }
