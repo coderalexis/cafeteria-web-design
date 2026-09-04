@@ -6,6 +6,7 @@ import {
   conflictName,
   isVieja,
   lineKey,
+  suggestAccountNames,
   waitingLabel,
 } from "@/app/pos/parked"
 
@@ -123,5 +124,34 @@ describe("applyCartDelta", () => {
     expect(applyCartDelta(base, base, base).lines).toEqual(base.lines)
     expect(applyCartDelta(base, base, { ...base, ticketNotes: "" }).ticketNotes).toBe("sin azúcar")
     expect(applyCartDelta(base, base, { ...base, ticketNotes: "para llevar" }).ticketNotes).toBe("para llevar")
+  })
+})
+
+// «Quién suele venir a esta hora»: Juan pasa después de entrenar entre 8 y
+// 10; a las 9 su nombre tiene que estar a un toque, y a las 4 de la tarde no.
+describe("suggestAccountNames", () => {
+  const visitas = [
+    { name: "Juan", hour: 8, n: 4 },
+    { name: "Juan", hour: 9, n: 3 },
+    { name: "Ana", hour: 9, n: 2 },
+    { name: "Ana", hour: 16, n: 5 },
+    { name: "Mesa 1", hour: 9, n: 9 },
+    { name: "Para llevar", hour: 9, n: 7 },
+    { name: "Pedido 09:12", hour: 9, n: 3 },
+    { name: "Luis (2)", hour: 10, n: 1 },
+    { name: "Noche", hour: 23, n: 2 },
+  ]
+  it("junta la franja de dos horas y ordena por frecuencia", () => {
+    expect(suggestAccountNames(visitas, 9, ["Mesa 1", "Mesa 2", "Barra", "Para llevar"])).toEqual(["Juan", "Ana", "Luis"])
+    expect(suggestAccountNames(visitas, 16, [])).toEqual(["Ana"])
+  })
+  it("los chips fijos y los nombres automáticos no son personas", () => {
+    expect(suggestAccountNames(visitas, 9, [])).not.toContain("Pedido 09:12")
+    expect(suggestAccountNames(visitas, 9, [])).not.toContain("Mesa 1")
+    expect(suggestAccountNames(visitas, 9, ["Para llevar"])).not.toContain("Para llevar")
+  })
+  it("la medianoche es un círculo y hay un tope", () => {
+    expect(suggestAccountNames(visitas, 0, [])).toEqual(["Noche"])
+    expect(suggestAccountNames(visitas, 9, [], 1)).toEqual(["Juan"])
   })
 })

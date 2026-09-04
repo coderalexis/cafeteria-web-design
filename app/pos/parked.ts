@@ -330,3 +330,36 @@ export function applyCartDelta(server: PersistedCart, atOpen: PersistedCart, min
     savedAt: mine.savedAt,
   }
 }
+
+/** Una fila de account_name_suggestions(): cuántas veces se abrió cuenta con ese nombre a esa hora. */
+export interface AccountVisit {
+  name: string
+  hour: number
+  n: number
+}
+
+/**
+ * Quién suele venir a esta hora: los nombres con cuenta abierta en una franja
+ * de dos horas alrededor de ahora (±1 h, con la medianoche como círculo),
+ * los más frecuentes primero. Fuera quedan los chips fijos (mesas y
+ * etiquetas, que ya están a un toque), los nombres automáticos «Pedido
+ * 09:54» y las copias «(2)»: nada de eso es una persona.
+ */
+export function suggestAccountNames(visitas: AccountVisit[], hourNow: number, excluir: string[] = [], limite = 5): string[] {
+  const fuera = new Set(excluir.map((e) => e.trim().toLowerCase()))
+  const suma = new Map<string, { name: string; n: number }>()
+  for (const v of visitas) {
+    const diff = Math.abs(v.hour - hourNow)
+    if (Math.min(diff, 24 - diff) > 1) continue
+    const nombre = v.name.trim().replace(/ \(\d+\)$/, "")
+    const k = nombre.toLowerCase()
+    if (!k || fuera.has(k) || /^pedido \d{1,2}:\d{2}$/.test(k) || /^mesa \d+$/.test(k)) continue
+    const cur = suma.get(k) ?? { name: nombre, n: 0 }
+    cur.n += v.n
+    suma.set(k, cur)
+  }
+  return [...suma.values()]
+    .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, "es"))
+    .slice(0, limite)
+    .map((x) => x.name)
+}

@@ -64,7 +64,7 @@ import {
   parkedAccount,
   waitingLabel,
   PARKED_MAX_AGE_MS,
-  type ParkedOrder, applyCartDelta } from "./parked"
+  type ParkedOrder, applyCartDelta, suggestAccountNames, type AccountVisit } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -146,6 +146,8 @@ interface POSClientProps {
   openSession: OpenSession | null
   /** Lo que se dejó de fondo en el último corte (P27): se sugiere al abrir caja. */
   suggestedFloat: number | null
+  /** Nombres con cuenta abierta por hora, últimos 60 días (P33): «quién suele venir a esta hora». */
+  visitas: AccountVisit[]
 }
 
 export default function POSClient({
@@ -172,6 +174,7 @@ export default function POSClient({
   initialTotalSales,
   openSession,
   suggestedFloat,
+  visitas,
 }: POSClientProps) {
   const appCtx = useAppContext()
   const businessName = appCtx.business?.name ?? "Cafecito POS"
@@ -337,6 +340,12 @@ export default function POSClient({
         cuentasVisibles.filter((o) => !esFiado(o)).map((o) => o.name),
       ),
     [tableCount, accountLabels, cuentasVisibles],
+  )
+
+  /** Quién suele venir a esta hora: se calcula al abrir el diálogo, con la hora de ese momento. */
+  const sugeridosNombre = useMemo(
+    () => (showPark ? suggestAccountNames(visitas, new Date().getHours(), chipsDeNombre) : []),
+    [showPark, visitas, chipsDeNombre],
   )
 
   /** Chips de la rejilla: solo cuentas del día, con su total al menú de hoy. */
@@ -1760,6 +1769,7 @@ export default function POSClient({
         onPark={parkCurrent}
         abiertas={chipsCuentas.map(({ o }) => o.name)}
         chips={chipsDeNombre}
+        sugeridos={sugeridosNombre}
       />
       <ParkedTrayDialog
         open={showTray}
