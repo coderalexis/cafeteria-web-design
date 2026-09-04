@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
+import { borrarCacheDelPos } from "@/lib/arranque-rapido"
 import Link from "next/link"
 import { login } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,12 @@ export default function LoginPage() {
 
   // Recuerda el café en este dispositivo; `?c=slug` (p. ej. desde un acceso
   // directo en la tablet) tiene prioridad.
+  // Quien pasa por aquí puede ser otra persona u otro café: la página del
+  // POS guardada en el dispositivo (arranque rápido) deja de valer.
+  useEffect(() => {
+    void borrarCacheDelPos()
+  }, [])
+
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("c")
     const stored = window.localStorage.getItem(BUSINESS_STORAGE_KEY)

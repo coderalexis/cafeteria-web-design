@@ -100,6 +100,14 @@ la venta encolada puede llevar cliente adjunto y el sello se aplica al subir).
 
 ### Fase 2 — Sobrevivir a la recarga (service worker)
 
+> **2026-09-04:** el service worker YA existe, pero nació por otra razón:
+> el arranque instantáneo del POS en celular (`public/sw-pos.js`, P34). Guarda
+> la última página de /pos con su código y la sirve al instante mientras pide
+> la fresca. Efecto colateral: recargar sin red abre el POS con el último menú
+> conocido y la cola de la Fase 1 sigue viva. Lo que sigue faltando de esta
+> fase es probarlo en iPad/iPhone de verdad y decidir si hace falta un modo
+> «solo cobrar» explícito.
+
 La Fase 1 muere si la tablet se recarga sin red: la cola en sí ya está en
 localStorage (sobrevive), pero **la app no carga**. Fase 2 = PWA de verdad:
 un service worker que cachea el shell y el último menú conocido, para abrir
