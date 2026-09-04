@@ -14,6 +14,9 @@ export const CACHE_SHELL = "pos-shell-v1"
 /** Mensaje con el que la página pregunta al worker por el resultado de la red. */
 export const PREGUNTA_ESTADO = { tipo: "¿estado?" } as const
 
+/** Mensaje con el que la página pide al worker que guarde /pos si aún no lo tiene. */
+export const PIDE_PRECARGA = { tipo: "precargar" } as const
+
 export type MensajeDelSW =
   /** La fresca sigue en camino. */
   | { tipo: "pendiente" }

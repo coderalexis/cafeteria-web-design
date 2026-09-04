@@ -77,6 +77,7 @@ type PosSW = {
   huellaDe: (html: string) => string
   esNavegacionAlPos: (r: { method: string; mode: string; url: string }, origen: string) => boolean
   marcarDesdeCache: (html: string) => string
+  cabecerasParaServir: (originales: Headers) => Headers
 }
 
 function cargarSW(): PosSW {
@@ -134,6 +135,25 @@ describe("sw-pos.js", () => {
     expect(sw.identidadDe(servida)).toBe("b:u")
     // Una página sin identidad no se marca (tampoco se habría guardado).
     expect(sw.marcarDesdeCache("<html></html>")).toBe("<html></html>")
+  })
+
+  it("la copia servida conserva los encabezados de seguridad y suelta los del cuerpo", () => {
+    const h = sw.cabecerasParaServir(
+      new Headers({
+        "content-type": "text/html; charset=utf-8",
+        "content-length": "156344",
+        "content-encoding": "br",
+        "x-frame-options": "DENY",
+        "content-security-policy": "frame-ancestors 'none'",
+        "x-content-type-options": "nosniff",
+      }),
+    )
+    expect(h.get("x-frame-options")).toBe("DENY")
+    expect(h.get("content-security-policy")).toBe("frame-ancestors 'none'")
+    expect(h.get("x-content-type-options")).toBe("nosniff")
+    expect(h.get("content-type")).toBe("text/html; charset=utf-8")
+    expect(h.get("content-length")).toBeNull()
+    expect(h.get("content-encoding")).toBeNull()
   })
 
   it("solo la navegación GET a /pos del mismo origen pasa por el guardado", () => {

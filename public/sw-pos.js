@@ -69,6 +69,19 @@ function marcarDesdeCache(html) {
   return html.replace(MARCA_IDENTIDAD, MARCA_DESDE_CACHE + MARCA_IDENTIDAD)
 }
 
+// La copia servida conserva los encabezados de la original (los de seguridad
+// —no embeber, no adivinar tipos— valen igual para una página guardada) salvo
+// los que describen el cuerpo, que ya no coincide porque lleva la marca.
+function cabecerasParaServir(originales) {
+  const h = new Headers()
+  originales.forEach((valor, nombre) => {
+    if (["content-length", "content-encoding", "transfer-encoding"].includes(nombre.toLowerCase())) return
+    h.set(nombre, valor)
+  })
+  h.set("content-type", "text/html; charset=utf-8")
+  return h
+}
+
 /* ── Red ───────────────────────────────────────────────────────────── */
 
 // Siempre con una petición propia y NUNCA reenviando la de la navegación:
@@ -112,9 +125,13 @@ async function podarEstatico(html) {
   }
 }
 
-async function htmlGuardado() {
+async function shellGuardado() {
   const shell = await self.caches.open(SHELL)
-  const r = await shell.match(RUTA, { ignoreVary: true })
+  return shell.match(RUTA, { ignoreVary: true })
+}
+
+async function htmlGuardado() {
+  const r = await shellGuardado()
   return r ? r.text() : null
 }
 
@@ -124,9 +141,15 @@ async function htmlGuardado() {
 // cliente: «pendiente» mientras se espera, y luego el resultado. La página
 // lo pregunta al arrancar; si el worker se reinició en medio y no lo sabe,
 // contesta «desconocido» y la página refresca por si acaso.
+//
+// `ultimo` es el resultado de la navegación más reciente, sin importar el id:
+// no todos los navegadores dicen a qué página corresponde una navegación
+// (resultingClientId), y en un celular es una sola página.
 const resultados = new Map()
+let ultimo = null
 
 function recordar(clienteId, mensaje) {
+  ultimo = mensaje
   if (!clienteId) return
   resultados.set(clienteId, mensaje)
   if (resultados.size > 20) resultados.delete(resultados.keys().next().value)
@@ -159,8 +182,22 @@ async function avisar(clienteId, mensaje) {
 
 self.addEventListener("message", (evento) => {
   const fuente = evento.source
-  if (!fuente || !evento.data || evento.data.tipo !== "¿estado?") return
-  fuente.postMessage(resultados.get(fuente.id) || { tipo: "desconocido" })
+  const tipo = evento.data && evento.data.tipo
+  if (!fuente || !tipo) return
+  if (tipo === "¿estado?") {
+    fuente.postMessage(resultados.get(fuente.id) || ultimo || { tipo: "desconocido" })
+    return
+  }
+  // La página llegó por navegación interna (p. ej. justo después del login)
+  // y no pasó por aquí: si no hay página guardada, se guarda ahora para que
+  // la PRÓXIMA apertura ya sea la rápida.
+  if (tipo === "precargar") {
+    evento.waitUntil(
+      shellGuardado().then((hay) => {
+        if (!hay) return precargar()
+      }),
+    )
+  }
 })
 
 /* ── Navegación a /pos ─────────────────────────────────────────────── */
@@ -214,18 +251,14 @@ async function actualizarDesdeRed(clienteId, habiaGuardado) {
 }
 
 async function navegar(evento) {
-  const shell = await self.caches.open(SHELL)
-  const guardado = await shell.match(RUTA, { ignoreVary: true })
+  const guardado = await shellGuardado()
   const clienteId = evento.resultingClientId
   const desdeRed = actualizarDesdeRed(clienteId, !!guardado)
   if (guardado) {
     recordar(clienteId, { tipo: "pendiente" })
     evento.waitUntil(desdeRed.catch(() => {}))
     const html = await guardado.text()
-    return new Response(marcarDesdeCache(html), {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    })
+    return new Response(marcarDesdeCache(html), { status: 200, headers: cabecerasParaServir(guardado.headers) })
   }
   // Sin guardado: la primera vez se sirve lo que llegó de la red. Una
   // respuesta que ya siguió una redirección no se puede entregar a una
@@ -285,4 +318,4 @@ self.addEventListener("fetch", (evento) => {
 })
 
 // Para las pruebas unitarias, que cargan este archivo con un `self` fingido.
-self.__pos = { SHELL, ESTATICO, RUTA, identidadDe, urlsEstaticas, huellaDe, esNavegacionAlPos, marcarDesdeCache }
+self.__pos = { SHELL, ESTATICO, RUTA, identidadDe, urlsEstaticas, huellaDe, esNavegacionAlPos, marcarDesdeCache, cabecerasParaServir }
