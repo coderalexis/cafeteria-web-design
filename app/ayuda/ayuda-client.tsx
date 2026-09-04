@@ -761,7 +761,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Smartphone,
       titulo: "En tablet o celular",
       palabras:
-        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket hora pico otra vez repetir ultima venta aviso corto tiles grandes",
+        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket hora pico otra vez repetir ultima venta aviso corto tiles grandes arranca al instante recarga lento cargar linea ambar actualizando",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
@@ -804,6 +804,11 @@ export function AyudaClient({ ticket, corte }: Props) {
             En Android/Chrome el POS te lo ofrece solo (en la tarjeta de la primera vez y en <strong>⋮ → Instalar como
             app</strong>). En iPhone o iPad: <strong>Compartir → Agregar a pantalla de inicio</strong>. Sigue
             necesitando internet.
+          </li>
+          <li>
+            <strong>Arranca al instante:</strong> desde la segunda vez, el POS abre en el celular con la última
+            pantalla que recibió (menú y favoritos) y se pone al día solo en unos segundos; mientras, una línea ámbar
+            arriba avisa. Si ese día hubo una actualización del sistema, se recarga una vez por su cuenta.
           </li>
         </ul>
       ),

@@ -2,8 +2,11 @@ import type { MetadataRoute } from "next"
 
 /**
  * Manifest PWA: permite "Agregar a pantalla de inicio" en tablet/celular y
- * abrir el POS a pantalla completa (sin barra del navegador). No hay
- * service worker a propósito: no prometemos funcionamiento sin internet.
+ * abrir el POS a pantalla completa (sin barra del navegador). El service
+ * worker (`public/sw-pos.js`) existe para que el POS ARRANQUE al instante con
+ * la última página guardada, no para prometer funcionamiento sin internet:
+ * sin red se abre con el último menú conocido y la cola de ventas hace el
+ * resto (docs/cola-sin-internet.md).
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {

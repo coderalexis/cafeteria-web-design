@@ -32,7 +32,12 @@ const nextConfig = {
     unoptimized: true,
   },
   async headers() {
-    return [{ source: "/(.*)", headers: encabezadosSeguridad }]
+    return [
+      { source: "/(.*)", headers: encabezadosSeguridad },
+      // El service worker del POS: que el navegador lo re-pregunte en cada
+      // visita (así un deploy lo actualiza) en vez de quedarse con uno viejo.
+      { source: "/sw-pos.js", headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }] },
+    ]
   },
 }
 
