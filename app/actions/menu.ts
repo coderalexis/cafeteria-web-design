@@ -656,3 +656,67 @@ export async function moveCategory(formData: FormData) {
   revalidateAll()
   return { success: true }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Al tocar en el POS (P34): preguntar extras y fijar en el inicio     */
+/* ------------------------------------------------------------------ */
+
+const alTocarSchema = z.object({ productId: z.string().uuid(), on: z.boolean() })
+
+/**
+ * «Preguntar extras al tocar» por producto. Apagado, el producto entra
+ * directo con sus opciones por omisión; lo obligatorio se pregunta igual.
+ */
+export async function setProductPrompt(input: unknown): Promise<{ success: true } | { error: string }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+  const parsed = alTocarSchema.safeParse(input)
+  if (!parsed.success) return { error: "Datos inválidos." }
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("menu_products")
+    .update({ prompt_modifiers: parsed.data.on })
+    .eq("id", parsed.data.productId)
+    .select("name")
+    .maybeSingle()
+  if (error) return { error: dbErrorMessage(error) }
+  if (!data) return { error: "Producto no encontrado." }
+  await logAudit(parsed.data.on ? "producto.extras_al_tocar" : "producto.extras_directo", data.name)
+  revalidateAll()
+  return { success: true }
+}
+
+/**
+ * «Fijar en el inicio»: el producto aparece siempre en «Más vendidos» del
+ * POS, después de los que ya estaban fijados. Quitarlo lo devuelve a lo
+ * automático.
+ */
+export async function setProductPinned(input: unknown): Promise<{ success: true } | { error: string }> {
+  const { error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
+  const parsed = alTocarSchema.safeParse(input)
+  if (!parsed.success) return { error: "Datos inválidos." }
+  const supabase = await createClient()
+  let orden: number | null = null
+  if (parsed.data.on) {
+    const { data: ultimo } = await supabase
+      .from("menu_products")
+      .select("pinned_order")
+      .not("pinned_order", "is", null)
+      .order("pinned_order", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    orden = (ultimo?.pinned_order ?? 0) + 1
+  }
+  const { data, error } = await supabase
+    .from("menu_products")
+    .update({ pinned_order: orden })
+    .eq("id", parsed.data.productId)
+    .select("name")
+    .maybeSingle()
+  if (error) return { error: dbErrorMessage(error) }
+  if (!data) return { error: "Producto no encontrado." }
+  await logAudit(parsed.data.on ? "producto.fijado" : "producto.desfijado", data.name)
+  revalidateAll()
+  return { success: true }
+}

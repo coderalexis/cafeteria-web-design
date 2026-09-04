@@ -42,6 +42,8 @@ export interface Product {
   subcategory: string
   description?: string
   modifierGroups?: ModifierGroup[]
+  /** false = la dueña apagó la pregunta al tocar: entra directo con las opciones por omisión (P34). */
+  promptModifiers?: boolean
 }
 
 export interface Category {
@@ -315,6 +317,8 @@ export function rehydrateCart(
 export function needsModifierPrompt(product: Product, mode: "required" | "always"): boolean {
   const groups = product.modifierGroups ?? []
   if (groups.length === 0) return false
+  // La dueña apagó la pregunta para este producto: solo lo obligatorio detiene.
+  if (product.promptModifiers === false) return groups.some((g) => g.minSelect > 0)
   if (mode === "always") return true
   return groups.some((g) => g.minSelect > 0)
 }
