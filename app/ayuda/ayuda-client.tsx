@@ -421,7 +421,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -618,6 +618,11 @@ export function AyudaClient({ ticket, corte }: Props) {
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Ventas del panel", href: "/admin/ventas", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Quién suele venir a esta hora:</strong> al abrir una cuenta, arriba salen los nombres a los que
+            más veces les has abierto cuenta en esta franja de dos horas (Juan, que pasa después de entrenar entre 8 y
+            10). Sale solo, de las cuentas de los últimos 60 días; no hay que registrar a nadie.
+          </li>
           <li>
             <strong>En el celular, las cuentas viven junto al pulgar:</strong> una franja arriba de la barra de abajo,
             siempre a la vista, con cada cuenta y su monto. Tocar el nombre la abre en el carrito para agregarle; tocar{" "}

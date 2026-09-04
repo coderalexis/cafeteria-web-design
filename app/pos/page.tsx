@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import type { AccountVisit } from "./parked"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
 import { parseBusinessSettings } from "@/lib/settings"
@@ -55,6 +56,7 @@ export default async function POSPage() {
     { data: todayTickets },
     { data: pinSet },
     { data: topVariants },
+    { data: visitas },
   ] = await Promise.all([
     // Si la caja del turno pasado quedó abierta y ya venció, se cierra sola.
     // Aquí y no solo en el cron porque este es el momento en que importa:
@@ -88,6 +90,8 @@ export default async function POSPage() {
     supabase.rpc("my_pin_set"),
     // Más vendidos del último mes → fila de favoritos del POS
     supabase.rpc("top_variants", { p_days: 30, p_limit: 8 }),
+    // Quién suele venir a esta hora (P33): nombres de cuenta por hora, 60 días.
+    supabase.rpc("account_name_suggestions"),
   ])
 
   const session = barrido.session
@@ -248,6 +252,7 @@ export default async function POSPage() {
           : null
       }
       suggestedFloat={ultimoCorte?.next_float ?? null}
+      visitas={Array.isArray(visitas) ? (visitas as unknown as AccountVisit[]) : []}
     />
   )
 }

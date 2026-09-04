@@ -41,6 +41,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
   { titulo: "Cortes de caja", donde: "Cortes de caja", href: "/admin/cortes", palabras: "corte cortes caja turno arqueo diferencia faltante sobrante efectivo esperado cerrar caja abrir caja fondo" },
   { titulo: "Cerrar caja contando billetes y dejar fondo", donde: "POS → Caja abierta → Cerrar caja", href: "/pos", palabras: "contar billetes monedas denominacion conteo corte fondo siguiente turno retiro cuadra falta sobra me llevo" },
   { titulo: "Por cobrar (fiados)", donde: "Por cobrar", href: "/admin/por-cobrar", palabras: "fiado fiados por cobrar deben deuda cuenta pendiente cobrar despues perdonar" },
+  { titulo: "Quién suele venir a esta hora (sugerencias al abrir cuenta)", donde: "POS → Cuenta → Abrir cuenta", href: "/pos", palabras: "sugerencia nombres clientes frecuentes suele venir a esta hora franja cuenta abierta juan" },
   { titulo: "Gastos del mes", donde: "Gastos y utilidad", href: "/admin/gastos#variables", palabras: "gasto gastos compras reparaciones capturar gasto proveedores insumos" },
   { titulo: "Gastos fijos (renta, luz, sueldos)", donde: "Gastos y utilidad", href: "/admin/gastos#fijos", palabras: "renta luz agua internet sueldos nomina fijos cada mes lo mismo" },
   { titulo: "Punto de equilibrio: cuánto necesitas vender", donde: "Gastos y utilidad", href: "/admin/gastos#equilibrio", palabras: "punto de equilibrio cuanto necesito vender utilidad ganancia perdida meta minima" },

@@ -24,6 +24,7 @@ export function ParkDialog({
   onPark,
   abiertas = [],
   chips = [],
+  sugeridos = [],
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -38,6 +39,8 @@ export function ParkDialog({
    * adelante — justo en el camino más caliente.
    */
   chips?: string[]
+  /** Quién suele venir a esta hora (P33): nombres con cuenta abierta en esta franja, los últimos 60 días. */
+  sugeridos?: string[]
 }) {
   const [nombre, setNombre] = useState("")
   const yaAbierta = (n: string) => abiertas.some((a) => a.trim().toLowerCase() === n.trim().toLowerCase())
@@ -67,6 +70,32 @@ export function ParkDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Quien suele venir a esta hora, primero: Juan pasa después de
+              entrenar entre 8 y 10, y a las 9 su nombre debe estar a un toque
+              sin que nadie lo haya registrado en ningún lado. */}
+          {sugeridos.length > 0 && (
+            <div data-sugeridos>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-400">Suelen venir a esta hora</p>
+              <div className="flex flex-wrap gap-1.5">
+                {sugeridos.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => guardar(n)}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                      yaAbierta(n)
+                        ? "border-amber-400 bg-amber-50 text-amber-800 hover:border-amber-500"
+                        : "border-violet-200 bg-violet-50 text-violet-800 hover:border-violet-400"
+                    }`}
+                    title={yaAbierta(n) ? `«${n}» ya está abierta: se le sumará` : "Suele venir a esta hora"}
+                  >
+                    {n}
+                    {yaAbierta(n) && <span className="ml-1 opacity-70">+</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Una cafetería puede quedarse sin chips (cero mesas y sin
               etiquetas): ahí el campo de texto se basta solo. */}
           {chips.length > 0 && (

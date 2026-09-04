@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_visits: {
+        Row: {
+          business_id: string
+          created_at: string
+          hour: number
+          id: number
+          name: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          hour: number
+          id?: never
+          name: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          hour?: number
+          id?: never
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_visits_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_errors: {
         Row: {
           actor_id: string | null
@@ -1420,6 +1452,7 @@ export type Database = {
       }
       my_context: { Args: never; Returns: Json }
       my_pin_set: { Args: never; Returns: boolean }
+      account_name_suggestions: { Args: never; Returns: Json }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }
         Returns: Json
