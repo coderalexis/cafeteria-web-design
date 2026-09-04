@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
       account_visits: {
@@ -1361,6 +1356,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_name_suggestions: { Args: never; Returns: Json }
       add_cash_movement: {
         Args: { p_amount: number; p_kind: string; p_reason: string }
         Returns: Json
@@ -1452,7 +1448,6 @@ export type Database = {
       }
       my_context: { Args: never; Returns: Json }
       my_pin_set: { Args: never; Returns: boolean }
-      account_name_suggestions: { Args: never; Returns: Json }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }
         Returns: Json
