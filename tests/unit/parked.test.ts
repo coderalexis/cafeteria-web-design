@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { PARKED_VIEJA_MS, autoName, conflictName, isVieja, lineKey, waitingLabel } from "@/app/pos/parked"
+import {
+  applyCartDelta,
+  PARKED_VIEJA_MS,
+  autoName,
+  conflictName,
+  isVieja,
+  lineKey,
+  waitingLabel,
+} from "@/app/pos/parked"
 
 const MIN = 60_000
 const HORA = 60 * MIN
@@ -61,5 +69,59 @@ describe("lineKey", () => {
 describe("autoName", () => {
   it("nombra por la hora con dos dígitos", () => {
     expect(autoName(new Date(2026, 8, 1, 9, 5))).toBe("Pedido 09:05")
+  })
+})
+
+// Juntar en vez de clonar: cuando la cuenta cambió mientras estaba abierta
+// (otro aparato, o el mismo teléfono que se reinició a media ronda), lo que
+// este aparato agregó o quitó se aplica sobre la versión del servidor.
+describe("applyCartDelta", () => {
+  const linea = (productId: string, quantity: number, notes = "") => ({
+    lineId: `l-${productId}-${notes}`,
+    productId,
+    sizeLabel: null,
+    modifierIds: [],
+    quantity,
+    notes,
+  })
+  const cart = (lines: ReturnType<typeof linea>[], ticketNotes = "") => ({
+    v: 1 as const,
+    savedAt: 1,
+    saleRef: "",
+    paymentMethod: "efectivo" as const,
+    ticketNotes,
+    cashReceivedInput: "",
+    discount: null,
+    lines,
+  })
+
+  it("suma lo agregado y respeta lo que el otro aparato agregó", () => {
+    const atOpen = cart([linea("latte", 2)])
+    const mine = cart([linea("latte", 2), linea("muffin", 1)])
+    const server = cart([linea("latte", 2), linea("croissant", 1)]) // el otro agregó un croissant
+    const r = applyCartDelta(server, atOpen, mine)
+    expect(r.lines.map((l) => [l.productId, l.quantity])).toEqual([["latte", 2], ["croissant", 1], ["muffin", 1]])
+  })
+
+  it("resta lo quitado hasta donde alcance y tira el renglón en cero", () => {
+    const atOpen = cart([linea("latte", 2), linea("pan", 1)])
+    const mine = cart([linea("latte", 1)]) // quitó un latte y el pan
+    const server = cart([linea("latte", 3), linea("pan", 1)]) // el otro agregó un latte
+    const r = applyCartDelta(server, atOpen, mine)
+    expect(r.lines.map((l) => [l.productId, l.quantity])).toEqual([["latte", 2]])
+  })
+
+  it("el caso del teléfono reiniciado: el servidor ya tiene mi ronda anterior y solo entra lo nuevo", () => {
+    const anterior = cart([linea("latte", 2)])
+    const mine = cart([linea("latte", 2), linea("agua", 1)])
+    const r = applyCartDelta(anterior, anterior, mine)
+    expect(r.lines.map((l) => [l.productId, l.quantity])).toEqual([["latte", 2], ["agua", 1]])
+  })
+
+  it("sin cambios míos, el servidor queda igual; la nota mía manda si la escribí", () => {
+    const base = cart([linea("latte", 1)], "sin azúcar")
+    expect(applyCartDelta(base, base, base).lines).toEqual(base.lines)
+    expect(applyCartDelta(base, base, { ...base, ticketNotes: "" }).ticketNotes).toBe("sin azúcar")
+    expect(applyCartDelta(base, base, { ...base, ticketNotes: "para llevar" }).ticketNotes).toBe("para llevar")
   })
 })

@@ -86,6 +86,8 @@ export interface PosHeaderProps {
   openAccount: { id: string; name: string } | null
   cuentasVisibles: ParkedOrder[]
   chipsCuentas: { o: ParkedOrder; total: number; vieja: boolean }[]
+  /** En celular las cuentas van en la barra de abajo, junto al pulgar: aquí no se repiten. */
+  cuentasEnBarra?: boolean
   setCartOpen: (open: boolean) => void
   resumeParked: (order: ParkedOrder) => Promise<void>
   // Categorías
@@ -105,7 +107,7 @@ export function PosHeader(p: PosHeaderProps) {
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
     setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, onAprender, instalar,
-    parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, setCartOpen, resumeParked,
+    parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, cuentasEnBarra, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
   /* Chip de estado de caja (compartido entre escritorio y móvil) */
@@ -367,7 +369,7 @@ export function PosHeader(p: PosHeaderProps) {
               cuentas (y con el módulo encendido): un café de barra no gasta
               ni un pixel en esto. Los fiados no salen aquí — son de alguien
               que ya se fue, no una mesa activa; viven en la bandeja. */}
-          {parkedEnabled && (openAccount || chipsCuentas.length > 0) && (
+          {parkedEnabled && !cuentasEnBarra && (openAccount || chipsCuentas.length > 0) && (
             <div className="flex items-center gap-2 mt-2 overflow-x-auto pb-1 scrollbar-hide">
               {openAccount && (
                 <button
