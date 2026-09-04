@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { PREGUNTA_ESTADO, decidirMensaje, frenoRefresco, type Accion } from "@/lib/arranque-rapido"
+import { PIDE_PRECARGA, PREGUNTA_ESTADO, decidirMensaje, frenoRefresco, type Accion } from "@/lib/arranque-rapido"
 
 const CLAVE_FRENO = "pos-arranque-refrescos"
 /** Si el worker no contesta en este tiempo, se refresca de todos modos. */
@@ -69,9 +69,20 @@ export function ArranqueRapido() {
     }
     sw.addEventListener("message", onMensaje)
     if (typeof sw.startMessages === "function") sw.startMessages()
-    sw.register("/sw-pos.js", { scope: "/pos" }).catch(() => {
-      // Sin service worker (navegador que no lo permite): el POS funciona igual, solo arranca como antes.
-    })
+    sw.register("/sw-pos.js", { scope: "/pos" })
+      .then((registro) => {
+        if (desdeCache) return
+        // Llegó de la red o por navegación interna —como justo después del
+        // login, que llega desde /login sin pasar por el worker—: que quede
+        // guardada si no lo está, para que la PRÓXIMA apertura ya sea la
+        // rápida. Una página que nació fuera de /pos no tiene `controller`,
+        // por eso se le habla al worker activo del registro.
+        const worker = sw.controller ?? registro.active
+        worker?.postMessage(PIDE_PRECARGA)
+      })
+      .catch(() => {
+        // Sin service worker (navegador que no lo permite): el POS funciona igual, solo arranca como antes.
+      })
 
     if (desdeCache) {
       setActualizando(true)
