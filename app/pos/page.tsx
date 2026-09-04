@@ -57,6 +57,7 @@ export default async function POSPage() {
     { data: pinSet },
     { data: topVariants },
     { data: visitas },
+    { count: promosActivas },
   ] = await Promise.all([
     // Si la caja del turno pasado quedó abierta y ya venció, se cierra sola.
     // Aquí y no solo en el cron porque este es el momento en que importa:
@@ -70,7 +71,7 @@ export default async function POSPage() {
     supabase
       .from("menu_products")
       .select(
-        `id, name, description, sort_order, category_id,
+        `id, name, description, sort_order, category_id, prompt_modifiers, pinned_order,
          menu_categories(id, name, slug),
          menu_variants(id, name, size_label, price, sort_order, is_active),
          product_modifier_groups(
@@ -92,6 +93,8 @@ export default async function POSPage() {
     supabase.rpc("top_variants", { p_days: 30, p_limit: 8 }),
     // Quién suele venir a esta hora (P33): nombres de cuenta por hora, 60 días.
     supabase.rpc("account_name_suggestions"),
+    // ¿Hay promociones encendidas? Si no, el POS no las consulta en cada cambio del carrito.
+    supabase.from("promotions").select("id", { count: "exact", head: true }).eq("is_active", true),
   ])
 
   const session = barrido.session
@@ -202,6 +205,7 @@ export default async function POSPage() {
       subcategory,
       description: cardDescription,
       modifierGroups: modifierGroups.length > 0 ? modifierGroups : undefined,
+      promptModifiers: p.prompt_modifiers ?? true,
     }
 
     if (isFlat) {
@@ -220,6 +224,23 @@ export default async function POSPage() {
   })
 
   const settings = parseBusinessSettings(ctx.business.settings)
+
+  // La primera pantalla: primero lo que la dueña fijó, en su orden; luego lo
+  // más vendido hasta completar ocho. Un producto fijado con tamaños pone un
+  // tile por tamaño.
+  const fijados = vendibles
+    .filter((p) => p.pinned_order != null)
+    .sort((a, b) => (a.pinned_order ?? 0) - (b.pinned_order ?? 0))
+    .flatMap((p) =>
+      [...(p.menu_variants ?? [])]
+        .filter((v) => v.is_active)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map((v) => v.id),
+    )
+  const automaticos = (topVariants ?? [])
+    .map((t) => t.variant_id)
+    .filter((id): id is string => !!id && !fijados.includes(id))
+  const favoriteVariantIds = [...fijados, ...automaticos].slice(0, Math.max(8, fijados.length))
 
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
@@ -244,7 +265,7 @@ export default async function POSPage() {
       takeoutFee={settings.takeoutFee}
       cardFeePct={settings.cardFeePct}
       hasPin={pinSet === true}
-      favoriteVariantIds={(topVariants ?? []).map((t) => t.variant_id).filter((id): id is string => !!id)}
+      favoriteVariantIds={favoriteVariantIds}
       initialTotalSales={dbTotalSales}
       openSession={
         session
@@ -253,6 +274,7 @@ export default async function POSPage() {
       }
       suggestedFloat={ultimoCorte?.next_float ?? null}
       visitas={Array.isArray(visitas) ? (visitas as unknown as AccountVisit[]) : []}
+      hayPromociones={(promosActivas ?? 0) > 0}
     />
   )
 }

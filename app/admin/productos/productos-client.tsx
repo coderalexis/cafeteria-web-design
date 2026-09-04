@@ -8,8 +8,7 @@ import {
   createVariant,
   updateVariant,
   deleteVariant,
-  toggleVariantActive,
-} from "@/app/actions/menu"
+  toggleVariantActive, setProductPinned, setProductPrompt } from "@/app/actions/menu"
 import { setProductModifierGroups } from "@/app/actions/modifiers"
 import { formatCurrency } from "@/lib/format"
 import { ActionForm } from "@/components/action-form"
@@ -21,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import {
   Sheet,
   SheetContent,
@@ -37,8 +37,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
-  SlidersHorizontal,
-} from "lucide-react"
+  SlidersHorizontal, Smartphone, Star } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -75,6 +74,10 @@ interface Product {
   variantCount: number
   variants: Variant[]
   modifierGroupIds: string[]
+  /** false = entra directo al tocar, sin la hoja de extras (P34). */
+  promptModifiers: boolean
+  /** Posición en «Más vendidos» del POS si la dueña lo fijó; null = no fijado (P34). */
+  pinnedOrder: number | null
 }
 
 export interface ModifierGroupOption {
@@ -89,6 +92,8 @@ export interface ModifierGroupOption {
 }
 
 interface ProductosClientProps {
+  /** Ventas por producto en 30 días y cuántas llevaron extras (P34). */
+  extrasUso: ExtrasUso
   categories: Category[]
   products: Product[]
   modifierGroups: ModifierGroupOption[]
@@ -124,10 +129,13 @@ function getPriceDisplay(p: Product): string {
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
+export type ExtrasUso = Record<string, { items: number; withExtras: number }>
+
 export default function ProductosClient({
   categories,
   products,
   modifierGroups,
+  extrasUso,
 }: ProductosClientProps) {
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState("todos")
@@ -384,6 +392,7 @@ export default function ProductosClient({
               product={products.find((p) => p.id === selectedProduct.id) ?? selectedProduct}
               categories={categories}
               modifierGroups={modifierGroups}
+              extrasUso={extrasUso[selectedProduct.id]}
               onClose={() => setSheetOpen(false)}
             />
           ) : null}
@@ -400,14 +409,51 @@ function EditProductSheet({
   product,
   categories,
   modifierGroups,
+  extrasUso,
   onClose,
 }: {
   product: Product
   categories: Category[]
   modifierGroups: ModifierGroupOption[]
+  /** Ventas del producto en 30 días y cuántas llevaron extras. */
+  extrasUso?: { items: number; withExtras: number }
   onClose: () => void
 }) {
   const router = useRouter()
+  const [guardandoTocar, setGuardandoTocar] = useState(false)
+  // «Al tocar en el POS»: dos interruptores que cambian el POS al instante.
+  const cambiarAlTocar = async (que: "prompt" | "pinned", on: boolean) => {
+    setGuardandoTocar(true)
+    const r =
+      que === "prompt"
+        ? await setProductPrompt({ productId: product.id, on })
+        : await setProductPinned({ productId: product.id, on })
+    setGuardandoTocar(false)
+    if ("error" in r) {
+      toast.error(r.error)
+      return
+    }
+    toast.success(
+      que === "pinned"
+        ? on
+          ? `«${product.name}» ya está en el inicio del POS.`
+          : `«${product.name}» vuelve a lo automático.`
+        : on
+          ? `«${product.name}» preguntará extras al tocar.`
+          : `«${product.name}» entra directo; los extras se cambian desde la línea.`,
+    )
+    router.refresh()
+  }
+  // La pista habla con datos cuando los hay: donde casi nadie elige extras,
+  // preguntar al tocar es un toque de más en cada venta.
+  const pistaExtras = (() => {
+    const u = extrasUso
+    if (!u || u.items < 5) {
+      return "Apagado, entra directo con sus opciones por omisión; los extras se cambian desde la línea. Lo obligatorio se pregunta siempre."
+    }
+    const base = `En ${u.items} ventas de los últimos 30 días, ${u.withExtras} llevaron extras.`
+    return product.promptModifiers && u.withExtras / u.items < 0.2 ? base + " Casi nadie elige: apágalo y entrará directo." : base
+  })()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isToggling, setIsToggling] = useState(false)
   const [savingGroups, setSavingGroups] = useState(false)
@@ -760,6 +806,48 @@ function EditProductSheet({
                 </div>
               </ActionForm>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* ── Al tocar en el POS (P34) ── */}
+          <div className="space-y-2" data-al-tocar>
+            <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
+              <Smartphone className="h-4 w-4 text-amber-600" />
+              Al tocar en el POS
+            </h3>
+            <label className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2 text-sm">
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5 font-medium text-stone-800">
+                  <Star className="h-3.5 w-3.5 text-amber-500" /> Fijar en el inicio
+                </span>
+                <span className="block text-xs text-stone-500">
+                  Aparece siempre en «Más vendidos», en el orden en que lo fijes; lo demás lo pone el sistema.
+                </span>
+              </span>
+              <Switch
+                checked={product.pinnedOrder != null}
+                disabled={guardandoTocar}
+                onCheckedChange={(v) => void cambiarAlTocar("pinned", v)}
+                aria-label="Fijar en el inicio"
+              />
+            </label>
+            {product.modifierGroupIds.length > 0 && (
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block font-medium text-stone-800">Preguntar extras al tocar</span>
+                  <span className="block text-xs text-stone-500" data-pista-extras>
+                    {pistaExtras}
+                  </span>
+                </span>
+                <Switch
+                  checked={product.promptModifiers}
+                  disabled={guardandoTocar}
+                  onCheckedChange={(v) => void cambiarAlTocar("prompt", v)}
+                  aria-label="Preguntar extras al tocar"
+                />
+              </label>
+            )}
           </div>
 
           <Separator />

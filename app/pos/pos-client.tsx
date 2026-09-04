@@ -148,6 +148,8 @@ interface POSClientProps {
   suggestedFloat: number | null
   /** Nombres con cuenta abierta por hora, últimos 60 días (P33): «quién suele venir a esta hora». */
   visitas: AccountVisit[]
+  /** ¿Hay alguna promoción encendida? Si no, el carrito no consulta promociones (P34). */
+  hayPromociones: boolean
 }
 
 export default function POSClient({
@@ -175,6 +177,7 @@ export default function POSClient({
   openSession,
   suggestedFloat,
   visitas,
+  hayPromociones,
 }: POSClientProps) {
   const appCtx = useAppContext()
   const businessName = appCtx.business?.name ?? "Cafecito POS"
@@ -555,7 +558,7 @@ export default function POSClient({
   const discountAmount = computeDiscount(subtotal, discount)
 
   // La promoción viva (espejo de lo que el servidor descontará al cobrar).
-  const { promo, sinPromo } = usePromoPreview(lines, discount !== null || loyaltyRedeem)
+  const { promo, sinPromo } = usePromoPreview(lines, discount !== null || loyaltyRedeem, hayPromociones)
 
   // El descuento que de verdad va a llevar el ticket: el de la promoción solo
   // cuando no hay otro. Nunca se suman.
@@ -860,69 +863,114 @@ export default function POSClient({
       setCartOpen(false)
       return
     }
-    setIsProcessing(true)
+
+    // Lo que se va a cobrar, congelado ahora: con el cobro instantáneo el
+    // carrito se vacía antes de que el servidor conteste, y la venta tiene
+    // que ser exactamente la que la persona vio.
+    const venta = {
+      lines: [...lines],
+      paymentMethod,
+      ticketNotes: ticketNotes.trim(),
+      cashReceived,
+      tipAmount,
+      discount,
+      esParaLlevar,
+      saleRef,
+      total,
+      due,
+    }
+    // Los precios NO se mandan: el servidor los recalcula desde el menú
+    // (variante + modificadores) y valida el descuento.
+    const items = venta.lines.map((line) => ({
+      variant_id: getLineVariantId(line) ?? "",
+      quantity: line.quantity,
+      notes: line.notes.trim() || undefined,
+      modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
+    }))
+    // Cobro instantáneo: en celular sin impresora la venta se da por hecha al
+    // momento —aviso, carrito limpio, siguiente cliente— y el servidor
+    // confirma por detrás; si la rechaza, el carrito regresa con el motivo.
+    // Con cuenta abierta, lealtad o impresora se espera, porque ahí lo que
+    // sigue necesita la respuesta del servidor.
+    const optimista = isMobile && autoPrint === "none" && !openAccount && !loyaltyCustomer && !loyaltyRedeem
+    let avisoId: string | number | undefined
+    if (optimista) {
+      avisoId = toast.loading(`Cobrando ${formatCurrency(venta.due)} · ${paymentLabel(venta.paymentMethod)}…`)
+      vibra(30)
+      clearTip()
+      resetAfterSale()
+      setCartOpen(false)
+    } else {
+      setIsProcessing(true)
+    }
+    const restaurar = () => {
+      restoreLines(venta.lines)
+      setTicketNotes(venta.ticketNotes)
+      setDiscount(venta.discount)
+      setCartOpen(true)
+    }
+    const cerrarVenta = () => {
+      vibra(30)
+      clearTip()
+      setLoyaltyCustomer(null)
+      setLoyaltyRedeem(false)
+      cerrarCuentaCobrada()
+      resetAfterSale()
+      setCartOpen(false)
+    }
 
     try {
-      // Los precios NO se mandan: el servidor los recalcula desde el menú
-      // (variante + modificadores) y valida el descuento.
       const result = await createTicket({
-        clientRef: saleRef,
+        clientRef: venta.saleRef,
         expectedBusinessId: businessId,
-        paymentMethod,
-        notes: ticketNotes.trim() || undefined,
-        cashReceived: cashReceived ?? undefined,
-        tip: tipAmount > 0 ? tipAmount : undefined,
-        discount: discount ?? undefined,
+        paymentMethod: venta.paymentMethod,
+        notes: venta.ticketNotes || undefined,
+        cashReceived: venta.cashReceived ?? undefined,
+        tip: venta.tipAmount > 0 ? venta.tipAmount : undefined,
+        discount: venta.discount ?? undefined,
         loyaltyCustomerId: loyaltyCustomer?.id,
         loyaltyRedeem: loyaltyRedeem || undefined,
-        takeout: esParaLlevar || undefined,
-        items: lines.map((line) => ({
-          variant_id: getLineVariantId(line) ?? "",
-          quantity: line.quantity,
-          notes: line.notes.trim() || undefined,
-          modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
-        })),
+        takeout: venta.esParaLlevar || undefined,
+        items,
       })
 
       if (result.success) {
-        const venta: CompletedSale = {
+        const completada: CompletedSale = {
           ticketId: result.ticketId,
           folio: result.folio,
-          lines: [...lines],
+          lines: venta.lines,
           subtotal: result.subtotal,
           discountTotal: result.discountTotal,
-          discountReason: discount?.reason ?? null,
+          discountReason: venta.discount?.reason ?? null,
           total: result.total,
           takeoutFee: result.takeoutFee,
           tip: result.tip,
-          paymentMethod,
+          paymentMethod: venta.paymentMethod,
           date: new Date(),
-          notes: ticketNotes.trim() || undefined,
+          notes: venta.ticketNotes || undefined,
           cashReceived: result.cashReceived,
           changeDue: result.changeDue,
           loyalty: result.loyalty
             ? { stamps: result.loyalty.stamps, target: result.loyalty.target, redeemed: result.loyalty.redeemed }
             : null,
         }
-        // En celular, sin impresora ni QR, el diálogo del recibo solo era un
-        // toque más («Nueva venta») entre una venta y la siguiente. Un aviso
-        // con folio, monto y cambio dice lo mismo sin estorbar, y «Ver ticket»
-        // abre el recibo completo (imprimir, compartir) cuando sí hace falta.
-        // Con impresión automática el diálogo se queda: ahí pasa algo. La nota
-        // con QR sigue a un toque en «Ver ticket»: en la fila, lo que estorba
-        // es la pantalla completa entre una venta y la siguiente.
+        // En celular sin impresora, un aviso con folio, monto y cambio dice lo
+        // mismo que el recibo sin estorbar; «Ver ticket» abre el recibo
+        // completo (imprimir, compartir, nota con QR) cuando sí hace falta.
+        // Con impresión automática el diálogo se queda: ahí pasa algo.
         if (isMobile && autoPrint === "none") {
           const cambio =
             result.changeDue != null && result.changeDue > 0 ? ` · Cambio ${formatCurrency(result.changeDue)}` : ""
           toast.success(
-            `Venta #${result.folio} · ${formatCurrency(result.total + result.tip)} · ${paymentLabel(paymentMethod)}${cambio}`,
+            `Venta #${result.folio} · ${formatCurrency(result.total + result.tip)} · ${paymentLabel(venta.paymentMethod)}${cambio}`,
             {
+              id: avisoId,
               duration: cambio ? 8000 : 5000,
-              action: { label: "Ver ticket", onClick: () => setCompletedSale(venta) },
+              action: { label: "Ver ticket", onClick: () => setCompletedSale(completada) },
             },
           )
         } else {
-          setCompletedSale(venta)
+          setCompletedSale(completada)
         }
         if (result.loyalty) {
           const quien = result.loyalty.name || formatPhone(result.loyalty.phone)
@@ -940,7 +988,7 @@ export default function POSClient({
         // menú vigente al momento de repetir, no ahora).
         try {
           const payload = serializeCart(
-            { saleRef: "", paymentMethod, ticketNotes: "", cashReceivedInput: "", discount: null, lines },
+            { saleRef: "", paymentMethod: venta.paymentMethod, ticketNotes: "", cashReceivedInput: "", discount: null, lines: venta.lines },
             Date.now(),
           )
           window.localStorage.setItem(lastSaleKey, JSON.stringify({ folio: result.folio, payload }))
@@ -948,13 +996,13 @@ export default function POSClient({
         } catch {
           /* sin espacio: solo se pierde el botón de repetir */
         }
-        vibra(30)
-        clearTip()
-        setLoyaltyCustomer(null)
-        setLoyaltyRedeem(false)
-        cerrarCuentaCobrada()
-        resetAfterSale()
-        setCartOpen(false)
+        if (!optimista) cerrarVenta()
+      } else if (optimista) {
+        restaurar()
+        toast.error(result.error || "No se registró la venta. Revisa el carrito y vuelve a cobrar.", {
+          id: avisoId,
+          duration: 8000,
+        })
       } else {
         toast.error(result.error || "Error al registrar la venta")
       }
@@ -964,47 +1012,36 @@ export default function POSClient({
       // al volver la señal. La idempotencia de create_ticket hace que
       // reenviarla sea inofensivo aunque en realidad sí hubiera entrado.
       const provisional = cola.encolar({
-        clientRef: saleRef,
+        clientRef: venta.saleRef,
         capturedAt: Date.now(),
-        items: lines.map((line) => ({
-          variant_id: getLineVariantId(line) ?? "",
-          quantity: line.quantity,
-          notes: line.notes.trim() || undefined,
-          modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
-        })),
-        paymentMethod,
-        notes: ticketNotes.trim() || undefined,
-        tip: tipAmount > 0 ? tipAmount : undefined,
-        discount: discount ?? undefined,
-        cashReceived: cashReceived ?? undefined,
-        takeout: esParaLlevar || undefined,
+        items,
+        paymentMethod: venta.paymentMethod,
+        notes: venta.ticketNotes || undefined,
+        tip: venta.tipAmount > 0 ? venta.tipAmount : undefined,
+        discount: venta.discount ?? undefined,
+        cashReceived: venta.cashReceived ?? undefined,
+        takeout: venta.esParaLlevar || undefined,
         loyaltyCustomerId: loyaltyCustomer?.id,
         // El total de la VENTA, sin propina: es lo que el servidor
-        // recalcula y devuelve como `total`. Comparar contra `due` marcaba
-        // como «cambió un precio» cualquier venta con propina.
-        chargedTotal: total,
-        lines: serializeLines(lines, getLinePrice, getLineLabel),
+        // recalcula y devuelve como `total`.
+        chargedTotal: venta.total,
+        lines: serializeLines(venta.lines, getLinePrice, getLineLabel),
       })
       if (provisional) {
-        toast.success(`Venta guardada sin conexión · ${provisional}. Se subirá sola al volver el internet.`)
-        vibra(30)
-        clearTip()
-        setLoyaltyCustomer(null)
-        setLoyaltyRedeem(false)
+        toast.success(`Venta guardada sin conexión · ${provisional}. Se subirá sola al volver el internet.`, { id: avisoId })
         // La cuenta se cierra igual: la venta ya está capturada y va en la
         // cola. Dejarla abierta invitaría a cobrarla dos veces.
-        cerrarCuentaCobrada()
-        resetAfterSale()
-        setCartOpen(false)
+        if (!optimista) cerrarVenta()
       } else {
-        toast.error(
-          `Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`,
-        )
+        if (optimista) restaurar()
+        toast.error(`Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`, {
+          id: avisoId,
+        })
       }
     } finally {
-      setIsProcessing(false)
+      if (!optimista) setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount])
 
   /**
    * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide

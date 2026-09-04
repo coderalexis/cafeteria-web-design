@@ -4,7 +4,7 @@ import ProductosClient, { type ModifierGroupOption } from "./productos-client"
 export default async function ProductosPage() {
   const supabase = await createClient()
 
-  const [{ data: categories }, { data: products }, { data: groups }] = await Promise.all([
+  const [{ data: categories }, { data: products }, { data: groups }, { data: usoExtras }] = await Promise.all([
     supabase
       .from("menu_categories")
       .select("id, name, slug, sort_order")
@@ -12,7 +12,7 @@ export default async function ProductosPage() {
     supabase
       .from("menu_products")
       .select(
-        `id, name, description, category_id, sort_order, is_active,
+        `id, name, description, category_id, sort_order, is_active, prompt_modifiers, pinned_order,
          menu_categories(id, name, slug),
          menu_variants(id, name, size_label, price, cost, sort_order, is_active),
          product_modifier_groups(group_id)`
@@ -23,7 +23,15 @@ export default async function ProductosPage() {
       .select("id, name, is_active, sort_order, min_select, max_select, modifiers(id, name, price_delta, sort_order, is_active)")
       .order("sort_order")
       .order("name"),
+    // Cuántas ventas de cada producto llevaron extras (30 días): el dato para
+    // decidir si vale la pena preguntar al tocar.
+    supabase.rpc("product_extras_usage", { p_days: 30 }),
   ])
+
+  const extrasUso: Record<string, { items: number; withExtras: number }> = {}
+  for (const u of (Array.isArray(usoExtras) ? usoExtras : []) as Array<{ product_id: string; items: number; with_extras: number }>) {
+    extrasUso[u.product_id] = { items: Number(u.items), withExtras: Number(u.with_extras) }
+  }
 
   // Serialize for client component
   const serializedCategories = (categories ?? []).map((c) => ({
@@ -65,6 +73,8 @@ export default async function ProductosPage() {
         isActive: v.is_active,
       })),
       modifierGroupIds: (p.product_modifier_groups ?? []).map((l) => l.group_id),
+      promptModifiers: p.prompt_modifiers ?? true,
+      pinnedOrder: p.pinned_order ?? null,
     }
   })
 
@@ -89,6 +99,7 @@ export default async function ProductosPage() {
       categories={serializedCategories}
       products={serializedProducts}
       modifierGroups={modifierGroups}
+      extrasUso={extrasUso}
     />
   )
 }

@@ -223,7 +223,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Coffee,
       titulo: "Abrir el turno y vender",
       palabras:
-        "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir cantidad para llevar mas opciones descuento extras leche opcion por omision aviso celular",
+        "caja fondo abrir pedido carrito tamanos vendidos buscar nota comanda whatsapp compartir folio repetir cantidad para llevar mas opciones descuento extras leche opcion por omision aviso celular cobro instantaneo una opcion agrega directo menos toques",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
@@ -287,6 +287,12 @@ export function AyudaClient({ ticket, corte }: Props) {
       acciones: [{ etiqueta: "Hacer el recorrido (1 min)", href: "/pos?recorrido=1" }, { etiqueta: "Practicar ahora", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Menos toques:</strong> si un producto solo pregunta una cosa de una sola opción (¿qué leche?),
+            tocar la opción lo agrega de inmediato, sin «Agregar». Y en celular el cobro es instantáneo: al tocar
+            Cobrar, el carrito queda libre para el siguiente y el servidor confirma por detrás; si algo no pasa, el
+            carrito regresa con el motivo.
+          </li>
           <li>
             <strong>Tu primera venta, de la mano:</strong> menú <strong>⋮</strong> → <strong>Aprender</strong> →{" "}
             <strong>Tu primera venta</strong> (en celular, también desde la tarjeta de la primera vez). Son cinco pasos
@@ -947,10 +953,16 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Coffee,
       titulo: "Menú: categorías, productos y precios",
-      palabras: "categorias colores variantes tamanos costo margen precios lote orden desactivar sin precio no aparece nota carta publica nuevo producto asistente de la mano paso a paso crear producto comida guarniciones proteina porciones",
+      palabras: "categorias colores variantes tamanos costo margen precios lote orden desactivar sin precio no aparece nota carta publica nuevo producto asistente de la mano paso a paso crear producto comida guarniciones proteina porciones fijar en el inicio mas vendidos preguntar extras al tocar directo",
       acciones: [{ etiqueta: "Nuevo producto", href: "/admin/productos", admin: true }, { etiqueta: "Categorías", href: "/admin/categorias", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Al tocar en el POS</strong>, dentro de cada producto: <strong>Fijar en el inicio</strong> lo deja
+            siempre en «Más vendidos», en el orden en que lo fijes; y <strong>Preguntar extras al tocar</strong> se
+            puede apagar donde casi nadie elige nada (el sistema te dice en cuántas ventas llevaron extras), para que
+            entre directo y los extras se cambien desde la línea. Lo obligatorio se pregunta siempre.
+          </li>
           <li>
             <strong>Nuevo producto, de la mano.</strong> El botón <strong>Nuevo producto</strong> te lleva en cuatro
             pasos con una sola pregunta cada uno: <em>¿qué vendes?</em> (nombre, categoría o una nueva ahí mismo, qué

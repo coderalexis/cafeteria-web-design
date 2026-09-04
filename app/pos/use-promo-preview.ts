@@ -9,7 +9,7 @@ import { getLineVariantId, type CartLine } from "./cart"
    para que la cajera se lo pueda decir al cliente ANTES. Se pregunta
    solo cuando la venta no lleva ya un descuento a mano ni un premio de
    lealtad, porque en ese caso el servidor tampoco la aplicaría. */
-export function usePromoPreview(lines: CartLine[], otroDescuento: boolean) {
+export function usePromoPreview(lines: CartLine[], otroDescuento: boolean, hayPromociones = true) {
   const [promo, setPromo] = useState<{ id: string; name: string; discount: number } | null>(null)
   const promoItems = useMemo(
     () =>
@@ -22,7 +22,9 @@ export function usePromoPreview(lines: CartLine[], otroDescuento: boolean) {
         .filter((i) => i.variant_id),
     [lines],
   )
-  const sinPromo = otroDescuento || promoItems.length === 0
+  // Sin promociones encendidas no hay nada que preguntar: eran tres viajes
+  // al servidor por cada cambio del carrito, para nada.
+  const sinPromo = !hayPromociones || otroDescuento || promoItems.length === 0
   const promoClave = sinPromo ? "" : JSON.stringify(promoItems)
   useEffect(() => {
     if (!promoClave) {

@@ -124,7 +124,9 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
                 )}
               </DialogTitle>
               <DialogDescription>
-                Base {formatCurrency(basePrice)} · elige las opciones del cliente
+                {groups.length === 1 && groups[0].maxSelect === 1 && !pending.editing
+                  ? `Base ${formatCurrency(basePrice)} · toca la opción y se agrega`
+                  : `Base ${formatCurrency(basePrice)} · elige las opciones del cliente`}
               </DialogDescription>
             </DialogHeader>
 
@@ -158,7 +160,17 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
                           <button
                             key={opt.id}
                             type="button"
-                            onClick={() => toggle(g, opt.id)}
+                            onClick={() => {
+                              // Una sola pregunta de una sola opción: elegir es
+                              // agregar. Dos de cada tres toques abrían esta hoja
+                              // para elegir una cosa y confirmar; ahora es uno. El
+                              // botón de abajo queda para «sin extra».
+                              if (!pending.editing && groups.length === 1 && g.maxSelect === 1) {
+                                onConfirm(pending.product, pending.size, [opt])
+                                return
+                              }
+                              toggle(g, opt.id)
+                            }}
                             disabled={disabled}
                             className={`flex items-center justify-between gap-2 rounded-lg border-2 px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-40 ${
                               isOn

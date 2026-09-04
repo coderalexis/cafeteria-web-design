@@ -185,3 +185,27 @@ describe("defaultModifiers", () => {
     expect(getLinePrice(lines[0])).toBe(40 + 12)
   })
 })
+
+// P34: la dueña puede apagar la pregunta por producto («Americano entra
+// directo»), pero una pregunta obligatoria se pregunta siempre.
+describe("needsModifierPrompt con la bandera por producto", () => {
+  const conLeche = (min: number, promptModifiers: boolean) => ({
+    id: "p",
+    name: "Americano",
+    price: 40,
+    variantId: "v",
+    category: "cafe",
+    subcategory: "Con café",
+    promptModifiers,
+    modifierGroups: [
+      { id: "g", name: "Tipo de leche", minSelect: min, maxSelect: 1, defaultOptionId: null, options: [{ id: "o", name: "Deslactosada", priceDelta: 0 }] },
+    ],
+  })
+  it("apagada, entra directo aunque el negocio pregunte siempre", () => {
+    expect(needsModifierPrompt(conLeche(0, false), "always")).toBe(false)
+    expect(needsModifierPrompt(conLeche(0, true), "always")).toBe(true)
+  })
+  it("apagada, lo obligatorio se sigue preguntando", () => {
+    expect(needsModifierPrompt(conLeche(1, false), "required")).toBe(true)
+  })
+})
