@@ -19,8 +19,7 @@ import {
   Search,
   Lock,
   ChevronUp,
-  Star,
-} from "lucide-react"
+  Star, PauseCircle, ChevronRight, RotateCcw } from "lucide-react"
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
@@ -65,8 +64,7 @@ import {
   parkedAccount,
   waitingLabel,
   PARKED_MAX_AGE_MS,
-  type ParkedOrder,
-} from "./parked"
+  type ParkedOrder, applyCartDelta } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -104,8 +102,7 @@ import {
   type CartLine,
   type Category,
   type Product,
-  type SizeOption,
-} from "./cart"
+  type SizeOption, type PersistedCart } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
 
@@ -307,6 +304,8 @@ export default function POSClient({
     openedAt: number
     /** Sello de la última escritura; se manda al guardar para no pisar a nadie. */
     updatedAt: string
+    /** La cuenta tal como estaba al abrirla: con eso se junta si cambió mientras tanto. */
+    cartAtOpen?: PersistedCart
   } | null>(null)
   const openAccountKey = `pos-open-account:${businessId}:${cashierId}`
   /**
@@ -648,8 +647,21 @@ export default function POSClient({
    */
   const saveToOpenAccount = useCallback(async (): Promise<boolean> => {
     if (!openAccount || lines.length === 0) return false
-    const r = await parked.update(openAccount.id, openAccount.updatedAt, serializeCart(cartStateNow(), Date.now()))
+    // El sello más fresco que se conoce: el de la lista que el sondeo mantiene
+    // al día, no el de cuando se abrió la cuenta. Con el de entonces, un
+    // teléfono que se reiniciaba a media ronda «chocaba» contra su propia
+    // ronda anterior y fabricaba una «Mesa 1 (2)».
+    const enLista = parked.orders.find((o) => o.id === openAccount.id)
+    const mio = serializeCart(cartStateNow(), Date.now())
+    let r = await parked.update(openAccount.id, enLista?.updatedAt || openAccount.updatedAt, mio)
     if (!r) return false // el hook ya avisó
+    if (!r.saved && r.current && openAccount.cartAtOpen) {
+      // Sí cambió mientras estaba abierta: se junta en la misma cuenta.
+      const junto = applyCartDelta(r.current.cart, openAccount.cartAtOpen, mio)
+      r = await parked.update(openAccount.id, r.current.updatedAt, junto)
+      if (!r) return false
+      if (r.saved) toast.info(`«${openAccount.name}» tenía cambios de otro aparato: se juntaron en la misma cuenta.`)
+    }
     if (r.saved) {
       clearTip()
       clearCart()
@@ -673,7 +685,9 @@ export default function POSClient({
     setOpenAccount(null)
     vibra(12)
     toast.warning(
-      `«${openAccount.name}» se movió en otro aparato. Para no perder nada, esto se guardó como «${alterno}»: júntalas antes de cobrar.`,
+      r.current === null
+        ? `«${openAccount.name}» ya no existe: se cobró o se descartó en otro aparato. Para no perder nada, esto se guardó como «${alterno}».`
+        : `«${openAccount.name}» volvió a cambiar mientras se guardaba. Para no perder nada, esto se guardó como «${alterno}»: ábrela y júntalas.`,
       { duration: 12000 },
     )
     return true
@@ -722,6 +736,7 @@ export default function POSClient({
         name: order.name,
         openedAt: order.savedAt,
         updatedAt: order.updatedAt,
+        cartAtOpen: order.cart,
       })
       restoreLines(estado.lines)
       setTicketNotes(estado.ticketNotes)
@@ -884,8 +899,10 @@ export default function POSClient({
         // toque más («Nueva venta») entre una venta y la siguiente. Un aviso
         // con folio, monto y cambio dice lo mismo sin estorbar, y «Ver ticket»
         // abre el recibo completo (imprimir, compartir) cuando sí hace falta.
-        // Con impresión automática o QR el diálogo se queda: ahí pasa algo.
-        if (isMobile && autoPrint === "none" && !publicReceipt) {
+        // Con impresión automática el diálogo se queda: ahí pasa algo. La nota
+        // con QR sigue a un toque en «Ver ticket»: en la fila, lo que estorba
+        // es la pantalla completa entre una venta y la siguiente.
+        if (isMobile && autoPrint === "none") {
           const cambio =
             result.changeDue != null && result.changeDue > 0 ? ` · Cambio ${formatCurrency(result.changeDue)}` : ""
           toast.success(
@@ -978,7 +995,7 @@ export default function POSClient({
     } finally {
       setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, publicReceipt, practica, due, changeDue])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue])
 
   /**
    * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
@@ -1096,8 +1113,145 @@ export default function POSClient({
   /* Panel del carrito (header + líneas + cobro). Se monta una sola vez:
      como columna derecha en escritorio o dentro de una hoja inferior en
      móvil, para que refs y foco apunten al panel visible. */
+  /**
+   * Vuelve a poner la última venta en el carrito, validada contra el menú de
+   * hoy: si algo cambió de precio o se desactivó, esa línea no regresa (y se
+   * avisa). Después de una clase se venden cinco lattes iguales seguidos.
+   */
+  const repetirUltimaVenta = useCallback(() => {
+    if (!lastSale) return
+    const estado = rehydrateCart(lastSale.payload, products, Date.now())
+    if (!estado || estado.lines.length === 0) {
+      toast.error("El menú cambió y ya no se puede repetir esa venta.")
+      return
+    }
+    restoreLines(estado.lines)
+    vibra(12)
+    const guardadas = (lastSale.payload as { lines?: unknown[] }).lines?.length ?? 0
+    if (estado.lines.length < guardadas) {
+      toast.info("Se repitió la venta, pero algún artículo ya no está en el menú.")
+    }
+  }, [lastSale, products, restoreLines])
+  const ultimaTotal = useMemo(() => {
+    if (!lastSale) return null
+    const estado = rehydrateCart(lastSale.payload, products, Date.now())
+    return estado && estado.lines.length > 0 ? cartSubtotal(estado.lines) : null
+  }, [lastSale, products])
+
+  // ── Cobrar una cuenta directo desde la barra ──
+  // Un socio vuelve a pagar mientras se está tomando otro pedido: la cuenta
+  // se cobra sin tocar el carrito. En efectivo, sin propina ni descuento; si
+  // hace falta algo de eso, se abre la cuenta y se cobra como siempre. Dos
+  // toques en el mismo lugar («Cobrar» → «¿$85? Sí») para que un roce no
+  // cobre nada.
+  const [cobrandoCuenta, setCobrandoCuenta] = useState<string | null>(null)
+  const [confirmarCobro, setConfirmarCobro] = useState<string | null>(null)
+  const cobrarCuenta = useCallback(
+    async (o: ParkedOrder) => {
+      if (cobrandoCuenta || !openSession) return
+      const estado = rehydrateCart(o.cart, products, Date.now(), PARKED_MAX_AGE_MS)
+      if (!estado || estado.lines.length === 0) {
+        toast.error("Esta cuenta no se puede cobrar: sus productos ya no están en el menú. Reactívalos en Menú → Productos.", {
+          duration: 10000,
+        })
+        return
+      }
+      if (o.cart.lines.length > estado.lines.length) {
+        // Cobrar de menos sin decirlo sería peor que no cobrar: que la abra y lo vea.
+        toast.error("Algún artículo de esta cuenta ya no está en el menú. Ábrela para revisarla antes de cobrar.")
+        return
+      }
+      setCobrandoCuenta(o.id)
+      const clientRef = crypto.randomUUID()
+      const items = estado.lines.map((line) => ({
+        variant_id: getLineVariantId(line) ?? "",
+        quantity: line.quantity,
+        notes: line.notes.trim() || undefined,
+        modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
+      }))
+      const notas = estado.ticketNotes.trim() || undefined
+      try {
+        const result = await createTicket({
+          clientRef,
+          expectedBusinessId: businessId,
+          paymentMethod: "efectivo",
+          notes: notas,
+          items,
+        })
+        if (!result.success) {
+          toast.error(result.error || "Error al registrar la venta")
+          return
+        }
+        parked.remove(o.id)
+        if (openAccount?.id === o.id) {
+          // También estaba en el carrito: ya se cobró, no hay ronda que guardar.
+          setOpenAccount(null)
+          clearCart()
+        }
+        const venta: CompletedSale = {
+          ticketId: result.ticketId,
+          folio: result.folio,
+          lines: estado.lines,
+          subtotal: result.subtotal,
+          discountTotal: result.discountTotal,
+          discountReason: null,
+          total: result.total,
+          takeoutFee: result.takeoutFee,
+          tip: result.tip,
+          paymentMethod: "efectivo",
+          date: new Date(),
+          notes: notas,
+          cashReceived: result.cashReceived,
+          changeDue: result.changeDue,
+          loyalty: null,
+        }
+        toast.success(`Venta #${result.folio} · ${formatCurrency(result.total)} · Efectivo · «${o.name}»`, {
+          duration: 5000,
+          action: { label: "Ver ticket", onClick: () => setCompletedSale(venta) },
+        })
+        setTotalSales((prev) => prev + result.total)
+        vibra(30)
+      } catch {
+        // Sin señal: a la cola, como cualquier venta. La cuenta se cierra
+        // igual porque la venta ya está capturada.
+        const provisional = cola.encolar({
+          clientRef,
+          capturedAt: Date.now(),
+          items,
+          paymentMethod: "efectivo",
+          notes: notas,
+          chargedTotal: cartSubtotal(estado.lines),
+          lines: serializeLines(estado.lines, getLinePrice, getLineLabel),
+        })
+        if (provisional) {
+          parked.remove(o.id)
+          toast.success(`Venta guardada sin conexión · ${provisional}. Se subirá sola al volver el internet.`)
+          vibra(30)
+        } else {
+          toast.error(`Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`)
+        }
+      } finally {
+        setCobrandoCuenta(null)
+        setConfirmarCobro(null)
+      }
+    },
+    [cobrandoCuenta, openSession, products, businessId, parked, openAccount, clearCart, cola],
+  )
+  const tocarCobro = useCallback(
+    (o: ParkedOrder) => {
+      if (confirmarCobro === o.id) {
+        void cobrarCuenta(o)
+        return
+      }
+      setConfirmarCobro(o.id)
+      window.setTimeout(() => setConfirmarCobro((c) => (c === o.id ? null : c)), 4000)
+    },
+    [confirmarCobro, cobrarCuenta],
+  )
+
   const cartPanel = (
     <CartPanel
+      onRepeatLast={repetirUltimaVenta}
       lines={lines}
       products={products}
       itemCount={itemCount}
@@ -1233,6 +1387,7 @@ export default function POSClient({
           openAccount={openAccount}
           cuentasVisibles={cuentasVisibles}
           chipsCuentas={chipsCuentas}
+          cuentasEnBarra={isMobile === true}
           setCartOpen={setCartOpen}
           resumeParked={resumeParked}
           categories={categories}
@@ -1242,7 +1397,7 @@ export default function POSClient({
 
         {/* Product grid */}
         <ScrollArea ref={gridScrollRef} className="flex-1 min-h-0">
-          <div className={`p-4 space-y-6 ${isMobile ? "pb-24" : ""}`}>
+          <div className={`p-4 space-y-6 ${isMobile ? (cuentasActivas && (openAccount || chipsCuentas.length > 0) ? "pb-40" : "pb-24") : ""}`}>
             {/* Los dos pasos de una venta, solo la primera vez en un celular. */}
             <ArranqueCard
               mostrar={isMobile === true && products.length > 0}
@@ -1270,7 +1425,9 @@ export default function POSClient({
                   <Star className="h-3.5 w-3.5 text-amber-500" />
                   Más vendidos
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                {/* En celular son tiles grandes a dos columnas: en la hora pico
+                    la pantalla útil son estos ocho productos, no la carta entera. */}
+                <div className={isMobile ? "grid grid-cols-2 gap-2" : "flex flex-wrap gap-2"} data-favoritos>
                   {favorites.map(({ product, size }) => (
                     <m.button
                       key={size?.variantId ?? product.id}
@@ -1279,9 +1436,9 @@ export default function POSClient({
                         markFlyOrigin(e)
                         chooseProduct(product, size)
                       }}
-                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:border-amber-400 hover:bg-amber-100 transition-colors"
+                      className={`rounded-xl border border-amber-200 bg-amber-50 text-left hover:border-amber-400 hover:bg-amber-100 transition-colors ${isMobile ? "px-3 py-3" : "px-3 py-2"}`}
                     >
-                      <span className="block text-sm font-semibold text-stone-800 leading-tight">
+                      <span className={`block font-semibold text-stone-800 leading-tight ${isMobile ? "text-base" : "text-sm"}`}>
                         {product.name}
                         {size ? <span className="text-stone-500 font-normal"> · {size.label}</span> : null}
                       </span>
@@ -1343,17 +1500,90 @@ export default function POSClient({
             animate={barDip}
             className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
           >
+            {/* Cuentas abiertas junto al pulgar, siempre a la vista. Tocar el
+                nombre la abre en el carrito; «Cobrar» la cobra directo en
+                efectivo sin tocar el carrito, con un segundo toque de
+                confirmación. En el encabezado se perdían al desplazarse. */}
+            {cuentasActivas && (openAccount || chipsCuentas.length > 0) && (
+              <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-hide" data-cuentas-barra>
+                {openAccount && (
+                  <button
+                    type="button"
+                    onClick={() => setCartOpen(true)}
+                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-amber-600 bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white"
+                    title={`«${openAccount.name}» está en el carrito`}
+                  >
+                    <PauseCircle className="h-3.5 w-3.5" />
+                    {openAccount.name}
+                    <span className="opacity-80">· en el carrito</span>
+                  </button>
+                )}
+                {chipsCuentas.map(({ o, total, vieja }) => (
+                  <div
+                    key={o.id}
+                    className={`flex shrink-0 overflow-hidden rounded-full border ${vieja ? "border-amber-400" : "border-stone-200"}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void resumeParked(o)}
+                      className={`flex items-center gap-1.5 py-1.5 pl-3 pr-2 text-sm font-semibold ${vieja ? "bg-amber-50 text-amber-800" : "bg-white text-stone-700"}`}
+                      title={`Abrir «${o.name}» para agregarle`}
+                    >
+                      <PauseCircle className={`h-3.5 w-3.5 ${vieja ? "text-amber-600" : "text-amber-500"}`} />
+                      {o.name}
+                      <span className={vieja ? "text-amber-700" : "text-stone-400"}>{formatCurrency(total)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => tocarCobro(o)}
+                      disabled={cobrandoCuenta !== null || !openSession}
+                      aria-label={`Cobrar «${o.name}» en efectivo`}
+                      title={openSession ? `Cobrar «${o.name}» en efectivo` : "Abre la caja para cobrar"}
+                      className={`border-l px-2.5 py-1.5 text-sm font-bold text-white disabled:opacity-40 ${
+                        confirmarCobro === o.id ? "border-green-700 bg-green-700" : "border-green-600 bg-green-600"
+                      }`}
+                    >
+                      {cobrandoCuenta === o.id ? "…" : confirmarCobro === o.id ? `¿${formatCurrency(total)}? Sí` : "Cobrar"}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setShowTray(true)}
+                  className="shrink-0 rounded-full border border-stone-200 bg-white p-1.5 text-stone-400"
+                  aria-label="Ver todas las cuentas"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             {lines.length === 0 ? (
-              <Button
-                className="w-full h-12 rounded-xl text-base font-bold justify-between px-4 bg-stone-100 text-stone-500 hover:bg-stone-200"
-                onClick={() => setCartOpen(true)}
-              >
-                <span className="flex items-center gap-2">
-                  <ShoppingBag className="h-5 w-5" />
-                  Carrito vacío
-                </span>
-                <ChevronUp className="h-4 w-4 opacity-70" />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  className="h-12 min-w-0 flex-1 rounded-xl text-base font-bold justify-between px-4 bg-stone-100 text-stone-500 hover:bg-stone-200"
+                  onClick={() => setCartOpen(true)}
+                >
+                  <span className="flex items-center gap-2">
+                    <ShoppingBag className="h-5 w-5" />
+                    Carrito vacío
+                  </span>
+                  <ChevronUp className="h-4 w-4 opacity-70" />
+                </Button>
+                {/* Después de una clase se venden cinco lattes iguales seguidos:
+                    la última venta, de vuelta al carrito en un toque. */}
+                {lastSale && ultimaTotal !== null && (
+                  <Button
+                    variant="outline"
+                    className="h-12 shrink-0 gap-1.5 rounded-xl border-amber-300 px-3 text-base font-bold text-amber-800 hover:bg-amber-50"
+                    onClick={repetirUltimaVenta}
+                    title={`Repetir la última venta (#${lastSale.folio})`}
+                    data-otra-vez
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Otra vez · {formatCurrency(ultimaTotal)}
+                  </Button>
+                )}
+              </div>
             ) : (
               /* Con artículos, la barra se parte: ver el carrito a la
                  izquierda, Cobrar directo a la derecha. La venta común es "2

@@ -281,3 +281,52 @@ export function mergeParkedCarts(base: PersistedCart, extra: PersistedCart): Per
     savedAt: extra.savedAt,
   }
 }
+
+/**
+ * Aplica sobre la versión del servidor lo que ESTE aparato cambió desde que
+ * abrió la cuenta: la diferencia entre el carrito de ahora y el de entonces,
+ * renglón por renglón (mismo contenido = mismo renglón, ver `lineKey`).
+ *
+ * Hace falta cuando dos aparatos tocan la misma cuenta, y también cuando el
+ * mismo teléfono se reinició a media ronda y volvió con un sello viejo: en
+ * vez de clonar la cuenta como «Mesa 1 (2)» —que nadie sabía juntar— se
+ * suma lo agregado, se resta lo quitado, y la cuenta sigue siendo una. Lo
+ * que el otro aparato agregó se respeta; lo que este quitó, se quita hasta
+ * donde alcance.
+ */
+export function applyCartDelta(server: PersistedCart, atOpen: PersistedCart, mine: PersistedCart): PersistedCart {
+  const cantidades = (cart: PersistedCart) => {
+    const m = new Map<string, number>()
+    for (const l of cart.lines) m.set(lineKey(l), (m.get(lineKey(l)) ?? 0) + l.quantity)
+    return m
+  }
+  const antes = cantidades(atOpen)
+  const ahora = cantidades(mine)
+  const delta = new Map<string, number>()
+  for (const [k, q] of ahora) delta.set(k, q - (antes.get(k) ?? 0))
+  for (const [k, q] of antes) if (!ahora.has(k)) delta.set(k, -q)
+
+  const lines = server.lines.map((l) => ({ ...l }))
+  const porLlave = new Map(lines.map((l) => [lineKey(l), l]))
+  const muestra = new Map(mine.lines.map((l) => [lineKey(l), l]))
+  for (const [k, d] of delta) {
+    if (d === 0) continue
+    const ya = porLlave.get(k)
+    if (ya) {
+      ya.quantity = Math.max(0, Math.min(99, ya.quantity + d))
+    } else if (d > 0) {
+      const base = muestra.get(k)
+      if (base) {
+        const copia = { ...base, quantity: Math.min(99, d) }
+        lines.push(copia)
+        porLlave.set(k, copia)
+      }
+    }
+  }
+  return {
+    ...server,
+    lines: lines.filter((l) => l.quantity > 0),
+    ticketNotes: mine.ticketNotes?.trim() ? mine.ticketNotes : server.ticketNotes,
+    savedAt: mine.savedAt,
+  }
+}

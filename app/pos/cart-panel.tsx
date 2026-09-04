@@ -39,7 +39,7 @@ import { CartLineDialog } from "./cart-line-dialog"
 import { formatPhone } from "./loyalty-dialog"
 import type { LoyaltyCustomer } from "@/app/actions/loyalty"
 import type { OpenSession } from "./cash-session-dialog"
-import { getLinePrice, rehydrateCart, type CartLine, type PaymentMethod, type Product, type SizeOption, type TicketDiscount } from "./cart"
+import { getLinePrice, type CartLine, type PaymentMethod, type Product, type SizeOption, type TicketDiscount } from "./cart"
 import { gestoEnTarjeta, vibra, PRESION_LARGA_MS, QUICK_NOTES, TIP_OPTIONS, UMBRAL_GESTO, type TipChoice } from "./pos-utils"
 import type { ParkedOrder } from "./parked"
 import type { usePosCart } from "./use-pos-cart"
@@ -78,6 +78,8 @@ export interface CartPanelProps {
   setLineNotes: Cart["setLineNotes"]
   setPendingModifiers: (p: PendingModifiers | null) => void
   lastSale: { folio: number; payload: unknown } | null
+  /** Vuelve a poner en el carrito la última venta (validada contra el menú de hoy). */
+  onRepeatLast: () => void
   setConfirmClear: (open: boolean) => void
   // Cuentas abiertas
   parkedEnabled: boolean
@@ -157,8 +159,8 @@ export interface CartPanelProps {
  */
 export function CartPanel(p: CartPanelProps) {
   const {
-    lines, products, itemCount, isMobile, setCartOpen,
-    updateQuantity, setQuantityTo, duplicateLine, removeLine, restoreLines, setLineNotes,
+    lines, itemCount, isMobile, setCartOpen,
+    updateQuantity, setQuantityTo, duplicateLine, removeLine, setLineNotes,
     setPendingModifiers, lastSale, setConfirmClear,
     parkedEnabled, openAccount, cuentasVisibles, saveToOpenAccount, setShowPark, setShowTray,
     loyaltyEnabled, loyaltyCustomer, loyaltyRedeem, loyaltyTarget,
@@ -380,21 +382,7 @@ export function CartPanel(p: CartPanelProps) {
               {lastSale && (
                 <button
                   type="button"
-                  onClick={() => {
-                    // Se valida contra el menú DE HOY: si algo cambió de precio
-                    // o se desactivó, esa línea no regresa (y se avisa).
-                    const estado = rehydrateCart(lastSale.payload, products, Date.now())
-                    if (!estado || estado.lines.length === 0) {
-                      toast.error("El menú cambió y ya no se puede repetir esa venta.")
-                      return
-                    }
-                    restoreLines(estado.lines)
-                    vibra(12)
-                    const guardadas = (lastSale.payload as { lines?: unknown[] }).lines?.length ?? 0
-                    if (estado.lines.length < guardadas) {
-                      toast.info("Se repitió la venta, pero algún artículo ya no está en el menú.")
-                    }
-                  }}
+                  onClick={p.onRepeatLast}
                   className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-600 hover:border-amber-300 hover:text-amber-700"
                 >
                   <RotateCcw className="h-4 w-4" />

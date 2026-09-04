@@ -421,7 +421,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -619,6 +619,13 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
+            <strong>En el celular, las cuentas viven junto al pulgar:</strong> una franja arriba de la barra de abajo,
+            siempre a la vista, con cada cuenta y su monto. Tocar el nombre la abre en el carrito para agregarle; tocar{" "}
+            <strong>Cobrar</strong> la cobra directo en efectivo sin tocar lo que ya llevas en el carrito, con un segundo
+            toque de confirmación («¿$85? Sí») para que un roce no cobre nada. Si la cuenta cambió mientras la tenías
+            abierta, lo tuyo se junta en la misma cuenta; ya no se crea una «Mesa 1 (2)».
+          </li>
+          <li>
             Menú <strong>⋮</strong> (arriba a la derecha) → <strong>Tickets del día</strong>: lista las ventas del
             turno. Cada una tiene{" "}
             <Printer className="inline h-3.5 w-3.5 align-text-bottom" /> reimprimir ticket,{" "}
@@ -743,10 +750,15 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Smartphone,
       titulo: "En tablet o celular",
       palabras:
-        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket",
+        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket hora pico otra vez repetir ultima venta aviso corto tiles grandes",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Hora pico:</strong> los «Más vendidos» son tiles grandes a dos columnas; después de cobrar sale un
+            aviso corto con «Ver ticket» en vez de la pantalla del recibo; y con el carrito vacío la barra ofrece{" "}
+            <strong>Otra vez</strong>, que vuelve a poner la última venta en el carrito para cobrarla de un toque.
+          </li>
           <li>
             <strong>La primera vez en un celular</strong> aparece una tarjeta con los dos pasos de una venta (toca el
             producto, toca Cobrar) y tres botones: <strong>Practicar sin registrar</strong>, <strong>Ver la guía</strong>{" "}

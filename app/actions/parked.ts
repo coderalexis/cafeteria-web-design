@@ -154,7 +154,9 @@ const actualizarSchema = z.object({
  */
 export async function updateParked(
   input: z.infer<typeof actualizarSchema>,
-): Promise<ActionResult<{ saved: boolean; updatedAt: string | null }>> {
+): Promise<
+  ActionResult<{ saved: boolean; updatedAt: string | null; current: { cart: unknown; updatedAt: string } | null }>
+> {
   const { error: ctxError } = await requireContext()
   if (ctxError !== null) return { error: ctxError }
 
@@ -173,7 +175,21 @@ export async function updateParked(
 
   if (error) return { error: dbErrorMessage(error) }
   const fila = data?.[0]
-  return { success: true, saved: !!fila, updatedAt: fila?.updated_at ?? null }
+  if (fila) return { success: true, saved: true, updatedAt: fila.updated_at, current: null }
+  // Chocó: se devuelve la versión que sí está en el servidor para que el POS
+  // junte en lugar de clonar. Si la cuenta ya no existe (se cobró o se
+  // descartó en otro aparato), se dice con null.
+  const { data: actual } = await supabase
+    .from("parked_orders")
+    .select("cart, updated_at")
+    .eq("id", parsed.data.id)
+    .maybeSingle()
+  return {
+    success: true,
+    saved: false,
+    updatedAt: null,
+    current: actual ? { cart: actual.cart, updatedAt: actual.updated_at } : null,
+  }
 }
 
 /** Quita un pedido de la bandeja (se retomó o se descartó). */

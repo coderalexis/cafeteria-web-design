@@ -9,6 +9,9 @@ import { PARKED_MAX, type ParkedOrder } from "./parked"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
 const REFRESCO_MS = 10_000
+// En un teléfono, cada consulta cuesta batería y datos, y el POS del celular
+// casi siempre es el único aparato de la cafetería: con 30 s alcanza.
+const REFRESCO_MOVIL_MS = 30_000
 
 /**
  * Cuentas abiertas de la CAFETERÍA, no del aparato.
@@ -119,14 +122,23 @@ export function useParkedOrders(businessId: string) {
 
   useEffect(() => {
     void refrescar()
-    const tic = setInterval(() => void refrescar(), REFRESCO_MS)
-    const alVolver = () => void refrescar()
+    const movil = window.matchMedia("(max-width: 767px)").matches
+    // Con la app en segundo plano no se consulta: al volver se refresca de
+    // inmediato (visibilitychange es lo que sí dispara iOS al regresar).
+    const tic = setInterval(() => {
+      if (!document.hidden) void refrescar()
+    }, movil ? REFRESCO_MOVIL_MS : REFRESCO_MS)
+    const alVolver = () => {
+      if (!document.hidden) void refrescar()
+    }
     window.addEventListener("focus", alVolver)
     window.addEventListener("online", alVolver)
+    document.addEventListener("visibilitychange", alVolver)
     return () => {
       clearInterval(tic)
       window.removeEventListener("focus", alVolver)
       window.removeEventListener("online", alVolver)
+      document.removeEventListener("visibilitychange", alVolver)
     }
     // `businessId` para volver a cargar si se cambia de cafetería en otra pestaña.
   }, [refrescar, businessId])
@@ -185,7 +197,12 @@ export function useParkedOrders(businessId: string) {
       id: string,
       expectedUpdatedAt: string,
       cart: ParkedOrder["cart"],
-    ): Promise<{ saved: boolean; updatedAt: string | null } | null> => {
+    ): Promise<{
+      saved: boolean
+      updatedAt: string | null
+      /** Al chocar: lo que sí está en el servidor (null si la cuenta ya no existe). */
+      current: { cart: ParkedOrder["cart"]; updatedAt: string } | null
+    } | null> => {
       const r = await updateParked({ id, cart, expectedUpdatedAt })
       if (!r?.success) {
         toast.error(r?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
@@ -198,7 +215,11 @@ export function useParkedOrders(businessId: string) {
       } else {
         void refrescar() // la versión buena es la del servidor
       }
-      return { saved: r.saved, updatedAt: r.updatedAt }
+      return {
+        saved: r.saved,
+        updatedAt: r.updatedAt,
+        current: r.current ? { cart: r.current.cart as ParkedOrder["cart"], updatedAt: r.current.updatedAt } : null,
+      }
     },
     [aplicar, refrescar],
   )
