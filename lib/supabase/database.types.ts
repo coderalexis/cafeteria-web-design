@@ -706,6 +706,8 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           name: string
+          pinned_order?: number | null
+          prompt_modifiers?: boolean
           sort_order?: number
           updated_at?: string
         }
@@ -1452,12 +1454,12 @@ export type Database = {
       }
       my_context: { Args: never; Returns: Json }
       my_pin_set: { Args: never; Returns: boolean }
-      product_extras_usage: { Args: { p_days?: number }; Returns: Json }
       open_cash_session: {
         Args: { p_notes?: string; p_opening_float: number }
         Returns: Json
       }
       platform_overview: { Args: never; Returns: Json }
+      product_extras_usage: { Args: { p_days?: number }; Returns: Json }
       profit_report: { Args: { p_month?: string }; Returns: Json }
       promo_best: {
         Args: { p_biz: string; p_items: Json; p_tz: string; p_when: string }
