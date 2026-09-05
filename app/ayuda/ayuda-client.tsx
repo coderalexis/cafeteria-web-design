@@ -463,7 +463,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           <DemoCuenta />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
-              <strong>Al abrir una cuenta, el carrito lo anuncia:</strong> «"Mesa 7" recuperada · 3 artículos» y las líneas
+              <strong>Al abrir una cuenta, el carrito lo anuncia:</strong> «&quot;Mesa 7&quot; recuperada · 3 artículos» y las líneas
               entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez de
               «+ Latte», para que no se confunda con haber tocado un producto.
             </li>
