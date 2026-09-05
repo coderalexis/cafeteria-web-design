@@ -428,7 +428,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -462,6 +462,11 @@ export function AyudaClient({ ticket, corte }: Props) {
           </ol>
           <DemoCuenta />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Al abrir una cuenta, el carrito lo anuncia:</strong> «"Mesa 7" recuperada · 3 artículos» y las líneas
+              entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez de
+              «+ Latte», para que no se confunda con haber tocado un producto.
+            </li>
             <li>
               <strong>Repetir el nombre no duplica: suma.</strong> Si tocas «Abrir cuenta» y eliges una mesa que ya
               tiene cuenta (el chip se marca con <strong>+</strong>), lo del carrito <em>se le agrega</em> a esa
@@ -581,7 +586,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: Wallet,
       titulo: "Efectivo, propinas y descuentos",
-      palabras: "cambio recibido teclado billete propina porcentaje descuento motivo",
+      palabras: "cambio recibido teclado billete propina porcentaje descuento motivo fiado fiar a nombre de credito metodo de pago",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Tope de descuento: Módulos del POS", href: "/admin/negocio#modulos", admin: true }, { etiqueta: "Para llevar y comisión", href: "/admin/negocio#para-llevar", admin: true }],
       nodo: (
         <>
@@ -716,7 +721,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Lock,
       titulo: "Cerrar el turno (corte de caja)",
       palabras:
-        "corte cierre cerrar cierro efectivo dinero caja esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre billetes monedas denominacion contar contado fondo siguiente turno retiro me llevo",
+        "corte cierre cerrar cierro efectivo dinero caja esperado contado diferencia cuadre sobrante faltante entrada salida movimiento propinas olvidar caja abierta automatico sin arqueo hora de cierre billetes monedas denominacion contar contado fondo siguiente turno retiro me llevo fiado fiados abonos abono entrada",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Cortes en el panel", href: "/admin/cortes", admin: true }, { etiqueta: "Hora de cierre", href: "/admin/negocio#cierre", admin: true }],
       nodo: (
         <>
@@ -746,6 +751,12 @@ export function AyudaClient({ ticket, corte }: Props) {
               caja) y se pueden reimprimir.
             </Step>
           </ol>
+          <p className="mt-3 text-sm text-stone-600">
+            <strong>Con fiados encendidos:</strong> lo vendido con «Fiado» se lista aparte en el corte —es venta del
+            turno, pero no entra a la caja, así que el efectivo esperado no lo incluye—. Los <strong>abonos</strong>{" "}
+            de fiados recibidos en efectivo sí cuentan: entran como <strong>entradas</strong> del turno, con el
+            nombre de quien abonó.
+          </p>
           <DemoDiferencia />
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <p className="font-semibold">¿Y si un día se me olvida cerrarla?</p>
@@ -1272,7 +1283,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Store,
       titulo: "Datos y ajustes: negocio, metas y menú con QR",
       palabras:
-        "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto",
+        "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto fiados modulo fiar",
       acciones: [{ etiqueta: "Datos y ajustes", href: "/admin/negocio", admin: true }, { etiqueta: "Metas", href: "/admin/negocio#metas", admin: true }, { etiqueta: "Menú público (QR)", href: "/admin/negocio#menu-publico", admin: true }, { etiqueta: "Impresión", href: "/admin/negocio#impresion", admin: true }, { etiqueta: "Módulos del POS", href: "/admin/negocio#modulos", admin: true }, { etiqueta: "Seguridad de caja", href: "/admin/negocio#seguridad", admin: true }],
       nodo: (
         <>
@@ -1317,7 +1328,8 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
-              <strong>Cuentas abiertas</strong>; define cuántas <strong>mesas</strong> tienes y qué otros botones
+              <strong>Cuentas abiertas</strong> o <strong>Fiados</strong> (cuentas por persona con abonos); define
+              cuántas <strong>mesas</strong> tienes y qué otros botones
               salen al abrir una cuenta; decide cuándo se preguntan los <strong>extras</strong> al tocar un producto
               (al tocarlo, o solo si hay que elegir uno); ajusta cada cuánto se actualiza{" "}
               <strong>«Por preparar»</strong>; y pone el <strong>descuento máximo en caja</strong> (dueños y
@@ -1461,10 +1473,15 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Receipt,
       titulo: "Ventas y reportes",
-      palabras: "historial periodo filtro folio buscar csv excel exportar detalle",
+      palabras: "historial periodo filtro folio buscar csv excel exportar detalle fiado metodo de pago abonos",
       acciones: [{ etiqueta: "Ventas", href: "/admin/ventas", admin: true }, { etiqueta: "Análisis", href: "/admin/analisis", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Fiado</strong> aparece como método propio en «Ventas por método»: es venta del día (con sus precios y su
+            hora), no dinero recibido. Los abonos no son ventas —la venta ya se contó cuando se fió— y viven en Por cobrar y
+            en los movimientos de caja del turno en que entraron.
+          </li>
           <li>
             Elige el periodo (Hoy, Ayer, 7 días, 30 días, Este mes o un rango del calendario) y filtra por cajero o
             método de pago. Indicadores, gráfica por día, hora pico y más vendidos corresponden al periodo elegido.
