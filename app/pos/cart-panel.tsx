@@ -10,6 +10,7 @@ import {
   HandCoins,
   Lock,
   Minus,
+  ArchiveRestore,
   MoreHorizontal,
   PauseCircle,
   Pencil,
@@ -41,7 +42,7 @@ import type { LoyaltyCustomer } from "@/app/actions/loyalty"
 import type { OpenSession } from "./cash-session-dialog"
 import { getLinePrice, type CartLine, type PaymentMethod, type Product, type SizeOption, type TicketDiscount } from "./cart"
 import { gestoEnTarjeta, vibra, PRESION_LARGA_MS, QUICK_NOTES, TIP_OPTIONS, UMBRAL_GESTO, type TipChoice } from "./pos-utils"
-import type { ParkedOrder } from "./parked"
+import { avisoRecuperada, type Recuperada, type ParkedOrder } from "./parked"
 import type { usePosCart } from "./use-pos-cart"
 
 type Cart = ReturnType<typeof usePosCart>
@@ -100,6 +101,8 @@ export interface CartPanelProps {
   // Vuelo al carrito (la bolsa rebota al aterrizar)
   cartPulse: number
   bagTargetRef: RefObject<HTMLSpanElement | null>
+  /** Cuenta (o última venta) que acaba de volver al carrito: se anuncia un instante. */
+  recuperada: Recuperada | null
   // Pago
   paymentMethod: PaymentMethod
   setPaymentMethod: Cart["setPaymentMethod"]
@@ -165,7 +168,7 @@ export function CartPanel(p: CartPanelProps) {
     parkedEnabled, openAccount, cuentasVisibles, saveToOpenAccount, setShowPark, setShowTray,
     loyaltyEnabled, loyaltyCustomer, loyaltyRedeem, loyaltyTarget,
     setLoyaltyCustomer, setLoyaltyRedeem, setShowLoyalty, setShowRedeem,
-    cartPulse, bagTargetRef,
+    cartPulse, bagTargetRef, recuperada,
     paymentMethod, setPaymentMethod, cashReceivedInput, setCashReceivedInput, cashInputRef,
     cashReceived, changeDue, cashInsufficient, setShowTender,
     tipChoice, setTipChoice, tipCustomInput, setTipCustomInput, tipAmount,
@@ -370,6 +373,27 @@ export function CartPanel(p: CartPanelProps) {
         )}
       </header>
 
+      {/* Confirmación de que la cuenta volvió completa: se lee un instante y
+          se va sola; las líneas entran escalonadas debajo para que se lea
+          «llegaron estas», no «aparecieron». */}
+      <AnimatePresence>
+        {recuperada && (
+          <m.div
+            key={recuperada.key}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            role="status"
+            className="flex shrink-0 items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800"
+            data-recuperada
+          >
+            <ArchiveRestore className="h-4 w-4 shrink-0" />
+            <span className="truncate">{avisoRecuperada(recuperada.name, recuperada.articulos)}</span>
+          </m.div>
+        )}
+      </AnimatePresence>
+
       {/* Cart items */}
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-3 py-4">
@@ -399,7 +423,7 @@ export function CartPanel(p: CartPanelProps) {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20, height: 0 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.2, delay: recuperada ? Math.min(i, 8) * 0.06 : 0 }}
                   data-recorrido={i === 0 ? "linea" : undefined}
                   className="relative border-b border-stone-100"
                 >

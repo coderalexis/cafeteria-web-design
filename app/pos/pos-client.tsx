@@ -19,7 +19,7 @@ import {
   Search,
   Lock,
   ChevronUp,
-  Star, PauseCircle, ChevronRight, RotateCcw } from "lucide-react"
+  Star, PauseCircle, ChevronRight, RotateCcw, ArchiveRestore } from "lucide-react"
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
@@ -64,7 +64,7 @@ import {
   parkedAccount,
   waitingLabel,
   PARKED_MAX_AGE_MS,
-  type ParkedOrder, applyCartDelta, suggestAccountNames, type AccountVisit } from "./parked"
+  type ParkedOrder, applyCartDelta, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -500,8 +500,16 @@ export default function POSClient({
   }, [searchPinned])
 
   // ── Vuelo al carrito y «¿sí lo agregó?» (móvil) ──
-  const feedback = useCartFeedback({ lines, isMobile, cartOpen })
-  const { lastAdded, markFlyOrigin, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
+  // Lo que acaba de volver entero al carrito (una cuenta o la última venta):
+  // se anuncia unos segundos en el carrito y en la barra de celular.
+  const [recuperada, setRecuperada] = useState<Recuperada | null>(null)
+  useEffect(() => {
+    if (!recuperada) return
+    const t = setTimeout(() => setRecuperada(null), 3000)
+    return () => clearTimeout(t)
+  }, [recuperada])
+  const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
+  const { lastAdded, aviso, markFlyOrigin, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
 
   // Aviso único si se restauró un carrito guardado
   useEffect(() => {
@@ -751,6 +759,7 @@ export default function POSClient({
         cartAtOpen: order.cart,
       })
       restoreLines(estado.lines)
+      setRecuperada({ key: Date.now(), name: order.name, articulos: estado.lines.reduce((s, l) => s + l.quantity, 0) })
       setTicketNotes(estado.ticketNotes)
       clearTip()
       setShowTray(false)
@@ -1172,6 +1181,7 @@ export default function POSClient({
       return
     }
     restoreLines(estado.lines)
+    setRecuperada({ key: Date.now(), name: `Venta #${lastSale.folio}`, articulos: estado.lines.reduce((s, l) => s + l.quantity, 0) })
     vibra(12)
     const guardadas = (lastSale.payload as { lines?: unknown[] }).lines?.length ?? 0
     if (estado.lines.length < guardadas) {
@@ -1330,6 +1340,7 @@ export default function POSClient({
       setShowRedeem={setShowRedeem}
       cartPulse={cartPulse}
       bagTargetRef={bagTargetRef}
+      recuperada={recuperada}
       paymentMethod={paymentMethod}
       setPaymentMethod={setPaymentMethod}
       cashReceivedInput={cashReceivedInput}
@@ -1643,7 +1654,12 @@ export default function POSClient({
                   className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
                   onClick={() => setCartOpen(true)}
                 >
-                  {lastAdded ? (
+                  {aviso ? (
+                    <span key={aviso.key} className="flex min-w-0 items-center gap-1.5 text-emerald-700" data-recuperada>
+                      <ArchiveRestore className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 truncate">{aviso.label}</span>
+                    </span>
+                  ) : lastAdded ? (
                     <span key={lastAdded.key} className="flex min-w-0 items-center gap-1.5 text-amber-700">
                       <Plus className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">{lastAdded.label}</span>

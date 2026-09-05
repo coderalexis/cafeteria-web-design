@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { m, useAnimationControls, useReducedMotion } from "framer-motion"
 import { getLinePrice, type CartLine } from "./cart"
+import { avisoRecuperada, type Recuperada } from "./parked"
 import { vibra } from "./pos-utils"
 
 /** ¿El navegador sabe animar sobre una curva? (Safari viejo no; ahí el
@@ -22,7 +23,18 @@ type Landing = { id: number; x: number; y: number }
  * anterior con el nuevo, y esa comparación es una sola aunque la pinten dos
  * cosas distintas.
  */
-export function useCartFeedback({ lines, isMobile, cartOpen }: { lines: CartLine[]; isMobile: boolean; cartOpen: boolean }) {
+export function useCartFeedback({
+  lines,
+  isMobile,
+  cartOpen,
+  recuperada,
+}: {
+  lines: CartLine[]
+  isMobile: boolean
+  cartOpen: boolean
+  /** Una cuenta (o la última venta) que acaba de volver entera al carrito. */
+  recuperada: Recuperada | null
+}) {
   // ── "¿Sí lo agregó?" (móvil) ──
   // En tablet ves el carrito crecer al tocar un producto; en celular solo
   // cambia un numerito en la barra de abajo. Ese silencio provoca dobles
@@ -31,6 +43,12 @@ export function useCartFeedback({ lines, isMobile, cartOpen }: { lines: CartLine
   // vibración corta. Con la hoja abierta no hace falta: el carrito se ve.
   const [lastAdded, setLastAdded] = useState<{ label: string; price: number; key: number } | null>(null)
   const prevLinesRef = useRef<CartLine[]>(lines)
+  // ── "Volvió la cuenta" (móvil) ──
+  // Al abrir una cuenta el carrito cambia entero; eso no es «un artículo
+  // más» y la barra no debe decir «+ Latte $40» como si se hubiera tocado
+  // algo. Dice lo que pasó: qué cuenta volvió y con cuántos artículos.
+  const [aviso, setAviso] = useState<{ label: string; key: number } | null>(null)
+  const recuperadaKeyRef = useRef<number | null>(null)
 
   // ── Vuelo al carrito ──
   // Un punto sale de la tarjeta tocada y aterriza en el carrito: barra
@@ -61,6 +79,18 @@ export function useCartFeedback({ lines, isMobile, cartOpen }: { lines: CartLine
   }, [])
 
   useEffect(() => {
+    if (recuperada && recuperada.key !== recuperadaKeyRef.current) {
+      // Volvió una cuenta entera: ni vuelo ni «+ Latte». El origen de vuelo
+      // se descarta también, por si quedó apuntado de un toque anterior.
+      recuperadaKeyRef.current = recuperada.key
+      prevLinesRef.current = lines
+      flyOriginRef.current = null
+      setLastAdded(null)
+      if (isMobile && !cartOpen) {
+        setAviso({ label: avisoRecuperada(recuperada.name, recuperada.articulos), key: recuperada.key })
+      }
+      return
+    }
     const prev = prevLinesRef.current
     prevLinesRef.current = lines
     let added: CartLine | null = null
@@ -98,12 +128,17 @@ export function useCartFeedback({ lines, isMobile, cartOpen }: { lines: CartLine
       price: getLinePrice(added),
       key: Date.now(),
     })
-  }, [lines, isMobile, cartOpen, reducedMotion])
+  }, [lines, isMobile, cartOpen, reducedMotion, recuperada])
   useEffect(() => {
     if (!lastAdded) return
     const t = setTimeout(() => setLastAdded(null), 1800)
     return () => clearTimeout(t)
   }, [lastAdded])
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 2600)
+    return () => clearTimeout(t)
+  }, [aviso])
 
   /** Terminó de volar un punto: se retira y, si era el principal, aterriza. */
   const completeFlight = useCallback(
@@ -124,7 +159,7 @@ export function useCartFeedback({ lines, isMobile, cartOpen }: { lines: CartLine
     setLandings((cur) => cur.filter((x) => x.id !== id))
   }, [])
 
-  return { lastAdded, markFlyOrigin, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
+  return { lastAdded, aviso, markFlyOrigin, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
 }
 
 /** Los puntos en vuelo y los aterrizajes, encima de todo el POS. */
