@@ -88,7 +88,10 @@ begin
   perform pruebas.espera(
     (select sum(total) from public.tickets where business_id = c.business_id and status = 'completado')
       = c.precio_chico + c.precio_grande + c.precio_grande,
-    'el corte cuenta solo las ventas vivas');
+    format('el corte cuenta solo las ventas vivas (dio %s, esperaba %s; vivas: %s)',
+      (select sum(total) from public.tickets where business_id = c.business_id and status = 'completado'),
+      c.precio_chico + c.precio_grande + c.precio_grande,
+      (select string_agg(folio || ':' || total || ':' || status || ':' || coalesce(discount_reason, '-'), ' ' order by folio) from public.tickets where business_id = c.business_id)));
 
   -- Con la caja cerrada ya no se corrige, ni el dueño.
   perform pruebas.como(c.owner_id);
