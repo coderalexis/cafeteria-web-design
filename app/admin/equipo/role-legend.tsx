@@ -29,6 +29,12 @@ const FILAS: { que: string; cajero: string; admin: string; owner: string }[] = [
     owner: "Cualquiera, cuando sea",
   },
   {
+    que: "Corregir una venta (vuelve al carrito y se cobra de nuevo; la original queda cancelada)",
+    cajero: "Solo las suyas, mientras la caja siga abierta",
+    admin: "Cualquiera, mientras la caja de esa venta siga abierta",
+    owner: "Cualquiera, mientras la caja de esa venta siga abierta",
+  },
+  {
     que: "Descuentos en caja",
     cajero: "Hasta el tope de Datos y ajustes (0 = ninguno)",
     admin: "Sin tope",

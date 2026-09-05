@@ -103,6 +103,9 @@ export interface CartPanelProps {
   bagTargetRef: RefObject<HTMLSpanElement | null>
   /** Cuenta (o última venta) que acaba de volver al carrito: se anuncia un instante. */
   recuperada: Recuperada | null
+  /** Corrigiendo una venta cobrada (P37): al cobrar se sustituye la original. */
+  corrigiendo: { folio: number } | null
+  cancelarCorreccion: () => void
   // Pago
   paymentMethod: PaymentMethod
   setPaymentMethod: Cart["setPaymentMethod"]
@@ -168,7 +171,7 @@ export function CartPanel(p: CartPanelProps) {
     parkedEnabled, openAccount, cuentasVisibles, saveToOpenAccount, setShowPark, setShowTray,
     loyaltyEnabled, loyaltyCustomer, loyaltyRedeem, loyaltyTarget,
     setLoyaltyCustomer, setLoyaltyRedeem, setShowLoyalty, setShowRedeem,
-    cartPulse, bagTargetRef, recuperada,
+    cartPulse, bagTargetRef, recuperada, corrigiendo, cancelarCorreccion,
     paymentMethod, setPaymentMethod, cashReceivedInput, setCashReceivedInput, cashInputRef,
     cashReceived, changeDue, cashInsufficient, setShowTender,
     tipChoice, setTipChoice, tipCustomInput, setTipCustomInput, tipAmount,
@@ -393,6 +396,29 @@ export function CartPanel(p: CartPanelProps) {
           </m.div>
         )}
       </AnimatePresence>
+
+      {/* Corrigiendo una venta: el carrito ES esa venta. Se ve siempre,
+          porque cobrar aquí cancela la original. */}
+      {corrigiendo && (
+        <div
+          className="flex shrink-0 items-center justify-between gap-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-900"
+          data-corrigiendo
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <Pencil className="h-4 w-4 shrink-0 text-sky-700" />
+            <span className="truncate">
+              <strong>Corrigiendo la venta #{corrigiendo.folio}</strong> · al cobrar se sustituye
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={cancelarCorreccion}
+            className="shrink-0 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900"
+          >
+            Dejarla como estaba
+          </button>
+        </div>
+      )}
 
       {/* Cart items */}
       <ScrollArea className="flex-1 min-h-0">
@@ -1038,7 +1064,9 @@ export function CartPanel(p: CartPanelProps) {
             >
               {isProcessing
                 ? "Procesando..."
-                : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
+                : corrigiendo
+                  ? `Corregir #${corrigiendo.folio} · ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`
+                  : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
               <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
             </Button>
           ) : (
