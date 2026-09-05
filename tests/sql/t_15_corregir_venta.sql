@@ -89,7 +89,9 @@ begin
     perform pruebas.espera(sqlerrm like '%tus propias ventas%', 'la cajera solo corrige las suyas: ' || sqlerrm);
   end;
 
-  -- El corte solo cuenta las ventas vivas.
+  -- El corte solo cuenta las ventas vivas. Se mira como dueño: la cajera
+  -- solo ve SUS tickets (RLS), y la venta del dueño no aparecería.
+  perform pruebas.como(c.owner_id);
   perform pruebas.espera(
     (select sum(total) from public.tickets where business_id = c.business_id and status = 'completado')
       = c.precio_chico + c.precio_grande + c.precio_grande,
