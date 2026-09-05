@@ -1277,6 +1277,7 @@ export type Database = {
         Row: {
           business_id: string
           id: string
+          is_custom: boolean
           line_total: number
           notes: string | null
           product_id: string | null
@@ -1292,6 +1293,7 @@ export type Database = {
         Insert: {
           business_id?: string
           id?: string
+          is_custom?: boolean
           line_total: number
           notes?: string | null
           product_id?: string | null
@@ -1307,6 +1309,7 @@ export type Database = {
         Update: {
           business_id?: string
           id?: string
+          is_custom?: boolean
           line_total?: number
           notes?: string | null
           product_id?: string | null
@@ -1589,6 +1592,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["business_role"]
       }
+      custom_items_recent: { Args: { p_days?: number }; Returns: Json }
       delete_business: {
         Args: {
           p_actor?: string
@@ -1681,6 +1685,7 @@ export type Database = {
         Returns: {
           category_id: string
           idx: number
+          is_custom: boolean
           line_total: number
           modifier_ids: Json
           notes: string

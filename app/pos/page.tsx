@@ -61,6 +61,7 @@ export default async function POSPage() {
     { data: visitas },
     { count: promosActivas },
     { data: fiados },
+    { data: recientesFuera },
   ] = await Promise.all([
     // Si la caja del turno pasado quedó abierta y ya venció, se cierra sola.
     // Aquí y no solo en el cron porque este es el momento en que importa:
@@ -100,6 +101,8 @@ export default async function POSPage() {
     supabase.from("promotions").select("id", { count: "exact", head: true }).eq("is_active", true),
     // Fiados (P38): quién debe cuánto, para el selector «¿a nombre de quién?» y el diálogo de abonos.
     settings.credit ? supabase.rpc("credit_balances") : Promise.resolve({ data: null }),
+    // Fuera de menú (P39): lo vendido así en 60 días, para repetirlo en un toque.
+    settings.customItems ? supabase.rpc("custom_items_recent", { p_days: 60 }) : Promise.resolve({ data: null }),
   ])
 
   const session = barrido.session
@@ -280,6 +283,12 @@ export default async function POSPage() {
       hayPromociones={(promosActivas ?? 0) > 0}
       creditEnabled={settings.credit}
       fiados={creditAccountsFrom(fiados)}
+      customItemsEnabled={settings.customItems}
+      recientesFueraDeMenu={
+        Array.isArray(recientesFuera)
+          ? (recientesFuera as Array<{ name: string; price: number; n: number }>).map((r) => ({ name: String(r.name), price: Number(r.price), n: Number(r.n) }))
+          : []
+      }
     />
   )
 }

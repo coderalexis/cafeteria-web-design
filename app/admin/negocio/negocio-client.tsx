@@ -385,6 +385,24 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 dinero entra a la caja el día que abona.
               </p>
 
+              <label htmlFor="custom_items" className="text-sm font-medium text-stone-700">
+                Fuera de menú (precio decidido en caja)
+              </label>
+              <select
+                id="custom_items"
+                name="custom_items"
+                defaultValue={currentSettings.customItems ? "on" : "off"}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="on">Activado</option>
+                <option value="off">Desactivado</option>
+              </select>
+              <p className="text-xs text-stone-400">
+                Para lo que piden y no está en la carta («la fruta picada, pero sin yogurt»): quien cobra escribe qué
+                es y cuánto, y entra a la venta con ese nombre. Queda marcado como fuera de menú en los reportes y
+                lo que ya se vendió así se repite en un toque. Tope de $9,999 por artículo.
+              </p>
+
               {/* La leche se pregunta cuando el cliente pide, no al final: por
                   eso «al tocar el producto» es lo normal. «Solo obligatorios»
                   existe para el café donde casi nadie cambia nada y la hoja

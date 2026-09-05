@@ -41,6 +41,12 @@ const FILAS: { que: string; cajero: string; admin: string; owner: string }[] = [
     owner: "Sí",
   },
   {
+    que: "Vender fuera de menú (nombre y precio decididos en caja, con el módulo encendido)",
+    cajero: "Sí, hasta $9,999 por artículo",
+    admin: "Sí",
+    owner: "Sí",
+  },
+  {
     que: "Descuentos en caja",
     cajero: "Hasta el tope de Datos y ajustes (0 = ninguno)",
     admin: "Sin tope",

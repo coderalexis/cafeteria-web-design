@@ -19,7 +19,7 @@ import {
   Search,
   Lock,
   ChevronUp,
-  Star, PauseCircle, ChevronRight, RotateCcw, ArchiveRestore } from "lucide-react"
+  Star, PauseCircle, ChevronRight, RotateCcw, ArchiveRestore, Sparkles } from "lucide-react"
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
@@ -38,6 +38,7 @@ import type { TicketRecord } from "@/lib/tickets"
 import { useRouter } from "next/navigation"
 import type { CreditAccount } from "@/app/actions/credit"
 import { CreditAccountsDialog, CreditPickerDialog, type CuentaFiado } from "./credit-dialogs"
+import { CustomItemDialog, type CustomRecent } from "./custom-item-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -100,13 +101,12 @@ import {
   getDisplayPrice,
   getLineLabel,
   getLinePrice,
-  getLineVariantId,
   needsModifierPrompt,
   parseCash,
   type CartLine,
   type Category,
   type Product,
-  type SizeOption, type PersistedCart, CART_STORAGE_VERSION } from "./cart"
+  type SizeOption, type PersistedCart, CART_STORAGE_VERSION, customProduct, linesToItems } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
 
@@ -158,6 +158,9 @@ interface POSClientProps {
   creditEnabled: boolean
   /** Cuentas de fiado con su saldo (vacío si el módulo está apagado). */
   fiados: CreditAccount[]
+  /** Fuera de menú (P39): vender algo que no está en la carta con precio de caja. */
+  customItemsEnabled: boolean
+  recientesFueraDeMenu: CustomRecent[]
 }
 
 export default function POSClient({
@@ -188,6 +191,8 @@ export default function POSClient({
   hayPromociones,
   creditEnabled,
   fiados,
+  customItemsEnabled,
+  recientesFueraDeMenu,
 }: POSClientProps) {
   const router = useRouter()
   const appCtx = useAppContext()
@@ -519,6 +524,19 @@ export default function POSClient({
     const t = setTimeout(() => setRecuperada(null), 3000)
     return () => clearTimeout(t)
   }, [recuperada])
+  // ── Fuera de menú (P39) ──
+  // «La fruta picada pero sin yogurt»: qué es y cuánto, y entra al carrito
+  // como un renglón más, con su nombre. Se abre desde la fila de más
+  // vendidos o desde una búsqueda sin resultados, ya con lo buscado escrito.
+  const [fueraDeMenu, setFueraDeMenu] = useState<{ open: boolean; name: string }>({ open: false, name: "" })
+  const agregarFueraDeMenu = useCallback(
+    (item: { name: string; price: number }) => {
+      addLine(customProduct(item.name, item.price))
+      vibra(12)
+    },
+    [addLine],
+  )
+
   // ── Fiados (P38) ──
   // Con «Fiado» elegido, la venta va a nombre de alguien: se pregunta al
   // momento y se conserva hasta cobrar. La propina no se fía.
@@ -858,6 +876,8 @@ export default function POSClient({
           modifierIds: it.modifiers.map((m) => m.modifierId),
           quantity: it.quantity,
           notes: it.notes,
+          // Fuera de menú: no hay producto que buscar; vuelve con su nombre y precio.
+          ...(it.isCustom ? { custom: { name: it.productName, price: it.unitPrice } } : {}),
         })),
       }
       const estado = rehydrateCart(guardado, products, Date.now())
@@ -1053,12 +1073,7 @@ export default function POSClient({
     }
     // Los precios NO se mandan: el servidor los recalcula desde el menú
     // (variante + modificadores) y valida el descuento.
-    const items = venta.lines.map((line) => ({
-      variant_id: getLineVariantId(line) ?? "",
-      quantity: line.quantity,
-      notes: line.notes.trim() || undefined,
-      modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
-    }))
+    const items = linesToItems(venta.lines)
     // Cobro instantáneo: en celular sin impresora la venta se da por hecha al
     // momento —aviso, carrito limpio, siguiente cliente— y el servidor
     // confirma por detrás; si la rechaza, el carrito regresa con el motivo.
@@ -1421,12 +1436,7 @@ export default function POSClient({
       }
       setCobrandoCuenta(o.id)
       const clientRef = crypto.randomUUID()
-      const items = estado.lines.map((line) => ({
-        variant_id: getLineVariantId(line) ?? "",
-        quantity: line.quantity,
-        notes: line.notes.trim() || undefined,
-        modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
-      }))
+      const items = linesToItems(estado.lines)
       const notas = estado.ticketNotes.trim() || undefined
       try {
         const result = await createTicket({
@@ -1683,10 +1693,23 @@ export default function POSClient({
               <div className="flex flex-col items-center justify-center py-16 text-stone-400">
                 <Search className="h-10 w-10 mb-3 opacity-40" />
                 <p className="text-sm">Sin resultados para «{searchQuery}»</p>
+                {/* Lo buscado no existe en la carta: se vende fuera de menú con
+                    lo que se escribió, sin volver a teclearlo. */}
+                {customItemsEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setFueraDeMenu({ open: true, name: searchQuery.trim() })}
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-amber-400 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+                    data-fuera-buscar
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Vender «{searchQuery.trim()}» fuera de menú
+                  </button>
+                )}
               </div>
             )}
             {/* Más vendidos: un toque para los productos de siempre */}
-            {favorites.length > 0 && !searchLower && activeCategory === "todos" && (
+            {(favorites.length > 0 || customItemsEnabled) && !searchLower && activeCategory === "todos" && (
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1 flex items-center gap-1.5">
                   <Star className="h-3.5 w-3.5 text-amber-500" />
@@ -1714,6 +1737,23 @@ export default function POSClient({
                       </span>
                     </m.button>
                   ))}
+                  {/* Lo que no está en la carta, al alcance del pulgar: un
+                      tile más al final de los de siempre. */}
+                  {customItemsEnabled && (
+                    <m.button
+                      key="fuera-de-menu"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setFueraDeMenu({ open: true, name: "" })}
+                      className={`rounded-xl border border-dashed border-amber-400 bg-white text-left hover:bg-amber-50 transition-colors ${isMobile ? "px-3 py-3" : "px-3 py-2"}`}
+                      data-fuera-tile
+                    >
+                      <span className={`flex items-center gap-1.5 font-semibold text-amber-800 leading-tight ${isMobile ? "text-base" : "text-sm"}`}>
+                        <Sparkles className="h-4 w-4 shrink-0" />
+                        Fuera de menú
+                      </span>
+                      <span className="block text-xs text-stone-500">precio al vuelo</span>
+                    </m.button>
+                  )}
                 </div>
               </div>
             )}
@@ -1985,6 +2025,15 @@ export default function POSClient({
         cardFeePct={cardFeePct}
         pendingUploads={cola.pendientes + cola.porRevisar}
       />
+      {customItemsEnabled && (
+        <CustomItemDialog
+          open={fueraDeMenu.open}
+          onOpenChange={(o) => setFueraDeMenu((f) => ({ ...f, open: o }))}
+          initialName={fueraDeMenu.name}
+          recientes={recientesFueraDeMenu}
+          onAdd={agregarFueraDeMenu}
+        />
+      )}
       {creditEnabled && (
         <>
           <CreditPickerDialog

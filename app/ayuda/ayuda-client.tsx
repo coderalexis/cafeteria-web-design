@@ -24,6 +24,7 @@ import {
   Percent,
   Pencil,
   Printer,
+  Sparkles,
   Receipt,
   Search,
   Settings,
@@ -624,6 +625,34 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
           </ul>
         </>
+      ),
+    },
+    {
+      id: "fuera-de-menu",
+      grupo: "cajero",
+      icon: Sparkles,
+      titulo: "Vender algo que no está en el menú",
+      palabras:
+        "fuera de menu precio al vuelo especial pedido raro fruta sin yogurt cosa sencilla improvisado otro producto libre no esta en la carta inventar precio cobrar algo que no existe",
+      acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Encender o apagar: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            «Quiero la fruta picada, pero sin yogurt». Para lo que piden y no está en la carta, toca{" "}
+            <strong>Fuera de menú</strong> (el último tile de «Más vendidos») o, si lo buscaste y no salió,{" "}
+            <strong>Vender «…» fuera de menú</strong> debajo de la búsqueda. Escribes qué es y cuánto, y entra al
+            carrito como un renglón más, con ese nombre y ese precio.
+          </li>
+          <li>
+            Lo que ya vendiste así aparece como <strong>chips</strong> con su último precio: un toque lo pone. La
+            cantidad se cambia en el carrito como en cualquier renglón, y admite nota.
+          </li>
+          <li>
+            En los reportes queda marcado como <strong>fuera de menú</strong> y sin costo (no infla el margen). Si algo
+            se vende seguido, conviene darlo de alta en Menú → Productos para que tenga su precio fijo y su costo. Tope
+            de $9,999 por artículo; se apaga en Datos y ajustes → Módulos.
+          </li>
+        </ul>
       ),
     },
     {
@@ -1328,7 +1357,8 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               <strong>Módulos del POS</strong>: enciende o apaga funciones de la pantalla de venta, como{" "}
-              <strong>Cuentas abiertas</strong> o <strong>Fiados</strong> (cuentas por persona con abonos); define
+              <strong>Cuentas abiertas</strong>, <strong>Fiados</strong> (cuentas por persona con abonos) o{" "}
+              <strong>Fuera de menú</strong> (precio decidido en caja); define
               cuántas <strong>mesas</strong> tienes y qué otros botones
               salen al abrir una cuenta; decide cuándo se preguntan los <strong>extras</strong> al tocar un producto
               (al tocarlo, o solo si hay que elegir uno); ajusta cada cuánto se actualiza{" "}

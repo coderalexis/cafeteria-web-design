@@ -19,6 +19,8 @@ export interface TicketItemRecord {
   /** Producto y variante del menú (para volver a cargar la venta al carrito). */
   productId: string
   variantId: string
+  /** Fuera de menú: nombre y precio decididos en caja (P39). */
+  isCustom: boolean
   quantity: number
   unitPrice: number
   /** Costo unitario fotografiado al vender (0 = no se había capturado). */
@@ -68,7 +70,7 @@ export const TICKET_SELECT = `
   status, cancelled_at, cancelled_by, cancel_reason, cash_received, change_due, corrected_from, promotion_id,
   loyalty_customers(id, name, phone, stamps, visits, rewards_redeemed, last_visit_at),
   ticket_items(
-    id, product_id, variant_id, quantity, unit_price, unit_cost, line_total, notes, product_name, variant_name, size_label,
+    id, product_id, variant_id, is_custom, quantity, unit_price, unit_cost, line_total, notes, product_name, variant_name, size_label,
     ticket_item_modifiers(id, modifier_id, modifier_name, modifier_price)
   )
 ` as const
@@ -106,8 +108,9 @@ export interface TicketRow {
   } | null
   ticket_items: Array<{
     id: string
-    product_id: string
-    variant_id: string
+    product_id: string | null
+    variant_id: string | null
+    is_custom?: boolean | null
     quantity: number
     unit_price: number
     unit_cost: number
@@ -169,8 +172,9 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
       : null,
     items: (row.ticket_items ?? []).map((item) => ({
       id: item.id,
-      productId: item.product_id,
-      variantId: item.variant_id,
+      productId: item.product_id ?? "",
+      variantId: item.variant_id ?? "",
+      isCustom: item.is_custom === true,
       quantity: item.quantity,
       unitPrice: item.unit_price,
       unitCost: item.unit_cost ?? 0,

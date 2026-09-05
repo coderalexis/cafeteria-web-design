@@ -69,6 +69,11 @@ export interface BusinessSettings {
    */
   credit: boolean
   /**
+   * Vender algo que no está en el menú con el precio decidido en caja (P39).
+   * Encendido por omisión: ocurre con fila y no hay tiempo de dar de alta.
+   */
+  customItems: boolean
+  /**
    * Nota al pie del menú público: lo que en la carta impresa va en letra chica
    * ("nuestros jarabes son libres de azúcar", "precios con IVA"). No sale en el
    * ticket — para eso está `receipt_footer`.
@@ -192,6 +197,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   loyaltyTarget: 10,
   loyaltyReward: "Bebida gratis",
   credit: false,
+  customItems: true,
   // 4 mesas + estas dos etiquetas = exactamente los chips que estaban fijos
   // en código, para que ninguna cafetería vea cambiar lo que ya conocía.
   tableCount: 4,
@@ -268,6 +274,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     if (Number.isFinite(comision) && comision > 0) out.cardFeePct = Math.min(Math.round(comision * 100) / 100, 20)
     out.loyalty = r.loyalty === true
     out.credit = r.credit === true
+    out.customItems = r.custom_items !== false
     const meta = Number(r.loyalty_target)
     if (Number.isFinite(meta) && meta >= 2 && meta <= 30) out.loyaltyTarget = Math.round(meta)
     if (typeof r.loyalty_reward === "string" && r.loyalty_reward.trim()) {
@@ -304,6 +311,7 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     card_fee_pct: s.cardFeePct,
     loyalty: s.loyalty,
     credit: s.credit,
+    custom_items: s.customItems,
     loyalty_target: s.loyaltyTarget,
     loyalty_reward: s.loyaltyReward,
   }

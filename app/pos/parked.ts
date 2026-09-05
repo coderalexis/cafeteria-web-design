@@ -250,9 +250,12 @@ export function lineKey(l: {
   sizeLabel?: string | null
   modifierIds?: string[]
   notes?: string | null
+  custom?: { name: string; price: number } | null
 }): string {
   return [
-    l.productId ?? "",
+    // Fuera de menú: dos renglones son «lo mismo» si dicen lo mismo y cuestan
+    // lo mismo; el id del producto sintético cambia en cada aparato.
+    l.custom ? `custom:${l.custom.name.trim().toLowerCase()}@${l.custom.price}` : (l.productId ?? ""),
     l.sizeLabel ?? "",
     [...(l.modifierIds ?? [])].sort().join("+"),
     (l.notes ?? "").trim(),
