@@ -66,7 +66,7 @@ begin
   update public.businesses set settings = coalesce(settings, '{}'::jsonb) || '{"loyalty": true, "loyalty_target": 5}'::jsonb
   where id = c.business_id;
   perform pruebas.como(c.cashier_id);
-  v_cliente := (public.loyalty_find_or_create('5551112222', 'Ana')->>'customer_id')::uuid;
+  v_cliente := (public.loyalty_find_or_create('5551112222', 'Ana')->>'id')::uuid;
   v_a := public.create_ticket(gen_random_uuid(), 'efectivo', pruebas.items(c.variant_chico, 1), null, null, null, 0, v_cliente);
   v_b := public.correct_ticket((v_a->>'ticket_id')::uuid, gen_random_uuid(), 'efectivo', pruebas.items(c.variant_grande, 1), null, null, null, 0, v_cliente);
   select stamps into v_sellos from public.loyalty_customers where id = v_cliente;
