@@ -363,3 +363,27 @@ export function suggestAccountNames(visitas: AccountVisit[], hourNow: number, ex
     .slice(0, limite)
     .map((x) => x.name)
 }
+
+/* ------------------------------------------------------------------ */
+/*  Lo que acaba de volver al carrito                                   */
+/* ------------------------------------------------------------------ */
+
+/** Una cuenta (o la última venta) que se acaba de traer de vuelta al carrito. */
+export interface Recuperada {
+  key: number
+  name: string
+  articulos: number
+}
+
+/**
+ * «"Mesa 3" recuperada · 3 artículos». Lo que se lee un instante en el
+ * carrito —y en la barra de abajo, en celular— al abrir una cuenta: la
+ * confirmación de que lo anotado volvió completo y con cuántos artículos.
+ * Antes la cuenta aparecía sin más, y con prisa no se distinguía de haber
+ * tocado un producto por error.
+ */
+export function avisoRecuperada(name: string, articulos: number): string {
+  const n = Math.max(0, Math.floor(articulos))
+  return `«${name}» recuperada · ${n} artículo${n === 1 ? "" : "s"}`
+}
+

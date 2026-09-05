@@ -3,6 +3,7 @@ import {
   applyCartDelta,
   PARKED_VIEJA_MS,
   autoName,
+  avisoRecuperada,
   conflictName,
   isVieja,
   lineKey,
@@ -153,5 +154,17 @@ describe("suggestAccountNames", () => {
   it("la medianoche es un círculo y hay un tope", () => {
     expect(suggestAccountNames(visitas, 0, [])).toEqual(["Noche"])
     expect(suggestAccountNames(visitas, 9, [], 1)).toEqual(["Juan"])
+  })
+})
+
+// Al abrir una cuenta, lo que se lee un instante: qué volvió y cuánto.
+describe("avisoRecuperada", () => {
+  it("nombra la cuenta y cuenta artículos en singular y plural", () => {
+    expect(avisoRecuperada("Mesa 3", 3)).toBe("«Mesa 3» recuperada · 3 artículos")
+    expect(avisoRecuperada("Juan", 1)).toBe("«Juan» recuperada · 1 artículo")
+  })
+  it("no se rompe con cantidades raras", () => {
+    expect(avisoRecuperada("X", 2.7)).toBe("«X» recuperada · 2 artículos")
+    expect(avisoRecuperada("X", -1)).toBe("«X» recuperada · 0 artículos")
   })
 })
