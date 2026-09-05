@@ -56,15 +56,29 @@ const createTicketSchema = z.object({
   creditCustomerId: z.string().uuid().optional(),
   items: z
     .array(
-      z.object({
-        // Con mensaje propio: el de zod es «Invalid uuid», que a quien está en
-        // caja no le dice nada. Llega aquí cuando una línea del carrito quedó
-        // sin variante —un producto al que le desactivaron todos sus precios—.
-        variant_id: z.string().uuid("Un artículo del carrito ya no tiene precio activo. Quítalo y vuelve a agregarlo."),
-        quantity: z.number().int().min(1).max(99),
-        notes: z.string().trim().max(200).optional(),
-        modifiers: z.array(z.string().uuid()).max(20).optional(),
-      }),
+      z
+        .object({
+          // Con mensaje propio: el de zod es «Invalid uuid», que a quien está en
+          // caja no le dice nada. Llega aquí cuando una línea del carrito quedó
+          // sin variante —un producto al que le desactivaron todos sus precios—.
+          variant_id: z
+            .string()
+            .uuid("Un artículo del carrito ya no tiene precio activo. Quítalo y vuelve a agregarlo.")
+            .optional(),
+          /** Fuera de menú (P39): nombre y precio de caja. El RPC vuelve a validar y acota. */
+          custom: z
+            .object({
+              name: z.string().trim().min(1, "Escribe qué es lo que vendes fuera de menú.").max(80),
+              price: z.number().finite().min(0.01, "El precio fuera de menú debe ser mayor a 0.").max(9999.99, "El precio fuera de menú es demasiado alto."),
+            })
+            .optional(),
+          quantity: z.number().int().min(1).max(99),
+          notes: z.string().trim().max(200).optional(),
+          modifiers: z.array(z.string().uuid()).max(20).optional(),
+        })
+        .refine((i) => (i.variant_id ? 1 : 0) + (i.custom ? 1 : 0) === 1, {
+          message: "Un artículo es del menú o fuera de menú, no las dos cosas.",
+        }),
     )
     .min(1, "El ticket debe incluir al menos un artículo.")
     .max(50),

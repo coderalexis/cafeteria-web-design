@@ -131,6 +131,8 @@ interface LineaCarrito {
   quantity?: number
   notes?: string | null
   modifierIds?: string[]
+  /** Fuera de menú: el nombre viene en el propio renglón. */
+  custom?: { name: string; price: number } | null
 }
 
 /**
@@ -194,9 +196,11 @@ async function cuentasPorPreparar(
     for (const [k, { l, total }] of porContenido) {
       const pendiente = Math.max(0, total - (Number(foto[k]) || 0))
       if (pendiente <= 0) continue
-      const label = l.sizeLabel
-        ? etiqueta.get(`${l.productId}|${l.sizeLabel}`)
-        : unico.get(l.productId ?? "") || undefined
+      const label = l.custom
+        ? l.custom.name
+        : l.sizeLabel
+          ? etiqueta.get(`${l.productId}|${l.sizeLabel}`)
+          : unico.get(l.productId ?? "") || undefined
       if (!label) continue // salió del menú: no se puede preparar
       items.push({
         label,

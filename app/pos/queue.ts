@@ -1,4 +1,4 @@
-import type { CartLine, PaymentMethod, TicketDiscount } from "./cart"
+import type { CartLine, PaymentMethod, TicketDiscount, TicketItemInput } from "./cart"
 
 /**
  * Cola de ventas capturadas sin internet.
@@ -28,12 +28,8 @@ const QUEUE_VERSION = 1
 
 export type QueuedStatus = "pendiente" | "revisar"
 
-export interface QueuedItem {
-  variant_id: string
-  quantity: number
-  notes?: string
-  modifiers?: string[]
-}
+/** Un renglón tal como lo acepta el servidor (del menú o fuera de menú). */
+export type QueuedItem = TicketItemInput
 
 export interface QueuedSale {
   /** Idempotencia: el MISMO uuid en cada reintento. */

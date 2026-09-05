@@ -15,6 +15,7 @@ interface LineaGuardada {
   sizeLabel: string | null
   quantity: number
   modifierIds: string[]
+  custom?: { name: string; price: number } | null
 }
 
 /**
@@ -71,8 +72,9 @@ export default async function PorCobrarPage() {
     // aquí un total que la caja no va a poder cobrar sería mentir.
     let sinPrecio = 0
     for (const l of lineas) {
-      const base =
-        l.sizeLabel === null
+      const base = l.custom
+        ? Number(l.custom.price)
+        : l.sizeLabel === null
           ? unicaVariante.get(l.productId)
           : precioVariante.get(`${l.productId}|${l.sizeLabel}`)
       if (base === undefined || Number.isNaN(base)) {

@@ -168,3 +168,14 @@ describe("avisoRecuperada", () => {
     expect(avisoRecuperada("X", -1)).toBe("«X» recuperada · 0 artículos")
   })
 })
+
+// Fuera de menú: dos renglones son «lo mismo» por nombre y precio, no por el id sintético.
+describe("lineKey fuera de menú", () => {
+  it("mismo nombre y precio → misma llave; distinto precio → otra", () => {
+    const a = lineKey({ productId: "custom:1", custom: { name: "Charola", price: 100 } })
+    const b = lineKey({ productId: "custom:2", custom: { name: " charola ", price: 100 } })
+    const c = lineKey({ productId: "custom:3", custom: { name: "Charola", price: 120 } })
+    expect(a).toBe(b)
+    expect(a).not.toBe(c)
+  })
+})

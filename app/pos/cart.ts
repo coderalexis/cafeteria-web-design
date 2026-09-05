@@ -44,6 +44,50 @@ export interface Product {
   modifierGroups?: ModifierGroup[]
   /** false = la dueña apagó la pregunta al tocar: entra directo con las opciones por omisión (P34). */
   promptModifiers?: boolean
+  /** Fuera de menú (P39): nombre y precio decididos en caja; no existe en el menú. */
+  custom?: boolean
+}
+
+export const CUSTOM_CATEGORY = "fuera-de-menu"
+export const CUSTOM_PRICE_MAX = 9999.99
+
+/**
+ * Un producto que no está en el menú, con el nombre y el precio que se
+ * escribieron en caja. Cada uno lleva su propio id: dos «fruta sin yogurt»
+ * a precios distintos son dos renglones, no uno con cantidad 2.
+ */
+export function customProduct(name: string, price: number, id?: string): Product {
+  return {
+    id: id ?? `custom:${crypto.randomUUID()}`,
+    name: name.trim().replace(/\s+/g, " ").slice(0, 80),
+    price: Math.round(price * 100) / 100,
+    category: CUSTOM_CATEGORY,
+    subcategory: "Fuera de menú",
+    custom: true,
+  }
+}
+
+/** Un renglón tal como lo acepta el servidor: del menú (variante + extras) o fuera de menú (nombre + precio). */
+export type TicketItemInput =
+  | { variant_id: string; quantity: number; notes?: string; modifiers?: string[] }
+  | { custom: { name: string; price: number }; quantity: number; notes?: string }
+
+/** Los renglones del carrito como los manda el POS. Una sola conversión para cobrar, corregir y encolar. */
+export function linesToItems(lines: CartLine[]): TicketItemInput[] {
+  return lines.map((line) =>
+    line.product.custom
+      ? {
+          custom: { name: line.product.name, price: Math.round((line.product.price ?? 0) * 100) / 100 },
+          quantity: line.quantity,
+          notes: line.notes.trim() || undefined,
+        }
+      : {
+          variant_id: getLineVariantId(line) ?? "",
+          quantity: line.quantity,
+          notes: line.notes.trim() || undefined,
+          modifiers: line.modifiers.length > 0 ? line.modifiers.map((m) => m.id) : undefined,
+        },
+  )
 }
 
 export interface Category {
@@ -190,6 +234,8 @@ export interface PersistedCart {
     modifierIds: string[]
     quantity: number
     notes: string
+    /** Fuera de menú: lo que se escribió en caja (el producto no existe en el menú). */
+    custom?: { name: string; price: number }
   }>
 }
 
@@ -218,6 +264,7 @@ export function serializeCart(state: CartState, now: number): PersistedCart {
       modifierIds: l.modifiers.map((m) => m.id),
       quantity: l.quantity,
       notes: l.notes,
+      ...(l.product.custom ? { custom: { name: l.product.name, price: l.product.price ?? 0 } } : {}),
     })),
   }
 }
@@ -250,10 +297,26 @@ export function rehydrateCart(
 
   for (const l of p.lines) {
     if (!l || typeof l !== "object") continue
-    const product = byId.get(l.productId)
-    if (!product) continue
     const quantity = Number(l.quantity)
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) continue
+    // Fuera de menú: no hay producto que buscar; vuelve con su nombre y su
+    // precio. Si el dato viene roto, la línea se descarta como cualquier otra.
+    if (l.custom && typeof l.custom === "object") {
+      const nombre = typeof l.custom.name === "string" ? l.custom.name.trim() : ""
+      const precio = Number(l.custom.price)
+      if (!nombre || !Number.isFinite(precio) || precio < 0.01 || precio > CUSTOM_PRICE_MAX) continue
+      const lineId = typeof l.lineId === "string" && l.lineId ? l.lineId : `custom-${lines.length}`
+      lines.push({
+        lineId,
+        product: customProduct(nombre, precio, `custom:${lineId}`),
+        modifiers: [],
+        quantity,
+        notes: typeof l.notes === "string" ? l.notes : "",
+      })
+      continue
+    }
+    const product = byId.get(l.productId)
+    if (!product) continue
 
     let size: SizeOption | undefined
     if (l.sizeLabel) {

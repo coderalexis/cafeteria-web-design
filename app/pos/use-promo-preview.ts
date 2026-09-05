@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { previewPromotion } from "@/app/actions/promotions"
-import { getLineVariantId, type CartLine } from "./cart"
+import { type CartLine, linesToItems } from "./cart"
 
 /* ── Promoción viva ────────────────────────────────────────────────
    Quien decide de verdad es el servidor al cobrar; esto es el espejo
@@ -13,13 +13,9 @@ export function usePromoPreview(lines: CartLine[], otroDescuento: boolean, hayPr
   const [promo, setPromo] = useState<{ id: string; name: string; discount: number } | null>(null)
   const promoItems = useMemo(
     () =>
-      lines
-        .map((l) => ({
-          variant_id: getLineVariantId(l) ?? "",
-          quantity: l.quantity,
-          modifiers: l.modifiers.map((m) => m.id),
-        }))
-        .filter((i) => i.variant_id),
+      // La misma conversión que al cobrar: lo fuera de menú también cuenta
+      // para una promoción por ticket (el servidor lo suma igual).
+      linesToItems(lines).filter((i) => ("custom" in i ? true : !!i.variant_id)),
     [lines],
   )
   // Sin promociones encendidas no hay nada que preguntar: eran tres viajes

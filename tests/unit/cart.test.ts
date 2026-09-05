@@ -14,6 +14,8 @@ import {
   type CartState,
   type ModifierOption,
   type Product,
+  customProduct,
+  linesToItems,
 } from "@/app/pos/cart"
 
 // El carrito es el ESPEJO de lo que el servidor va a cobrar. Quien manda es
@@ -207,5 +209,42 @@ describe("needsModifierPrompt con la bandera por producto", () => {
   })
   it("apagada, lo obligatorio se sigue preguntando", () => {
     expect(needsModifierPrompt(conLeche(1, false), "required")).toBe(true)
+  })
+})
+
+// Fuera de menú (P39): el renglón que no existe en el menú viaja con su
+// nombre y su precio, sobrevive a guardarse y vuelve tal cual.
+describe("fuera de menú", () => {
+  it("un producto sintético lleva nombre limpio, precio redondeado y su marca", () => {
+    const p = customProduct("  Fruta   picada sin yogurt ", 45.499)
+    expect(p.name).toBe("Fruta picada sin yogurt")
+    expect(p.price).toBe(45.5)
+    expect(p.custom).toBe(true)
+    expect(p.id.startsWith("custom:")).toBe(true)
+  })
+
+  it("linesToItems manda custom para lo fuera de menú y variant_id para lo demás", () => {
+    const menu: CartLine = { lineId: "a", product: { id: "p1", name: "Latte", price: 40, variantId: "v1", category: "c", subcategory: "s" }, modifiers: [], quantity: 2, notes: " " }
+    const libre: CartLine = { lineId: "b", product: customProduct("Charola", 100), modifiers: [], quantity: 1, notes: "sin miel" }
+    expect(linesToItems([menu, libre])).toEqual([
+      { variant_id: "v1", quantity: 2, notes: undefined, modifiers: undefined },
+      { custom: { name: "Charola", price: 100 }, quantity: 1, notes: "sin miel" },
+    ])
+  })
+
+  it("se guarda y vuelve sin necesitar el menú; lo roto se descarta", () => {
+    const libre: CartLine = { lineId: "b", product: customProduct("Charola", 100), modifiers: [], quantity: 3, notes: "" }
+    const guardado = serializeCart(
+      { saleRef: "r", paymentMethod: "efectivo", ticketNotes: "", cashReceivedInput: "", discount: null, lines: [libre] },
+      1000,
+    )
+    expect(guardado.lines[0].custom).toEqual({ name: "Charola", price: 100 })
+    const vuelto = rehydrateCart(guardado, [], 1000)
+    expect(vuelto?.lines).toHaveLength(1)
+    expect(vuelto?.lines[0].product.name).toBe("Charola")
+    expect(vuelto?.lines[0].product.custom).toBe(true)
+    expect(vuelto?.lines[0].quantity).toBe(3)
+    const roto = { ...guardado, lines: [{ ...guardado.lines[0], custom: { name: "", price: 100 } }, { ...guardado.lines[0], lineId: "c", custom: { name: "X", price: 0 } }] }
+    expect(rehydrateCart(roto, [], 1000)?.lines ?? []).toHaveLength(0)
   })
 })
