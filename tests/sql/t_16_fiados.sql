@@ -95,9 +95,12 @@ begin
   v_resumen := public.cash_session_summary(v_session);
   perform pruebas.espera((v_resumen->>'credit_paid_cash')::numeric = 50 and (v_resumen->>'movements_in')::numeric = 50,
     'el corte desglosa los abonos en efectivo');
+  -- La bitácora solo la leen los administradores (RLS): se mira como postgres.
+  perform pruebas.como_postgres();
   perform pruebas.espera(
     exists (select 1 from public.audit_events a where a.business_id = c.business_id and a.action = 'fiado.abono' and a.actor_id = c.cashier_id),
     'el abono queda en la bitácora aunque lo registre la cajera');
+  perform pruebas.como(c.cashier_id);
 
   -- Por transferencia no toca la caja.
   v_pago := public.credit_pay(v_cli, 20, 'transferencia');
