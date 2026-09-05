@@ -1338,6 +1338,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_corrected_from_fkey"
+            columns: ["corrected_from"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_loyalty_customer_id_fkey"
             columns: ["loyalty_customer_id"]
             isOneToOne: false
@@ -1393,7 +1400,6 @@ export type Database = {
         }
         Returns: Json
       }
-      create_product_guided: { Args: { p: Json }; Returns: Json }
       correct_ticket: {
         Args: {
           p_cash_received?: number
@@ -1410,6 +1416,7 @@ export type Database = {
         }
         Returns: Json
       }
+      create_product_guided: { Args: { p: Json }; Returns: Json }
       create_ticket: {
         Args: {
           p_captured_at?: string
