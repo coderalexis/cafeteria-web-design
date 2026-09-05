@@ -75,6 +75,11 @@ begin
   -- La cajera no corrige ventas del dueño.
   perform pruebas.como(c.owner_id);
   v_a := public.create_ticket(gen_random_uuid(), 'efectivo', pruebas.items(c.variant_grande, 1));
+  perform pruebas.espera(
+    (select business_id from public.tickets where id = (v_a->>'ticket_id')::uuid) = c.business_id,
+    format('la venta del dueño cae en su cafetería (folio %s, biz del ticket %s, cafetería %s, ctx %s, dup %s)',
+      v_a->>'folio', (select business_id from public.tickets where id = (v_a->>'ticket_id')::uuid), c.business_id,
+      (select business_id from public.member_ctx()), v_a->>'duplicate'));
   perform pruebas.como(c.cashier_id);
   begin
     perform public.correct_ticket((v_a->>'ticket_id')::uuid, gen_random_uuid(), 'efectivo', pruebas.items(c.variant_chico, 1));
