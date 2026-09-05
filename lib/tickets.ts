@@ -8,12 +8,17 @@ export type TicketStatus = "completado" | "cancelado"
 
 export interface TicketItemModifierRecord {
   id: string
+  /** Modificador del menú (para volver a cargar la venta al carrito). */
+  modifierId: string
   name: string
   price: number
 }
 
 export interface TicketItemRecord {
   id: string
+  /** Producto y variante del menú (para volver a cargar la venta al carrito). */
+  productId: string
+  variantId: string
   quantity: number
   unitPrice: number
   /** Costo unitario fotografiado al vender (0 = no se había capturado). */
@@ -48,16 +53,23 @@ export interface TicketRecord {
   cancelledByName: string | null
   cashReceived: number | null
   changeDue: number | null
+  /** Venta original que esta corrige (P37); la original quedó cancelada. */
+  correctedFrom: string | null
+  /** Promoción aplicada sola (el descuento no fue a mano). */
+  promotionId: string | null
+  /** Cliente de la tarjeta de sellos adjunto, si lo hubo. */
+  loyalty: { id: string; name: string; phone: string; stamps: number; visits: number; rewardsRedeemed: number; lastVisitAt: string | null } | null
   items: TicketItemRecord[]
 }
 
 /** Columnas que necesita `serializeTicket`; usar en los `.select()`. */
 export const TICKET_SELECT = `
   id, folio, payment_method, subtotal, discount_total, discount_reason, total, takeout_fee, tip_amount, notes, created_at, cashier_id,
-  status, cancelled_at, cancelled_by, cancel_reason, cash_received, change_due,
+  status, cancelled_at, cancelled_by, cancel_reason, cash_received, change_due, corrected_from, promotion_id,
+  loyalty_customers(id, name, phone, stamps, visits, rewards_redeemed, last_visit_at),
   ticket_items(
-    id, quantity, unit_price, unit_cost, line_total, notes, product_name, variant_name, size_label,
-    ticket_item_modifiers(id, modifier_name, modifier_price)
+    id, product_id, variant_id, quantity, unit_price, unit_cost, line_total, notes, product_name, variant_name, size_label,
+    ticket_item_modifiers(id, modifier_id, modifier_name, modifier_price)
   )
 ` as const
 
@@ -81,8 +93,21 @@ export interface TicketRow {
   cancel_reason: string | null
   cash_received: number | null
   change_due: number | null
+  corrected_from?: string | null
+  promotion_id?: string | null
+  loyalty_customers?: {
+    id: string
+    name: string
+    phone: string
+    stamps: number
+    visits: number
+    rewards_redeemed: number
+    last_visit_at: string | null
+  } | null
   ticket_items: Array<{
     id: string
+    product_id: string
+    variant_id: string
     quantity: number
     unit_price: number
     unit_cost: number
@@ -91,7 +116,7 @@ export interface TicketRow {
     product_name: string
     variant_name: string
     size_label: string | null
-    ticket_item_modifiers?: Array<{ id: string; modifier_name: string; modifier_price: number }> | null
+    ticket_item_modifiers?: Array<{ id: string; modifier_id: string; modifier_name: string; modifier_price: number }> | null
   }>
 }
 
@@ -129,8 +154,23 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
     cancelledByName: row.cancelled_by ? (names[row.cancelled_by] ?? "Desconocido") : null,
     cashReceived: row.cash_received,
     changeDue: row.change_due,
+    correctedFrom: row.corrected_from ?? null,
+    promotionId: row.promotion_id ?? null,
+    loyalty: row.loyalty_customers
+      ? {
+          id: row.loyalty_customers.id,
+          name: row.loyalty_customers.name,
+          phone: row.loyalty_customers.phone,
+          stamps: row.loyalty_customers.stamps,
+          visits: row.loyalty_customers.visits,
+          rewardsRedeemed: row.loyalty_customers.rewards_redeemed,
+          lastVisitAt: row.loyalty_customers.last_visit_at,
+        }
+      : null,
     items: (row.ticket_items ?? []).map((item) => ({
       id: item.id,
+      productId: item.product_id,
+      variantId: item.variant_id,
       quantity: item.quantity,
       unitPrice: item.unit_price,
       unitCost: item.unit_cost ?? 0,
@@ -141,6 +181,7 @@ export function serializeTicket(row: TicketRow, names: ProfileNameMap): TicketRe
       sizeLabel: item.size_label || "",
       modifiers: (item.ticket_item_modifiers ?? []).map((m) => ({
         id: m.id,
+        modifierId: m.modifier_id,
         name: m.modifier_name,
         price: m.modifier_price,
       })),

@@ -1237,6 +1237,7 @@ export type Database = {
           cashier_id: string
           change_due: number | null
           client_ref: string
+          corrected_from: string | null
           created_at: string
           discount_reason: string | null
           discount_total: number
@@ -1265,6 +1266,7 @@ export type Database = {
           cashier_id: string
           change_due?: number | null
           client_ref: string
+          corrected_from?: string | null
           created_at?: string
           discount_reason?: string | null
           discount_total?: number
@@ -1293,6 +1295,7 @@ export type Database = {
           cashier_id?: string
           change_due?: number | null
           client_ref?: string
+          corrected_from?: string | null
           created_at?: string
           discount_reason?: string | null
           discount_total?: number
@@ -1391,6 +1394,22 @@ export type Database = {
         Returns: Json
       }
       create_product_guided: { Args: { p: Json }; Returns: Json }
+      correct_ticket: {
+        Args: {
+          p_cash_received?: number
+          p_client_ref: string
+          p_discount?: Json
+          p_items: Json
+          p_loyalty_customer?: string
+          p_loyalty_redeem?: boolean
+          p_notes?: string
+          p_original: string
+          p_payment_method: Database["public"]["Enums"]["payment_method"]
+          p_takeout?: boolean
+          p_tip?: number
+        }
+        Returns: Json
+      }
       create_ticket: {
         Args: {
           p_captured_at?: string

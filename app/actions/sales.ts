@@ -149,6 +149,82 @@ export async function createTicket(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Corregir una venta cobrada (P37) — el RPC cancela la original con   */
+/*  motivo automático y cobra la corregida con la hora original, todo  */
+/*  en una transacción. Mismas validaciones que cualquier cobro.       */
+/* ------------------------------------------------------------------ */
+
+const correctTicketSchema = createTicketSchema.extend({
+  originalId: z.string().uuid(),
+})
+
+export type CorrectTicketInput = z.infer<typeof correctTicketSchema>
+
+export async function correctTicket(
+  input: CorrectTicketInput,
+): Promise<ActionResult<CreateTicketData & { originalFolio: number }>> {
+  const parsed = correctTicketSchema.safeParse(input)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
+  }
+  const { originalId, clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, loyaltyCustomerId, loyaltyRedeem } = parsed.data
+
+  const businessError = await checkExpectedBusiness(expectedBusinessId)
+  if (businessError) {
+    return { error: businessError }
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("correct_ticket", {
+    p_original: originalId,
+    p_client_ref: clientRef,
+    p_payment_method: paymentMethod,
+    p_items: items,
+    p_notes: notes,
+    p_cash_received: paymentMethod === "efectivo" ? cashReceived : undefined,
+    p_discount: discount,
+    p_tip: tip,
+    p_loyalty_customer: loyaltyCustomerId,
+    p_loyalty_redeem: loyaltyRedeem,
+    p_takeout: takeout ?? false,
+  })
+  if (error) {
+    return { error: error.message }
+  }
+
+  const ticket = data as {
+    ticket_id: string
+    folio: number
+    subtotal: number
+    discount_total: number
+    total: number
+    takeout_fee: number | null
+    tip_amount: number | null
+    cash_received: number | null
+    change_due: number | null
+    loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
+    original_folio: number
+  }
+
+  revalidateSales()
+
+  return {
+    success: true,
+    ticketId: ticket.ticket_id,
+    folio: ticket.folio,
+    subtotal: ticket.subtotal,
+    discountTotal: ticket.discount_total ?? 0,
+    total: ticket.total,
+    takeoutFee: ticket.takeout_fee ?? 0,
+    tip: ticket.tip_amount ?? 0,
+    cashReceived: ticket.cash_received ?? null,
+    changeDue: ticket.change_due ?? null,
+    loyalty: ticket.loyalty ?? null,
+    originalFolio: ticket.original_folio,
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Cancelar ticket (con motivo). Las reglas de quién puede cancelar   */
 /*  qué viven en el RPC cancel_ticket.                                 */
 /* ------------------------------------------------------------------ */

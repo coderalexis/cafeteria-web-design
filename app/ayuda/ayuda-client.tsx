@@ -22,6 +22,7 @@ import {
   PauseCircle,
   PackagePlus,
   Percent,
+  Pencil,
   Printer,
   Receipt,
   Search,
@@ -619,8 +620,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "cancelar",
       grupo: "cajero",
       icon: Ban,
-      titulo: "Cancelar una venta o reimprimir",
-      palabras: "tickets reimprimir cancelacion motivo error equivocacion",
+      titulo: "Corregir o cancelar una venta, reimprimir",
+      palabras: "tickets reimprimir cancelacion motivo error equivocacion corregir corregida se equivoco cambiar cantidad metodo de pago editar venta cobrada",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Ventas del panel", href: "/admin/ventas", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
@@ -642,6 +643,14 @@ export function AyudaClient({ ticket, corte }: Props) {
             <Printer className="inline h-3.5 w-3.5 align-text-bottom" /> reimprimir ticket,{" "}
             <ChefHat className="inline h-3.5 w-3.5 align-text-bottom" /> comanda y{" "}
             <Ban className="inline h-3.5 w-3.5 align-text-bottom" /> cancelar.
+          </li>
+          <li>
+            <strong>Corregir en vez de cancelar:</strong> si una venta salió mal (un latte de más, otro tamaño, quedó en
+            efectivo y pagó con tarjeta), en Tickets del día toca{" "}
+            <Pencil className="inline h-3.5 w-3.5 align-text-bottom" /> <strong>Corregir</strong>: la venta se carga al
+            carrito tal como se cobró, la ajustas y vuelves a cobrar. La original queda cancelada sola con el motivo
+            «Corregida: ahora es el ticket #N» y la nueva conserva la hora original, así el corte y los reportes quedan
+            bien. Solo mientras la caja de esa venta siga abierta; después, lo que queda es cancelarla.
           </li>
           <li>
             Cancelar <strong>pide motivo</strong> y deja la venta marcada como cancelada (no se borra). Deja de contar

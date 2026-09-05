@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Ban, ChefHat, Printer, QrCode, Receipt, RefreshCw } from "lucide-react"
+import { Ban, ChefHat, Pencil, Printer, QrCode, Receipt, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
@@ -38,15 +38,18 @@ interface Props {
   isAdmin: boolean
   /** El café ofrece la nota en la web: se puede volver a mostrar su QR. */
   publicReceipt: boolean
+  /** Corregir: la venta se carga al carrito para cobrarla de nuevo (P37). */
+  onCorrect?: (ticket: TicketRecord) => void
 }
 
-export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt }: Props) {
+export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt, onCorrect }: Props) {
   const router = useRouter()
   const receiptBiz = receiptBusinessFrom(useBusiness())
   const qr = useReceiptQr()
   const [tickets, setTickets] = useState<TicketRecord[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [toCancel, setToCancel] = useState<TicketRecord | null>(null)
+  const [toCorrect, setToCorrect] = useState<TicketRecord | null>(null)
   const [reason, setReason] = useState("")
   const [isCancelling, setIsCancelling] = useState(false)
 
@@ -157,6 +160,11 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
                               Cancelado
                             </Badge>
                           )}
+                          {ticket.correctedFrom && (
+                            <Badge className="bg-sky-100 text-sky-700 border-sky-200 hover:bg-sky-100 text-[10px]" data-corrige>
+                              corrige #{tickets?.find((t) => t.id === ticket.correctedFrom)?.folio ?? "…"}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-stone-500 mt-1 truncate">
                           {ticket.items
@@ -211,6 +219,21 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
                             <QrCode className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        {/* Se equivocó en algo: la venta vuelve al carrito tal
+                            como se cobró, se ajusta y se cobra de nuevo. La
+                            original queda cancelada sola, con motivo. */}
+                        {onCorrect && !cancelled && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 text-sky-700 hover:bg-sky-50 hover:text-sky-800"
+                            title="Corregir venta (se carga al carrito para cobrarla de nuevo)"
+                            onClick={() => setToCorrect(ticket)}
+                            data-corregir
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="icon"
@@ -234,6 +257,38 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
         </DialogContent>
       </Dialog>
       <ReceiptQrDialog {...qr.props} />
+
+      {/* Corregir: qué va a pasar, antes de tocar el carrito */}
+      <AlertDialog open={toCorrect !== null} onOpenChange={(o) => !o && setToCorrect(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Corregir la venta #{toCorrect?.folio}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se carga al carrito tal como se cobró ({toCorrect ? formatCurrency(toCorrect.total) : ""}). Ajusta lo que
+              haga falta y vuelve a cobrar: la original queda cancelada sola con el motivo «Corregida» y la nueva conserva
+              la hora original, así el corte y los reportes quedan bien. Si solo quieres anularla, usa Cancelar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-sky-700 hover:bg-sky-800"
+              onClick={(e) => {
+                e.preventDefault()
+                const t = toCorrect
+                setToCorrect(null)
+                if (t && onCorrect) {
+                  onOpenChange(false)
+                  onCorrect(t)
+                }
+              }}
+              data-corregir-confirmar
+            >
+              Cargar al carrito
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirmación de cancelación con motivo */}
       <AlertDialog open={toCancel !== null} onOpenChange={(o) => !o && setToCancel(null)}>

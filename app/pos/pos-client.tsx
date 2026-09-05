@@ -33,7 +33,8 @@ import { colorClasses } from "@/lib/category-colors"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { createTicket } from "@/app/actions/sales"
+import { correctTicket, createTicket } from "@/app/actions/sales"
+import type { TicketRecord } from "@/lib/tickets"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -102,7 +103,7 @@ import {
   type CartLine,
   type Category,
   type Product,
-  type SizeOption, type PersistedCart } from "./cart"
+  type SizeOption, type PersistedCart, CART_STORAGE_VERSION } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
 
@@ -508,6 +509,10 @@ export default function POSClient({
     const t = setTimeout(() => setRecuperada(null), 3000)
     return () => clearTimeout(t)
   }, [recuperada])
+  // ── Corregir una venta cobrada (P37) ──
+  // La venta vuelve al carrito tal como se cobró; al cobrar de nuevo, el
+  // servidor cancela la original y cobra esta con la hora original.
+  const [corrigiendo, setCorrigiendo] = useState<{ id: string; folio: number; total: number } | null>(null)
   const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
   const { lastAdded, aviso, markFlyOrigin, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
 
@@ -788,6 +793,132 @@ export default function POSClient({
     setTipCustomInput("")
   }, [])
 
+  /**
+   * Corregir una venta cobrada (P37): vuelve al carrito tal como se cobró
+   * —líneas, método, notas (y con ellas «Para llevar»), descuento a mano,
+   * propina, tarjeta de sellos— y al cobrar de nuevo el servidor cancela la
+   * original y cobra esta con la hora original. Lo que hubiera en el
+   * carrito se pone a salvo como al abrir una cuenta.
+   */
+  const iniciarCorreccion = useCallback(
+    async (ticket: TicketRecord) => {
+      if (practica) {
+        toast.error("Sal del modo práctica para corregir una venta de verdad.")
+        return
+      }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        toast.error("Para corregir una venta hace falta conexión.")
+        return
+      }
+      const porId = new Map(products.map((p) => [p.id, p]))
+      const guardado: PersistedCart = {
+        v: CART_STORAGE_VERSION,
+        savedAt: Date.now(),
+        saleRef: crypto.randomUUID(),
+        paymentMethod:
+          ticket.paymentMethod === "transferencia" || ticket.paymentMethod === "tarjeta_clip"
+            ? ticket.paymentMethod
+            : "efectivo",
+        ticketNotes: ticket.notes,
+        cashReceivedInput: "",
+        discount: null,
+        lines: ticket.items.map((it) => ({
+          lineId: crypto.randomUUID(),
+          productId: it.productId,
+          // Un producto con tamaños guarda el NOMBRE de la variante; uno sin
+          // tamaños, null. Es la misma llave que usan las cuentas abiertas.
+          sizeLabel: porId.get(it.productId)?.sizes?.length ? it.variantName : null,
+          modifierIds: it.modifiers.map((m) => m.modifierId),
+          quantity: it.quantity,
+          notes: it.notes,
+        })),
+      }
+      const estado = rehydrateCart(guardado, products, Date.now())
+      if (!estado || estado.lines.length === 0) {
+        toast.error("No se puede corregir: sus productos ya no están en el menú. Cancélala y cóbrala de nuevo.", {
+          duration: 10000,
+        })
+        return
+      }
+      if (lines.length > 0) {
+        if (openAccount) {
+          if (!(await saveToOpenAccount())) return
+        } else {
+          const auto = autoName(new Date())
+          if (!parked.park(cartStateNow(), auto)) {
+            toast.error("La bandeja está llena: cobra o descarta una cuenta antes de corregir.")
+            return
+          }
+          toast.info(`Lo que tenías en el carrito se guardó como «${auto}».`)
+        }
+      }
+      setOpenAccount(null)
+      restoreLines(estado.lines)
+      setPaymentMethod(estado.paymentMethod)
+      setTicketNotes(estado.ticketNotes)
+      // El descuento a mano vuelve tal cual; el de promoción no (la promoción
+      // se vuelve a evaluar sola) y el canje de lealtad vuelve como canje.
+      const esCanje = !!ticket.loyalty && ticket.discountReason === "Premio de lealtad"
+      setDiscount(
+        ticket.discountTotal > 0 && ticket.discountReason && (esCanje || !ticket.promotionId)
+          ? { type: "amount", value: ticket.discountTotal, reason: ticket.discountReason }
+          : null,
+      )
+      setLoyaltyCustomer(
+        ticket.loyalty
+          ? {
+              id: ticket.loyalty.id,
+              phone: ticket.loyalty.phone,
+              name: ticket.loyalty.name,
+              stamps: ticket.loyalty.stamps,
+              visits: ticket.loyalty.visits,
+              rewardsRedeemed: ticket.loyalty.rewardsRedeemed,
+              lastVisitAt: ticket.loyalty.lastVisitAt,
+            }
+          : null,
+      )
+      setLoyaltyRedeem(esCanje)
+      if (ticket.tip > 0) {
+        setTipChoice("otro")
+        setTipCustomInput(String(ticket.tip))
+      } else {
+        clearTip()
+      }
+      setCorrigiendo({ id: ticket.id, folio: ticket.folio, total: ticket.total })
+      setRecuperada({
+        key: Date.now(),
+        name: `Venta #${ticket.folio}`,
+        articulos: estado.lines.reduce((s, l) => s + l.quantity, 0),
+      })
+      setShowTray(false)
+      if (isMobile) setCartOpen(true)
+      vibra(12)
+      const caidos = ticket.items.length - estado.lines.length
+      if (caidos > 0) {
+        toast.warning(
+          caidos === 1
+            ? "1 artículo de esa venta ya no está en el menú y no se va a cobrar. Reactívalo en Menú → Productos si hace falta."
+            : `${caidos} artículos de esa venta ya no están en el menú y no se van a cobrar. Reactívalos en Menú → Productos si hace falta.`,
+          { duration: 12000 },
+        )
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, lines.length, openAccount, saveToOpenAccount, parked, cartStateNow, restoreLines, setPaymentMethod, setTicketNotes, setDiscount, clearTip, isMobile],
+  )
+
+  /** Dejar la venta como estaba: el carrito se vacía y no se cancela nada. */
+  const cancelarCorreccion = useCallback(() => {
+    if (!corrigiendo) return
+    const folio = corrigiendo.folio
+    setCorrigiendo(null)
+    clearCart()
+    clearTip()
+    setLoyaltyCustomer(null)
+    setLoyaltyRedeem(false)
+    toast.info(`La venta #${folio} se queda como estaba.`)
+  }, [corrigiendo, clearCart, clearTip])
+
   // ── Modo práctica ──
   // Para aprender el POS tocando, sin miedo a ensuciar las ventas reales:
   // «siento que es más rápido en la libreta» casi siempre es falta de
@@ -901,7 +1032,7 @@ export default function POSClient({
     // confirma por detrás; si la rechaza, el carrito regresa con el motivo.
     // Con cuenta abierta, lealtad o impresora se espera, porque ahí lo que
     // sigue necesita la respuesta del servidor.
-    const optimista = isMobile && autoPrint === "none" && !openAccount && !loyaltyCustomer && !loyaltyRedeem
+    const optimista = isMobile && autoPrint === "none" && !openAccount && !loyaltyCustomer && !loyaltyRedeem && !corrigiendo
     let avisoId: string | number | undefined
     if (optimista) {
       avisoId = toast.loading(`Cobrando ${formatCurrency(venta.due)} · ${paymentLabel(venta.paymentMethod)}…`)
@@ -929,7 +1060,7 @@ export default function POSClient({
     }
 
     try {
-      const result = await createTicket({
+      const entrada = {
         clientRef: venta.saleRef,
         expectedBusinessId: businessId,
         paymentMethod: venta.paymentMethod,
@@ -941,7 +1072,12 @@ export default function POSClient({
         loyaltyRedeem: loyaltyRedeem || undefined,
         takeout: venta.esParaLlevar || undefined,
         items,
-      })
+      }
+      // Corrigiendo: el servidor cancela la original y cobra esta, en una
+      // sola transacción y con la hora de la original.
+      const result = corrigiendo
+        ? await correctTicket({ ...entrada, originalId: corrigiendo.id })
+        : await createTicket(entrada)
 
       if (result.success) {
         const completada: CompletedSale = {
@@ -991,8 +1127,13 @@ export default function POSClient({
             toast.success(`Sello ${result.loyalty.stamps} de ${result.loyalty.target} para ${quien}.`)
           }
         }
-        // El total del día son ventas: la propina no suma aquí.
-        setTotalSales((prev) => prev + result.total)
+        // El total del día son ventas: la propina no suma aquí. Si se
+        // corrigió una venta, la original ya no cuenta.
+        setTotalSales((prev) => prev + result.total - (corrigiendo ? corrigiendo.total : 0))
+        if (corrigiendo) {
+          toast.success(`Venta #${corrigiendo.folio} corregida · ahora es el ticket #${result.folio}`, { duration: 7000 })
+          setCorrigiendo(null)
+        }
         // Guardar las líneas para «Repetir última venta» (validadas contra el
         // menú vigente al momento de repetir, no ahora).
         try {
@@ -1016,6 +1157,16 @@ export default function POSClient({
         toast.error(result.error || "Error al registrar la venta")
       }
     } catch {
+      if (corrigiendo) {
+        // Una corrección no va a la cola: cancela y cobra en el servidor, y
+        // a ciegas no se sabe qué quedó. Se reintenta con señal.
+        if (optimista) restaurar()
+        toast.error("Sin conexión: la corrección no se guardó. Vuelve a intentar cuando regrese la señal.", {
+          id: avisoId,
+          duration: 8000,
+        })
+        return
+      }
       // No llegó al servidor: en vez de dejar al cajero con la fila parada,
       // la venta se guarda en la cola con SU MISMO clientRef y se sube sola
       // al volver la señal. La idempotencia de create_ticket hace que
@@ -1050,7 +1201,7 @@ export default function POSClient({
     } finally {
       if (!optimista) setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount, corrigiendo])
 
   /**
    * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
@@ -1341,6 +1492,8 @@ export default function POSClient({
       cartPulse={cartPulse}
       bagTargetRef={bagTargetRef}
       recuperada={recuperada}
+      corrigiendo={corrigiendo ? { folio: corrigiendo.folio } : null}
+      cancelarCorreccion={cancelarCorreccion}
       paymentMethod={paymentMethod}
       setPaymentMethod={setPaymentMethod}
       cashReceivedInput={cashReceivedInput}
@@ -1776,6 +1929,7 @@ export default function POSClient({
         pendingUploads={cola.pendientes + cola.porRevisar}
       />
       <TicketHistoryDialog
+        onCorrect={iniciarCorreccion}
         open={showTickets}
         onOpenChange={setShowTickets}
         isAdmin={isAdmin}
