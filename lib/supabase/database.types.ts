@@ -1588,11 +1588,11 @@ export type Database = {
       }
       credit_statement: { Args: { p_customer: string }; Returns: Json }
       current_business_id: { Args: never; Returns: string }
-      custom_items_recent: { Args: { p_days?: number }; Returns: Json }
       current_member_role: {
         Args: never
         Returns: Database["public"]["Enums"]["business_role"]
       }
+      custom_items_recent: { Args: { p_days?: number }; Returns: Json }
       delete_business: {
         Args: {
           p_actor?: string
@@ -1685,6 +1685,7 @@ export type Database = {
         Returns: {
           category_id: string
           idx: number
+          is_custom: boolean
           line_total: number
           modifier_ids: Json
           notes: string
