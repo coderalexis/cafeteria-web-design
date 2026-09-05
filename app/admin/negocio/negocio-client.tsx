@@ -366,6 +366,25 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
                 se registra como venta hasta que se cobra.
               </p>
 
+              <label htmlFor="credit" className="text-sm font-medium text-stone-700">
+                Fiados (cuentas por persona, con abonos)
+              </label>
+              <select
+                id="credit"
+                name="credit"
+                defaultValue={currentSettings.credit ? "on" : "off"}
+                className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+              >
+                <option value="on">Activado</option>
+                <option value="off">Desactivado</option>
+              </select>
+              <p className="text-xs text-stone-400">
+                Para quien pide a crédito y paga después (el entrenador que paga en quincena): el POS gana el método
+                de pago <strong>Fiado</strong> a nombre de alguien, cada persona tiene su cuenta y se le abona completo
+                o en partes, en el POS (⋮ → Fiados y abonos) o en Por cobrar. La venta cuenta el día que se sirve; el
+                dinero entra a la caja el día que abona.
+              </p>
+
               {/* La leche se pregunta cuando el cliente pide, no al final: por
                   eso «al tocar el producto» es lo normal. «Solo obligatorios»
                   existe para el café donde casi nadie cambia nada y la hoja

@@ -35,6 +35,9 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { correctTicket, createTicket } from "@/app/actions/sales"
 import type { TicketRecord } from "@/lib/tickets"
+import { useRouter } from "next/navigation"
+import type { CreditAccount } from "@/app/actions/credit"
+import { CreditAccountsDialog, CreditPickerDialog, type CuentaFiado } from "./credit-dialogs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -151,6 +154,10 @@ interface POSClientProps {
   visitas: AccountVisit[]
   /** ¿Hay alguna promoción encendida? Si no, el carrito no consulta promociones (P34). */
   hayPromociones: boolean
+  /** Módulo de fiados encendido: el POS gana el método «Fiado» y «Fiados y abonos» en ⋮. */
+  creditEnabled: boolean
+  /** Cuentas de fiado con su saldo (vacío si el módulo está apagado). */
+  fiados: CreditAccount[]
 }
 
 export default function POSClient({
@@ -179,7 +186,10 @@ export default function POSClient({
   suggestedFloat,
   visitas,
   hayPromociones,
+  creditEnabled,
+  fiados,
 }: POSClientProps) {
+  const router = useRouter()
   const appCtx = useAppContext()
   const businessName = appCtx.business?.name ?? "Cafecito POS"
   /**
@@ -509,6 +519,23 @@ export default function POSClient({
     const t = setTimeout(() => setRecuperada(null), 3000)
     return () => clearTimeout(t)
   }, [recuperada])
+  // ── Fiados (P38) ──
+  // Con «Fiado» elegido, la venta va a nombre de alguien: se pregunta al
+  // momento y se conserva hasta cobrar. La propina no se fía.
+  const [creditCustomer, setCreditCustomer] = useState<CuentaFiado | null>(null)
+  const [showCreditPicker, setShowCreditPicker] = useState(false)
+  const [showCredit, setShowCredit] = useState(false)
+  useEffect(() => {
+    if (paymentMethod !== "fiado") return
+    if (!creditEnabled) {
+      setPaymentMethod("efectivo")
+      return
+    }
+    clearTip()
+    if (!creditCustomer) setShowCreditPicker(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMethod, creditEnabled])
+
   // ── Corregir una venta cobrada (P37) ──
   // La venta vuelve al carrito tal como se cobró; al cobrar de nuevo, el
   // servidor cancela la original y cobra esta con la hora original.
@@ -968,7 +995,12 @@ export default function POSClient({
 
   // Practicando no hace falta caja abierta: no se registra nada.
   const canCharge =
-    lines.length > 0 && !isProcessing && (practica || !!openSession) && !cashInsufficient && !discountInvalid
+    lines.length > 0 &&
+    !isProcessing &&
+    (practica || !!openSession) &&
+    !cashInsufficient &&
+    !discountInvalid &&
+    (paymentMethod !== "fiado" || creditCustomer !== null)
 
   /**
    * La cuenta ya se cobró: se borra del servidor y se suelta el puntero.
@@ -1032,7 +1064,8 @@ export default function POSClient({
     // confirma por detrás; si la rechaza, el carrito regresa con el motivo.
     // Con cuenta abierta, lealtad o impresora se espera, porque ahí lo que
     // sigue necesita la respuesta del servidor.
-    const optimista = isMobile && autoPrint === "none" && !openAccount && !loyaltyCustomer && !loyaltyRedeem && !corrigiendo
+    const optimista =
+      isMobile && autoPrint === "none" && !openAccount && !loyaltyCustomer && !loyaltyRedeem && !corrigiendo && venta.paymentMethod !== "fiado"
     let avisoId: string | number | undefined
     if (optimista) {
       avisoId = toast.loading(`Cobrando ${formatCurrency(venta.due)} · ${paymentLabel(venta.paymentMethod)}…`)
@@ -1054,6 +1087,10 @@ export default function POSClient({
       clearTip()
       setLoyaltyCustomer(null)
       setLoyaltyRedeem(false)
+      setCreditCustomer(null)
+      // Fiar es la excepción, no la regla: la siguiente venta arranca en
+      // efectivo y, si vuelve a ser fiado, se vuelve a preguntar a quién.
+      if (venta.paymentMethod === "fiado") setPaymentMethod("efectivo")
       cerrarCuentaCobrada()
       resetAfterSale()
       setCartOpen(false)
@@ -1071,6 +1108,7 @@ export default function POSClient({
         loyaltyCustomerId: loyaltyCustomer?.id,
         loyaltyRedeem: loyaltyRedeem || undefined,
         takeout: venta.esParaLlevar || undefined,
+        creditCustomerId: venta.paymentMethod === "fiado" ? creditCustomer?.id : undefined,
         items,
       }
       // Corrigiendo: el servidor cancela la original y cobra esta, en una
@@ -1098,6 +1136,12 @@ export default function POSClient({
           loyalty: result.loyalty
             ? { stamps: result.loyalty.stamps, target: result.loyalty.target, redeemed: result.loyalty.redeemed }
             : null,
+          credit: result.credit ? { name: result.credit.name, balance: result.credit.balance } : null,
+        }
+        if (result.credit) {
+          toast.success(`Fiado a ${result.credit.name} · ahora debe ${formatCurrency(result.credit.balance)}`, { duration: 8000 })
+          // Las cuentas del selector traen el saldo: que se vea el nuevo.
+          router.refresh()
         }
         // En celular sin impresora, un aviso con folio, monto y cambio dice lo
         // mismo que el recibo sin estorbar; «Ver ticket» abre el recibo
@@ -1157,6 +1201,13 @@ export default function POSClient({
         toast.error(result.error || "Error al registrar la venta")
       }
     } catch {
+      if (venta.paymentMethod === "fiado") {
+        // Un fiado no va a la cola: lleva una cuenta que el servidor debe
+        // validar, y sin señal no se sabe si ya quedó.
+        if (optimista) restaurar()
+        toast.error("Sin conexión: el fiado no se guardó. Vuelve a intentar cuando regrese la señal.", { id: avisoId, duration: 8000 })
+        return
+      }
       if (corrigiendo) {
         // Una corrección no va a la cola: cancela y cobra en el servidor, y
         // a ciegas no se sabe qué quedó. Se reintenta con señal.
@@ -1201,7 +1252,7 @@ export default function POSClient({
     } finally {
       if (!optimista) setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount, corrigiendo])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount, corrigiendo, creditCustomer, router, setPaymentMethod])
 
   /**
    * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
@@ -1411,6 +1462,7 @@ export default function POSClient({
           cashReceived: result.cashReceived,
           changeDue: result.changeDue,
           loyalty: null,
+          credit: null,
         }
         toast.success(`Venta #${result.folio} · ${formatCurrency(result.total)} · Efectivo · «${o.name}»`, {
           duration: 5000,
@@ -1494,6 +1546,9 @@ export default function POSClient({
       recuperada={recuperada}
       corrigiendo={corrigiendo ? { folio: corrigiendo.folio } : null}
       cancelarCorreccion={cancelarCorreccion}
+      creditEnabled={creditEnabled}
+      creditCustomer={creditCustomer}
+      setShowCreditPicker={setShowCreditPicker}
       paymentMethod={paymentMethod}
       setPaymentMethod={setPaymentMethod}
       cashReceivedInput={cashReceivedInput}
@@ -1587,6 +1642,8 @@ export default function POSClient({
           setShowTray={setShowTray}
           setShowRecent={setShowRecent}
           setShowTickets={setShowTickets}
+          creditEnabled={creditEnabled}
+          setShowCredit={setShowCredit}
           setShowShortcuts={setShowShortcuts}
           textSize={textSize}
           practica={practica}
@@ -1928,6 +1985,24 @@ export default function POSClient({
         cardFeePct={cardFeePct}
         pendingUploads={cola.pendientes + cola.porRevisar}
       />
+      {creditEnabled && (
+        <>
+          <CreditPickerDialog
+            open={showCreditPicker}
+            onOpenChange={(o) => {
+              setShowCreditPicker(o)
+              // Cerró sin elegir: la venta no puede quedar «fiada a nadie».
+              if (!o && !creditCustomer && paymentMethod === "fiado") setPaymentMethod("efectivo")
+            }}
+            cuentas={fiados}
+            onPick={(c) => {
+              setCreditCustomer(c)
+              setShowCreditPicker(false)
+            }}
+          />
+          <CreditAccountsDialog open={showCredit} onOpenChange={setShowCredit} cuentas={fiados} onChanged={() => router.refresh()} />
+        </>
+      )}
       <TicketHistoryDialog
         onCorrect={iniciarCorreccion}
         open={showTickets}

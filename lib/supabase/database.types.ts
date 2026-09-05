@@ -416,6 +416,129 @@ export type Database = {
           },
         ]
       }
+      credit_customers: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+        }
+        Insert: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_customers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_customers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_payments: {
+        Row: {
+          amount: number
+          business_id: string
+          created_at: string
+          created_by: string
+          customer_id: string
+          id: string
+          method: Database["public"]["Enums"]["payment_method"]
+          movement_id: string | null
+          notes: string | null
+          session_id: string | null
+        }
+        Insert: {
+          amount: number
+          business_id?: string
+          created_at?: string
+          created_by: string
+          customer_id: string
+          id?: string
+          method: Database["public"]["Enums"]["payment_method"]
+          movement_id?: string | null
+          notes?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          created_at?: string
+          created_by?: string
+          customer_id?: string
+          id?: string
+          method?: Database["public"]["Enums"]["payment_method"]
+          movement_id?: string | null
+          notes?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "credit_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_payments_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "cash_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deleted_businesses: {
         Row: {
           business_id: string
@@ -1239,6 +1362,7 @@ export type Database = {
           client_ref: string
           corrected_from: string | null
           created_at: string
+          credit_customer_id: string | null
           discount_reason: string | null
           discount_total: number
           folio: number
@@ -1268,6 +1392,7 @@ export type Database = {
           client_ref: string
           corrected_from?: string | null
           created_at?: string
+          credit_customer_id?: string | null
           discount_reason?: string | null
           discount_total?: number
           folio: number
@@ -1297,6 +1422,7 @@ export type Database = {
           client_ref?: string
           corrected_from?: string | null
           created_at?: string
+          credit_customer_id?: string | null
           discount_reason?: string | null
           discount_total?: number
           folio?: number
@@ -1342,6 +1468,13 @@ export type Database = {
             columns: ["corrected_from"]
             isOneToOne: false
             referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_credit_customer_id_fkey"
+            columns: ["credit_customer_id"]
+            isOneToOne: false
+            referencedRelation: "credit_customers"
             referencedColumns: ["id"]
           },
           {
@@ -1404,6 +1537,7 @@ export type Database = {
         Args: {
           p_cash_received?: number
           p_client_ref: string
+          p_credit_customer?: string
           p_discount?: Json
           p_items: Json
           p_loyalty_customer?: string
@@ -1422,6 +1556,7 @@ export type Database = {
           p_captured_at?: string
           p_cash_received?: number
           p_client_ref: string
+          p_credit_customer?: string
           p_discount?: Json
           p_items: Json
           p_loyalty_customer?: string
@@ -1433,6 +1568,22 @@ export type Database = {
         }
         Returns: Json
       }
+      credit_balance_of: { Args: { p_customer: string }; Returns: number }
+      credit_balances: { Args: never; Returns: Json }
+      credit_customer_upsert: {
+        Args: { p_name: string; p_notes?: string; p_phone?: string }
+        Returns: Json
+      }
+      credit_pay: {
+        Args: {
+          p_amount: number
+          p_customer: string
+          p_method: Database["public"]["Enums"]["payment_method"]
+          p_notes?: string
+        }
+        Returns: Json
+      }
+      credit_statement: { Args: { p_customer: string }; Returns: Json }
       current_business_id: { Args: never; Returns: string }
       current_member_role: {
         Args: never
@@ -1558,7 +1709,7 @@ export type Database = {
     }
     Enums: {
       business_role: "owner" | "admin" | "cajero"
-      payment_method: "efectivo" | "transferencia" | "tarjeta_clip"
+      payment_method: "efectivo" | "transferencia" | "tarjeta_clip" | "fiado"
       ticket_status: "completado" | "cancelado"
     }
     CompositeTypes: {
@@ -1688,7 +1839,7 @@ export const Constants = {
   public: {
     Enums: {
       business_role: ["owner", "admin", "cajero"],
-      payment_method: ["efectivo", "transferencia", "tarjeta_clip"],
+      payment_method: ["efectivo", "transferencia", "tarjeta_clip", "fiado"],
       ticket_status: ["completado", "cancelado"],
     },
   },

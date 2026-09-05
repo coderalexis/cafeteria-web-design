@@ -96,6 +96,8 @@ function paymentColor(method: string): string {
       return "bg-blue-100 text-blue-700 border-blue-200"
     case "transferencia":
       return "bg-violet-100 text-violet-700 border-violet-200"
+    case "fiado":
+      return "bg-rose-100 text-rose-700 border-rose-200"
     default:
       return "bg-stone-100 text-stone-700 border-stone-200"
   }
@@ -299,7 +301,7 @@ export default function VentasClient({
               <p className="text-xs text-stone-400">Total: {formatCurrency(revenue)}</p>
             </div>
             <div className="space-y-3">
-              {(["efectivo", "transferencia", "tarjeta_clip"] as PaymentMethodKey[]).map((key) => {
+              {(["efectivo", "transferencia", "tarjeta_clip", "fiado"] as PaymentMethodKey[]).map((key) => {
                 const row = report?.by_method.find((m) => m.method === key)
                 const value = row?.revenue ?? 0
                 const percentage = revenue > 0 ? (value / revenue) * 100 : 0

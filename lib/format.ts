@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Smartphone, type LucideIcon } from "lucide-react"
+import { Banknote, CreditCard, HandCoins, Smartphone, type LucideIcon } from "lucide-react"
 
 /* ------------------------------------------------------------------ */
 /*  Moneda y fechas (una sola definición para POS, admin y recibos)    */
@@ -37,7 +37,7 @@ export function formatDateTime(date: Date | string, timeZone?: string): string {
 /*  Métodos de pago                                                    */
 /* ------------------------------------------------------------------ */
 
-export type PaymentMethodKey = "efectivo" | "transferencia" | "tarjeta_clip"
+export type PaymentMethodKey = "efectivo" | "transferencia" | "tarjeta_clip" | "fiado"
 
 export interface PaymentMethodInfo {
   key: PaymentMethodKey
@@ -70,6 +70,15 @@ export const PAYMENT_METHODS: Record<PaymentMethodKey, PaymentMethodInfo> = {
     shortLabel: "Tarjeta",
     icon: CreditCard,
     iconColor: "text-blue-600",
+  },
+  // Venta hecha cuyo dinero entra después, a nombre de alguien (P38). Solo
+  // aparece en el POS con el módulo de fiados encendido.
+  fiado: {
+    key: "fiado",
+    label: "Fiado",
+    shortLabel: "Fiado",
+    icon: HandCoins,
+    iconColor: "text-rose-600",
   },
 }
 

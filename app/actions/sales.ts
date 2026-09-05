@@ -38,7 +38,7 @@ const createTicketSchema = z.object({
   clientRef: z.string().uuid(),
   /** Negocio con el que la UI cree estar operando (guardia multi-pestaña). */
   expectedBusinessId: z.string().uuid().optional(),
-  paymentMethod: z.enum(["efectivo", "transferencia", "tarjeta_clip"]),
+  paymentMethod: z.enum(["efectivo", "transferencia", "tarjeta_clip", "fiado"]),
   notes: z.string().trim().max(500).optional(),
   cashReceived: z.number().finite().nonnegative().max(9_999_999).optional(),
   /** Propina: se cobra encima del total y no cuenta como venta. */
@@ -52,6 +52,8 @@ const createTicketSchema = z.object({
   loyaltyCustomerId: z.string().uuid().optional(),
   /** Canjear el premio en esta venta (el RPC valida saldo, monto y motivo). */
   loyaltyRedeem: z.boolean().optional(),
+  /** A nombre de quién se fía (solo con método «fiado»; el RPC lo exige y lo valida). */
+  creditCustomerId: z.string().uuid().optional(),
   items: z
     .array(
       z.object({
@@ -82,6 +84,8 @@ interface CreateTicketData {
   changeDue: number | null
   /** Estado de la tarjeta tras la venta (solo si se adjuntó cliente). */
   loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
+  /** Venta fiada: a quién y cuánto debe ya (para el aviso y el ticket). */
+  credit: { customerId: string; name: string; balance: number } | null
 }
 
 export async function createTicket(
@@ -92,7 +96,7 @@ export async function createTicket(
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
 
-  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, capturedAt, loyaltyCustomerId, loyaltyRedeem } = parsed.data
+  const { clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, capturedAt, loyaltyCustomerId, loyaltyRedeem, creditCustomerId } = parsed.data
 
   const businessError = await checkExpectedBusiness(expectedBusinessId)
   if (businessError) {
@@ -110,6 +114,7 @@ export async function createTicket(
     p_tip: tip,
     p_loyalty_customer: loyaltyCustomerId,
     p_loyalty_redeem: loyaltyRedeem,
+    p_credit_customer: paymentMethod === "fiado" ? creditCustomerId : undefined,
     p_takeout: takeout ?? false,
     p_captured_at: capturedAt,
   })
@@ -129,6 +134,7 @@ export async function createTicket(
     cash_received: number | null
     change_due: number | null
     loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
+    credit: { customer_id: string; name: string; balance: number } | null
   }
 
   revalidateSales()
@@ -145,6 +151,7 @@ export async function createTicket(
     cashReceived: ticket.cash_received ?? null,
     changeDue: ticket.change_due ?? null,
     loyalty: ticket.loyalty ?? null,
+    credit: ticket.credit ? { customerId: ticket.credit.customer_id, name: ticket.credit.name, balance: Number(ticket.credit.balance) } : null,
   }
 }
 
@@ -167,7 +174,7 @@ export async function correctTicket(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos de venta inválidos." }
   }
-  const { originalId, clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, loyaltyCustomerId, loyaltyRedeem } = parsed.data
+  const { originalId, clientRef, expectedBusinessId, paymentMethod, notes, items, cashReceived, tip, discount, takeout, loyaltyCustomerId, loyaltyRedeem, creditCustomerId } = parsed.data
 
   const businessError = await checkExpectedBusiness(expectedBusinessId)
   if (businessError) {
@@ -186,6 +193,7 @@ export async function correctTicket(
     p_tip: tip,
     p_loyalty_customer: loyaltyCustomerId,
     p_loyalty_redeem: loyaltyRedeem,
+    p_credit_customer: paymentMethod === "fiado" ? creditCustomerId : undefined,
     p_takeout: takeout ?? false,
   })
   if (error) {
@@ -203,6 +211,7 @@ export async function correctTicket(
     cash_received: number | null
     change_due: number | null
     loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
+    credit: { customer_id: string; name: string; balance: number } | null
     original_folio: number
   }
 
@@ -220,6 +229,7 @@ export async function correctTicket(
     cashReceived: ticket.cash_received ?? null,
     changeDue: ticket.change_due ?? null,
     loyalty: ticket.loyalty ?? null,
+    credit: ticket.credit ? { customerId: ticket.credit.customer_id, name: ticket.credit.name, balance: Number(ticket.credit.balance) } : null,
     originalFolio: ticket.original_folio,
   }
 }

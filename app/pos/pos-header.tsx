@@ -16,6 +16,7 @@ import {
   LogOut,
   MoreVertical,
   Footprints,
+  HandCoins,
   PauseCircle,
   Receipt,
   Search,
@@ -73,6 +74,9 @@ export interface PosHeaderProps {
   setShowRecent: (open: boolean) => void
   setShowTickets: (open: boolean) => void
   setShowShortcuts: (open: boolean) => void
+  /** Fiados (P38): quién debe cuánto y abonar, sin ir al panel. */
+  creditEnabled: boolean
+  setShowCredit: (open: boolean) => void
   /** Modo práctica (ventas que no se registran) y cómo entrar/salir. */
   practica: boolean
   onTogglePractica: () => void
@@ -106,7 +110,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, textSize, practica, onTogglePractica, onAprender, instalar,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, creditEnabled, setShowCredit, textSize, practica, onTogglePractica, onAprender, instalar,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, cuentasEnBarra, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -257,6 +261,11 @@ export function PosHeader(p: PosHeaderProps) {
                     <DropdownMenuItem onSelect={() => setShowTickets(true)}>
                       <Receipt className="h-4 w-4 mr-2" /> Tickets del día
                     </DropdownMenuItem>
+                    {creditEnabled && (
+                      <DropdownMenuItem onSelect={() => setShowCredit(true)} data-menu-fiados>
+                        <HandCoins className="h-4 w-4 mr-2" /> Fiados y abonos
+                      </DropdownMenuItem>
+                    )}
                     {/* No es un DropdownMenuItem a propósito: ajustar la letra
                         suele ser probar un tamaño y luego otro, y un Item
                         cerraría el menú en cada toque. */}

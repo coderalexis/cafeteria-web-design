@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import type { AccountVisit } from "./parked"
+import { creditAccountsFrom } from "@/lib/credit"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
 import { parseBusinessSettings } from "@/lib/settings"
@@ -48,6 +49,7 @@ export default async function POSPage() {
    * zona horaria del negocio, que ya viene en el contexto.
    */
   const { fromIso, toIso } = businessDayRange(ctx.business.timezone)
+  const settings = parseBusinessSettings(ctx.business.settings)
 
   const [
     barrido,
@@ -58,6 +60,7 @@ export default async function POSPage() {
     { data: topVariants },
     { data: visitas },
     { count: promosActivas },
+    { data: fiados },
   ] = await Promise.all([
     // Si la caja del turno pasado quedó abierta y ya venció, se cierra sola.
     // Aquí y no solo en el cron porque este es el momento en que importa:
@@ -95,6 +98,8 @@ export default async function POSPage() {
     supabase.rpc("account_name_suggestions"),
     // ¿Hay promociones encendidas? Si no, el POS no las consulta en cada cambio del carrito.
     supabase.from("promotions").select("id", { count: "exact", head: true }).eq("is_active", true),
+    // Fiados (P38): quién debe cuánto, para el selector «¿a nombre de quién?» y el diálogo de abonos.
+    settings.credit ? supabase.rpc("credit_balances") : Promise.resolve({ data: null }),
   ])
 
   const session = barrido.session
@@ -223,8 +228,6 @@ export default async function POSPage() {
     }
   })
 
-  const settings = parseBusinessSettings(ctx.business.settings)
-
   // La primera pantalla: primero lo que la dueña fijó, en su orden; luego lo
   // más vendido hasta completar ocho. Un producto fijado con tamaños pone un
   // tile por tamaño.
@@ -275,6 +278,8 @@ export default async function POSPage() {
       suggestedFloat={ultimoCorte?.next_float ?? null}
       visitas={Array.isArray(visitas) ? (visitas as unknown as AccountVisit[]) : []}
       hayPromociones={(promosActivas ?? 0) > 0}
+      creditEnabled={settings.credit}
+      fiados={creditAccountsFrom(fiados)}
     />
   )
 }

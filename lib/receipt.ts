@@ -120,6 +120,8 @@ export interface ReceiptData {
   reprint?: boolean
   /** Estado de la tarjeta de sellos tras esta venta (si hubo cliente). */
   loyalty?: { stamps: number; target: number; redeemed: boolean } | null
+  /** Venta fiada: a quién y cuánto debe en total después de esta. */
+  credit?: { name: string; balance: number } | null
 }
 
 export function receiptFromTicket(ticket: TicketRecord, reprint = false): ReceiptData {
@@ -160,6 +162,7 @@ export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[]
     `Hora: ${formatTime(r.date, tz)}`,
     `Pago: ${paymentLabel(r.paymentMethod)}`,
   ]
+  if (r.credit) lines.push(`A nombre de: ${r.credit.name}`)
   if (r.notes) lines.push(`Nota: ${r.notes}`)
   if (r.reprint) lines.push("(Reimpresión)")
   lines.push("", THIN)
@@ -200,6 +203,9 @@ export function buildTicketLines(r: ReceiptData, biz: ReceiptBusiness): string[]
   lines.push("")
 
   // Tarjeta de sellos: el cliente se lleva su avance impreso, como en el cartón.
+  if (r.credit) {
+    lines.push("", `Saldo de ${r.credit.name}: ${formatCurrency(r.credit.balance)}`)
+  }
   if (r.loyalty) {
     lines.push(
       center(
@@ -374,6 +380,10 @@ export interface CashSessionSummary {
   cash_tips?: number
   /** Entradas/salidas de efectivo a mitad de turno (Fase 4b). */
   movements_in?: number
+  /** Ventas fiadas del turno: venta sí, dinero en caja no (P38). */
+  credit_sales?: number
+  /** Abonos de fiados recibidos en efectivo en el turno (ya incluidos en movements_in). */
+  credit_paid_cash?: number
   movements_out?: number
   movements?: Array<{
     id: string
@@ -427,9 +437,11 @@ export function buildCorteLines(s: CashSessionSummary, biz: ReceiptBusiness): st
   lines.push("", THIN, "EFECTIVO EN CAJA")
   lines.push(row("Fondo inicial", formatCurrency(s.opening_float)))
   lines.push(row("Ventas efectivo", formatCurrency(s.cash_sales)))
+  if ((s.credit_sales ?? 0) > 0) lines.push(row("Fiado (no entra a caja)", formatCurrency(s.credit_sales ?? 0)))
   const cashTips = s.cash_tips ?? 0
   if (cashTips > 0) lines.push(row("Propinas efectivo", `+${formatCurrency(cashTips)}`))
   if (movIn > 0) lines.push(row("Entradas", `+${formatCurrency(movIn)}`))
+  if ((s.credit_paid_cash ?? 0) > 0) lines.push(row("  de abonos fiados", formatCurrency(s.credit_paid_cash ?? 0)))
   if (movOut > 0) lines.push(row("Salidas", `-${formatCurrency(movOut)}`))
   lines.push(row("Esperado", formatCurrency(s.expected_cash ?? s.opening_float + s.cash_sales + cashTips + movIn - movOut)))
   if (s.counted_cash != null) {

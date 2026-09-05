@@ -587,6 +587,11 @@ export function AyudaClient({ ticket, corte }: Props) {
         <>
           <ul className="space-y-2 text-sm text-stone-600">
             <li>
+              <strong>Fiado</strong> (solo con el módulo encendido): la venta se hace hoy pero el dinero entra
+              después, a nombre de alguien. No suma al efectivo de la caja, así que el corte no lo espera en el
+              cajón; se cobra cuando la persona abona (⋮ → Fiados y abonos). La propina no se fía.
+            </li>
+            <li>
               Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>. Toca{" "}
               <strong>«Teclado y montos rápidos»</strong> y se abre en grande, con teclas de dedo: los billetes se{" "}
               <strong>calculan según el total</strong> (para una cuenta de $87 ofrece $90, $100 y $200) y{" "}
@@ -1507,7 +1512,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: HandCoins,
       titulo: "Por cobrar (lo que te deben)",
       palabras:
-        "fiado deuda deben por cobrar sin pagar condonar perdonar cliente moroso telefono cuanto me deben",
+        "fiado deuda deben por cobrar sin pagar condonar perdonar cliente moroso telefono cuanto me deben fiados por persona abono abonar saldo estado de cuenta quincena entrenador credito",
       acciones: [{ etiqueta: "Por cobrar", href: "/admin/por-cobrar", admin: true }, { etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
@@ -1516,6 +1521,15 @@ export function AyudaClient({ ticket, corte }: Props) {
             Aquí las ves todas juntas: <strong>quién te debe, cuánto y desde cuándo</strong>.
           </p>
           <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>
+              <strong>Fiados por persona (módulo Fiados):</strong> para quien pide a crédito y paga después, como
+              el entrenador que paga en quincena. En el POS se cobra con el método <strong>Fiado</strong> a nombre
+              de alguien (se escribe el nombre; si ya tiene cuenta, sale con lo que debe). La venta cuenta ese
+              día, con sus precios y su hora; el dinero entra cuando abona. Los abonos se registran en el POS (⋮ →{" "}
+              <strong>Fiados y abonos</strong>) o aquí, completos o en partes; en efectivo entran a la caja del
+              turno como entrada. Aquí ves quién debe cuánto y el estado de cuenta de cada quien (cargos y abonos).
+              Se enciende en Datos y ajustes → Módulos.
+            </li>
             <li>
               Arriba, el <strong>total que te deben</strong>. Abajo cada persona con los días que lleva y su
               teléfono, que puedes tocar para marcarle directo.
