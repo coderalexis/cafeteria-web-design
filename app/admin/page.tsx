@@ -164,6 +164,7 @@ export default async function AdminDashboard() {
     efectivo: { count: 0, total: 0 },
     transferencia: { count: 0, total: 0 },
     tarjeta_clip: { count: 0, total: 0 },
+    fiado: { count: 0, total: 0 },
   }
   for (const m of report?.by_method ?? []) {
     const data = paymentBreakdown[m.method as keyof typeof paymentBreakdown]
@@ -245,6 +246,7 @@ export default async function AdminDashboard() {
     { ...PAYMENT_METHODS.efectivo, color: "text-emerald-600", barColor: "bg-emerald-500" },
     { ...PAYMENT_METHODS.transferencia, color: "text-violet-600", barColor: "bg-violet-500" },
     { ...PAYMENT_METHODS.tarjeta_clip, color: "text-blue-600", barColor: "bg-blue-500" },
+    { ...PAYMENT_METHODS.fiado, color: "text-rose-600", barColor: "bg-rose-500" },
   ]
 
   // Carta vacía: no tiene caso enseñar un tablero de ceros. Lo único que

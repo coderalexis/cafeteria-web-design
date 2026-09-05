@@ -3,7 +3,7 @@
  * Sin React ni imports de servidor para poder probarlo aislado.
  */
 
-export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta_clip"
+export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta_clip" | "fiado"
 
 export interface SizeOption {
   variantId: string
@@ -288,7 +288,9 @@ export function rehydrateCart(
   }
 
   const paymentMethod: PaymentMethod =
-    p.paymentMethod === "transferencia" || p.paymentMethod === "tarjeta_clip" ? p.paymentMethod : "efectivo"
+    p.paymentMethod === "transferencia" || p.paymentMethod === "tarjeta_clip" || p.paymentMethod === "fiado"
+      ? p.paymentMethod
+      : "efectivo"
 
   const d = p.discount
   const discount: TicketDiscount | null =

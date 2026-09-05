@@ -37,6 +37,8 @@ export interface CompletedSale {
   cashReceived: number | null
   changeDue: number | null
   loyalty: { stamps: number; target: number; redeemed: boolean } | null
+  /** Venta fiada: a quién y cuánto debe en total. */
+  credit: { name: string; balance: number } | null
 }
 
 function saleToReceipt(sale: CompletedSale): ReceiptData {
@@ -62,6 +64,7 @@ function saleToReceipt(sale: CompletedSale): ReceiptData {
     cashReceived: sale.cashReceived,
     changeDue: sale.changeDue,
     loyalty: sale.loyalty,
+    credit: sale.credit,
   }
 }
 

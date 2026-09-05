@@ -106,6 +106,10 @@ export interface CartPanelProps {
   /** Corrigiendo una venta cobrada (P37): al cobrar se sustituye la original. */
   corrigiendo: { folio: number } | null
   cancelarCorreccion: () => void
+  // Fiados (P38)
+  creditEnabled: boolean
+  creditCustomer: { id: string; name: string; balance: number } | null
+  setShowCreditPicker: (open: boolean) => void
   // Pago
   paymentMethod: PaymentMethod
   setPaymentMethod: Cart["setPaymentMethod"]
@@ -172,6 +176,7 @@ export function CartPanel(p: CartPanelProps) {
     loyaltyEnabled, loyaltyCustomer, loyaltyRedeem, loyaltyTarget,
     setLoyaltyCustomer, setLoyaltyRedeem, setShowLoyalty, setShowRedeem,
     cartPulse, bagTargetRef, recuperada, corrigiendo, cancelarCorreccion,
+    creditEnabled, creditCustomer, setShowCreditPicker,
     paymentMethod, setPaymentMethod, cashReceivedInput, setCashReceivedInput, cashInputRef,
     cashReceived, changeDue, cashInsufficient, setShowTender,
     tipChoice, setTipChoice, tipCustomInput, setTipCustomInput, tipAmount,
@@ -775,7 +780,7 @@ export function CartPanel(p: CartPanelProps) {
               lo ocasional (propina, para llevar, nota). */}
           {/* Payment method selector */}
           <div className="flex gap-2" data-recorrido="pago">
-            {PAYMENT_METHOD_KEYS.map((key, index) => {
+            {PAYMENT_METHOD_KEYS.filter((key) => key !== "fiado" || creditEnabled).map((key, index) => {
               const info = PAYMENT_METHODS[key]
               const Icon = info.icon
               const active = paymentMethod === key
@@ -784,6 +789,8 @@ export function CartPanel(p: CartPanelProps) {
                   ? "border-green-500 bg-green-50 text-green-700"
                   : key === "transferencia"
                   ? "border-violet-500 bg-violet-50 text-violet-700"
+                  : key === "fiado"
+                  ? "border-rose-500 bg-rose-50 text-rose-700"
                   : "border-blue-500 bg-blue-50 text-blue-700"
               return (
                 <button
@@ -843,7 +850,40 @@ export function CartPanel(p: CartPanelProps) {
               </button>
             </div>
           )}
-          {/* Propina: se cobra encima del total y no cuenta como venta */}
+          {/* Fiado: a nombre de quién. Sin nombre no se puede cobrar. */}
+          {paymentMethod === "fiado" && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-2.5 text-sm" data-fiado>
+              {creditCustomer ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-rose-900">
+                    A nombre de <strong>{creditCustomer.name}</strong>
+                    {creditCustomer.balance > 0 && (
+                      <span className="text-rose-700"> · ya debe {formatCurrency(creditCustomer.balance)}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreditPicker(true)}
+                    className="shrink-0 text-xs font-semibold text-rose-700 underline underline-offset-2"
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCreditPicker(true)}
+                  className="w-full text-left font-medium text-rose-800"
+                  data-fiado-quien
+                >
+                  ¿A nombre de quién? Toca para elegir…
+                </button>
+              )}
+            </div>
+          )}
+          {/* Propina: se cobra encima del total y no cuenta como venta. Un
+              fiado no lleva propina (se deja al abonar), así que no se ofrece. */}
+          {paymentMethod !== "fiado" && (
           <div className="flex flex-wrap items-center gap-1.5">
             {/* Solo el icono cuando el carrito es angosto: con la palabra
                 completa la fila se partía en dos y costaba 32 px de alto. */}
@@ -889,6 +929,7 @@ export function CartPanel(p: CartPanelProps) {
               <span className="ml-auto text-sm font-bold text-emerald-700">+{formatCurrency(tipAmount)}</span>
             )}
           </div>
+          )}
           {/* Plegable con lo ocasional. El botón dice qué trae cuando está
               cerrado, para que nada quede escondido sin avisar. */}
           <button
@@ -1055,6 +1096,8 @@ export function CartPanel(p: CartPanelProps) {
                   ? "bg-green-600 hover:bg-green-700"
                   : paymentMethod === "transferencia"
                   ? "bg-violet-600 hover:bg-violet-700"
+                  : paymentMethod === "fiado"
+                  ? "bg-rose-600 hover:bg-rose-700"
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
               size="lg"
@@ -1066,7 +1109,9 @@ export function CartPanel(p: CartPanelProps) {
                 ? "Procesando..."
                 : corrigiendo
                   ? `Corregir #${corrigiendo.folio} · ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`
-                  : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
+                  : paymentMethod === "fiado"
+                    ? `Fiar ${formatCurrency(due)}${creditCustomer ? ` a ${creditCustomer.name}` : " · ¿a quién?"}`
+                    : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
               <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
             </Button>
           ) : (

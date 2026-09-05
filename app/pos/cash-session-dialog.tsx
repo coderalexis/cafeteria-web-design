@@ -363,6 +363,16 @@ function CloseSessionForm({
                 )}
               </div>
             ))}
+            {(summary.credit_sales ?? 0) > 0 && (
+              <p className="text-xs text-rose-700">
+                Lo fiado ({formatCurrency(summary.credit_sales ?? 0)}) es venta, pero no entra a la caja: entra cuando abonen.
+              </p>
+            )}
+            {(summary.credit_paid_cash ?? 0) > 0 && (
+              <p className="text-xs text-stone-500">
+                Abonos de fiados en efectivo: {formatCurrency(summary.credit_paid_cash ?? 0)} (ya cuentan como entradas).
+              </p>
+            )}
             {summary.cancelled_count > 0 && (
               <div className="flex justify-between text-red-600">
                 <span>Canceladas ({summary.cancelled_count})</span>

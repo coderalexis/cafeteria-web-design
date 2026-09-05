@@ -25,6 +25,7 @@ describe("parseBusinessSettings", () => {
     expect(s.publicMenu).toBe(false) // la carta pública no: publica el negocio
     expect(s.receiptWidthMm).toBe(58)
     expect(s.parkedOrders).toBe(true) // las cuentas abiertas vienen encendidas
+    expect(s.credit).toBe(false) // fiar es decisión del dueño: apagado
   })
 
   it("ignora basura sin reventar y acota lo que se sale de rango", () => {

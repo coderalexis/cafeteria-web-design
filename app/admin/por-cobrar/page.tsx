@@ -3,6 +3,8 @@ import { HandCoins } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
+import { parseBusinessSettings } from "@/lib/settings"
+import { creditAccountsFrom } from "@/lib/credit"
 import { PorCobrarClient, type Deuda } from "./por-cobrar-client"
 
 export const dynamic = "force-dynamic"
@@ -15,14 +17,22 @@ interface LineaGuardada {
   modifierIds: string[]
 }
 
+/**
+ * Dos cosas distintas viven aquí, y se dice cuál es cuál:
+ *   · Fiados por persona (P38): ventas hechas, con método «Fiado», a nombre
+ *     de alguien, con saldo y abonos. Sí son ventas.
+ *   · Cuentas que se fueron sin pagar (P11c): una cuenta abierta marcada
+ *     así. NO son ventas hasta que se cobran.
+ */
 export default async function PorCobrarPage() {
   const ctx = await getContext()
   if (!ctx?.business) redirect(homePathFor(ctx))
   if (!isManager(ctx.role)) redirect("/pos")
 
   const supabase = await createClient()
+  const settings = parseBusinessSettings(ctx.business.settings)
 
-  const [{ data: filas }, { data: variantes }, { data: modificadores }] = await Promise.all([
+  const [{ data: filas }, { data: variantes }, { data: modificadores }, { data: fiados }] = await Promise.all([
     supabase
       .from("parked_orders")
       .select("id, name, cart, created_at, owed_since, owed_contact")
@@ -32,6 +42,7 @@ export default async function PorCobrarPage() {
     // va a cobrar, no lo que costaba el día que se sirvió.
     supabase.from("menu_variants").select("product_id, name, price").eq("is_active", true),
     supabase.from("modifiers").select("id, price_delta").eq("is_active", true),
+    settings.credit ? supabase.rpc("credit_balances") : Promise.resolve({ data: null }),
   ])
 
   // OJO con la llave: lo que el carrito guarda como `sizeLabel` es el NOMBRE
@@ -84,6 +95,8 @@ export default async function PorCobrarPage() {
     }
   })
 
+  const cuentas = creditAccountsFrom(fiados)
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div>
@@ -92,12 +105,21 @@ export default async function PorCobrarPage() {
           Por cobrar
         </h1>
         <p className="mt-1 text-sm text-stone-500">
-          Cuentas de gente que se fue sin pagar. <strong>No son ventas todavía</strong>: no cuentan en tus
-          reportes ni en los cortes. La venta se registra el día que te paguen, desde el POS.
+          {settings.credit ? (
+            <>
+              Lo que te deben: <strong>fiados por persona</strong> (ventas ya hechas, con saldo y abonos) y{" "}
+              <strong>cuentas que se fueron sin pagar</strong> (no son ventas hasta que se cobran).
+            </>
+          ) : (
+            <>
+              Cuentas de gente que se fue sin pagar. <strong>No son ventas todavía</strong>: no cuentan en tus
+              reportes ni en los cortes. La venta se registra el día que te paguen, desde el POS.
+            </>
+          )}
         </p>
       </div>
 
-      <PorCobrarClient deudas={deudas} timezone={ctx.business.timezone} />
+      <PorCobrarClient deudas={deudas} cuentas={cuentas} creditEnabled={settings.credit} timezone={ctx.business.timezone} />
     </div>
   )
 }

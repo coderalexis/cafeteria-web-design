@@ -35,6 +35,12 @@ const FILAS: { que: string; cajero: string; admin: string; owner: string }[] = [
     owner: "Cualquiera, mientras la caja de esa venta siga abierta",
   },
   {
+    que: "Fiar una venta y registrar abonos (con el módulo Fiados encendido)",
+    cajero: "Sí",
+    admin: "Sí",
+    owner: "Sí",
+  },
+  {
     que: "Descuentos en caja",
     cajero: "Hasta el tope de Datos y ajustes (0 = ninguno)",
     admin: "Sin tope",

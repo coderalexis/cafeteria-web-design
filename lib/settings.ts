@@ -64,6 +64,11 @@ export interface BusinessSettings {
   /** Qué es el premio, en palabras del negocio («Bebida gratis»). */
   loyaltyReward: string
   /**
+   * Fiados por persona con abonos (P38): el POS gana el método «Fiado» a
+   * nombre de alguien. Apagado por omisión: fiar es una decisión del dueño.
+   */
+  credit: boolean
+  /**
    * Nota al pie del menú público: lo que en la carta impresa va en letra chica
    * ("nuestros jarabes son libres de azúcar", "precios con IVA"). No sale en el
    * ticket — para eso está `receipt_footer`.
@@ -186,6 +191,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   loyalty: false,
   loyaltyTarget: 10,
   loyaltyReward: "Bebida gratis",
+  credit: false,
   // 4 mesas + estas dos etiquetas = exactamente los chips que estaban fijos
   // en código, para que ninguna cafetería vea cambiar lo que ya conocía.
   tableCount: 4,
@@ -261,6 +267,7 @@ export function parseBusinessSettings(raw: unknown): BusinessSettings {
     const comision = Number(r.card_fee_pct)
     if (Number.isFinite(comision) && comision > 0) out.cardFeePct = Math.min(Math.round(comision * 100) / 100, 20)
     out.loyalty = r.loyalty === true
+    out.credit = r.credit === true
     const meta = Number(r.loyalty_target)
     if (Number.isFinite(meta) && meta >= 2 && meta <= 30) out.loyaltyTarget = Math.round(meta)
     if (typeof r.loyalty_reward === "string" && r.loyalty_reward.trim()) {
@@ -296,6 +303,7 @@ export function serializeBusinessSettings(s: BusinessSettings): Record<string, u
     takeout_fee: s.takeoutFee,
     card_fee_pct: s.cardFeePct,
     loyalty: s.loyalty,
+    credit: s.credit,
     loyalty_target: s.loyaltyTarget,
     loyalty_reward: s.loyaltyReward,
   }
