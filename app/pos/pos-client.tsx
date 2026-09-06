@@ -59,6 +59,7 @@ import { ModifierSheet } from "./modifier-sheet"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
 import { AccountDialog } from "./account-dialog"
 import { useParkedOrders } from "./use-parked-orders"
+import { esErrorDeVersion, marcarRecargaPorVersion } from "@/lib/version"
 import {
   autoName,
   conflictName,
@@ -161,6 +162,26 @@ interface POSClientProps {
   /** Fuera de menú (P39): vender algo que no está en la carta con precio de caja. */
   customItemsEnabled: boolean
   recientesFueraDeMenu: CustomRecent[]
+}
+
+/**
+ * Un cobro que no llegó porque hay un deploy más nuevo que esta pestaña:
+ * la venta NO se registró (el servidor no reconoció la acción), el carrito
+ * sigue guardado con su clientRef, y lo que toca es recargar y volver a
+ * cobrar con el código nuevo. Ver lib/version.ts.
+ */
+/** Segundos de calma antes de recargar por versión nueva: que un aviso de venta alcance a leerse. */
+const CALMA_ANTES_DE_RECARGAR_MS = 8_000
+
+function avisarVersionNueva(id?: string | number) {
+  const recarga = marcarRecargaPorVersion()
+  toast.info(
+    recarga
+      ? "Hay una versión nueva del sistema. Se recarga y vuelves a cobrar."
+      : "Hay una versión nueva del sistema. Recarga la página y vuelve a cobrar.",
+    { id, duration: 6000 },
+  )
+  if (recarga) window.setTimeout(() => window.location.reload(), 900)
 }
 
 export default function POSClient({
@@ -305,6 +326,21 @@ export default function POSClient({
   } | null>(null)
   // Cuentas abiertas de la cafetería (compartidas entre aparatos)
   const parked = useParkedOrders(businessId)
+  // Tras un deploy, la pestaña que quedó abierta se recarga sola en un
+  // momento de calma: carrito vacío, sin recibo a la vista, sin diálogo
+  // abierto, y así durante unos segundos (justo después de cobrar el
+  // carrito queda vacío, pero la persona está leyendo el aviso o el recibo).
+  // Si no, la siguiente acción que revalide traería módulos de otro build y
+  // tronaría (ver lib/version.ts). El contador cambia en cada sondeo, así que
+  // se vuelve a intentar hasta que llegue la calma.
+  useEffect(() => {
+    if (!parked.versionNueva || cart.lines.length > 0 || completedSale) return
+    const t = window.setTimeout(() => {
+      if (document.querySelector('[role="dialog"]')) return
+      if (marcarRecargaPorVersion()) window.location.reload()
+    }, CALMA_ANTES_DE_RECARGAR_MS)
+    return () => window.clearTimeout(t)
+  }, [parked.versionNueva, cart.lines.length, completedSale])
   const [showPark, setShowPark] = useState(false)
   const [showTray, setShowTray] = useState(false)
   /** Cuenta que se está viendo con precios («¿me trae la cuenta?»). */
@@ -1215,7 +1251,14 @@ export default function POSClient({
       } else {
         toast.error(result.error || "Error al registrar la venta")
       }
-    } catch {
+    } catch (e) {
+      if (esErrorDeVersion(e)) {
+        // No es falta de señal: hay un deploy nuevo y la venta no entró.
+        // A la cola no va (subiría con el mismo id viejo y fallaría igual).
+        if (optimista) restaurar()
+        avisarVersionNueva(avisoId)
+        return
+      }
       if (venta.paymentMethod === "fiado") {
         // Un fiado no va a la cola: lleva una cuenta que el servidor debe
         // validar, y sin señal no se sabe si ya quedó.
@@ -1480,7 +1523,12 @@ export default function POSClient({
         })
         setTotalSales((prev) => prev + result.total)
         vibra(30)
-      } catch {
+      } catch (e) {
+        if (esErrorDeVersion(e)) {
+          // Deploy nuevo: la cuenta sigue abierta y se cobra tras recargar.
+          avisarVersionNueva()
+          return
+        }
         // Sin señal: a la cola, como cualquier venta. La cuenta se cierra
         // igual porque la venta ya está capturada.
         const provisional = cola.encolar({
