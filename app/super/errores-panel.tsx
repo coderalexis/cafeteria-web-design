@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react"
-import { ERRORES_DIAS, getRecentErrors } from "@/app/actions/errors"
+import { getRecentErrors } from "@/app/actions/errors"
+import { ERRORES_DIAS } from "@/lib/errores"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 /**

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireSuperAdmin } from "@/lib/context"
 import { escapeHtml, sendWithResend } from "@/lib/email"
+import { ERRORES_DIAS } from "@/lib/errores"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -59,9 +60,6 @@ export interface ErrorReciente {
   count: number
   lastAt: string
 }
-
-/** Cuántos días de errores se enseñan y se guardan (la limpieza del RPC usa el mismo plazo). */
-export const ERRORES_DIAS = 2
 
 /** Para /super: los errores de los últimos días, agrupados por ruta y mensaje. */
 export async function getRecentErrors(days = ERRORES_DIAS): Promise<ActionResult<{ errors: ErrorReciente[] }>> {
