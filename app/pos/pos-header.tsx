@@ -93,7 +93,7 @@ export interface PosHeaderProps {
   /** En celular las cuentas van en la barra de abajo, junto al pulgar: aquí no se repiten. */
   cuentasEnBarra?: boolean
   setCartOpen: (open: boolean) => void
-  resumeParked: (order: ParkedOrder) => Promise<void>
+  resumeParked: (order: ParkedOrder, e?: React.MouseEvent<HTMLElement>) => Promise<void>
   // Categorías
   categories: Category[]
   activeCategory: string
@@ -396,7 +396,7 @@ export function PosHeader(p: PosHeaderProps) {
                 <button
                   key={o.id}
                   type="button"
-                  onClick={() => void resumeParked(o)}
+                  onClick={(e) => void resumeParked(o, e)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${
                     vieja
                       ? "border-amber-400 bg-amber-50 text-amber-800 hover:border-amber-500"

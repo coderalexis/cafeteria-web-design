@@ -181,7 +181,7 @@ function CuentaRow({
   o: ParkedOrder
   products: Product[]
   ahora: number
-  onResume: (order: ParkedOrder) => void
+  onResume: (order: ParkedOrder, e?: React.MouseEvent<HTMLElement>) => void
   onRemove: (id: string) => void
   onViewAccount: (order: ParkedOrder) => void
   /** Solo para cuentas del día: el fiado ya está marcado. */
@@ -279,7 +279,7 @@ function CuentaRow({
           className="shrink-0 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
           disabled={!r.ok}
           title={fiado ? `Cobrarle a «${o.name}»` : `Abrir «${o.name}» para agregarle o cobrarla`}
-          onClick={() => onResume(o)}
+          onClick={(e) => onResume(o, e)}
         >
           <Play className="h-3.5 w-3.5" />
           {fiado ? "Cobrar" : "Abrir"}
@@ -360,7 +360,7 @@ export function ParkedTrayDialog({
   products: Product[]
   /** Si hay algo en el carrito, abrir otra cuenta guardará eso primero. */
   cartHasLines: boolean
-  onResume: (order: ParkedOrder) => void
+  onResume: (order: ParkedOrder, e?: React.MouseEvent<HTMLElement>) => void
   onRemove: (id: string) => void
   /** «¿Me trae la cuenta?»: enseña el desglose con precios, sin cobrar. */
   onViewAccount: (order: ParkedOrder) => void

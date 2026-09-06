@@ -80,7 +80,7 @@ export interface CartPanelProps {
   setPendingModifiers: (p: PendingModifiers | null) => void
   lastSale: { folio: number; payload: unknown } | null
   /** Vuelve a poner en el carrito la última venta (validada contra el menú de hoy). */
-  onRepeatLast: () => void
+  onRepeatLast: (e?: React.MouseEvent<HTMLElement>) => void
   setConfirmClear: (open: boolean) => void
   // Cuentas abiertas
   parkedEnabled: boolean
@@ -437,7 +437,7 @@ export function CartPanel(p: CartPanelProps) {
               {lastSale && (
                 <button
                   type="button"
-                  onClick={p.onRepeatLast}
+                  onClick={(e) => p.onRepeatLast(e)}
                   className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-600 hover:border-amber-300 hover:text-amber-700"
                 >
                   <RotateCcw className="h-4 w-4" />

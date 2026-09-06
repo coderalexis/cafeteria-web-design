@@ -13,8 +13,22 @@ const FLIGHT_PATH_SUPPORTED =
   typeof CSS.supports === "function" &&
   CSS.supports("offset-path", 'path("M 0 0 L 1 1")')
 
-type Flight = { id: number; from: { x: number; y: number }; to: { x: number; y: number }; kind: "main" | "trail"; delay: number; duration: number }
-type Landing = { id: number; x: number; y: number }
+type Tono = "ambar" | "verde"
+type Flight = {
+  id: number
+  from: { x: number; y: number }
+  to: { x: number; y: number }
+  kind: "main" | "trail"
+  delay: number
+  duration: number
+  /** Ambar = «entró un artículo»; verde = «volvió una cuenta entera». */
+  tono: Tono
+  /** Altura del arco en px (por omisión 90): variarla abre el chorro en abanico. */
+  arco?: number
+  /** Lo que dice la burbuja al aterrizar: «+1» o cuántos artículos volvieron. */
+  etiqueta: string
+}
+type Landing = { id: number; x: number; y: number; tono: Tono; etiqueta: string }
 
 /**
  * Lo que confirma un toque en el menú: el punto que vuela al carrito (con su
@@ -60,12 +74,10 @@ export function useCartFeedback({
   const reducedMotion = useReducedMotion()
   const flyOriginRef = useRef<{ x: number; y: number } | null>(null)
   const flightSeq = useRef(0)
-  const [flights, setFlights] = useState<
-    { id: number; from: { x: number; y: number }; to: { x: number; y: number }; kind: "main" | "trail"; delay: number; duration: number }[]
-  >([])
+  const [flights, setFlights] = useState<Flight[]>([])
   // Aterrizajes: el anillo que se expande y el «+1» que rebota donde cayó el
   // punto. Los dispara SOLO el punto principal — la estela aterriza muda.
-  const [landings, setLandings] = useState<{ id: number; x: number; y: number }[]>([])
+  const [landings, setLandings] = useState<Landing[]>([])
   const [cartPulse, setCartPulse] = useState(0)
   const barDip = useAnimationControls()
   const barTargetRef = useRef<HTMLButtonElement>(null)
@@ -77,17 +89,55 @@ export function useCartFeedback({
     const r = e.currentTarget.getBoundingClientRect()
     flyOriginRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
   }, [])
+  // Para retomar una cuenta: el chip se mide al tocarlo, pero el vuelo se
+  // apunta DESPUÉS de las comprobaciones que pueden abortar (productos que ya
+  // no están en el menú), para no dejar un origen colgado que luego haga
+  // volar un punto desde un chip que nadie tocó.
+  const marcarOrigenEn = useCallback((x: number, y: number) => {
+    flyOriginRef.current = { x, y }
+  }, [])
 
   useEffect(() => {
     if (recuperada && recuperada.key !== recuperadaKeyRef.current) {
-      // Volvió una cuenta entera: ni vuelo ni «+ Latte». El origen de vuelo
-      // se descarta también, por si quedó apuntado de un toque anterior.
+      // Volvió una cuenta entera. No es «+ Latte», así que no se dice como un
+      // alta suelta: desde el chip que se tocó sale un CHORRO de puntos verdes
+      // hacia el carrito, y al aterrizar la burbuja dice cuántos artículos
+      // volvieron. Es el mismo gesto que ya se entiende al agregar un
+      // producto, en plural y en otro color, porque lo que pasó es otra cosa.
       recuperadaKeyRef.current = recuperada.key
       prevLinesRef.current = lines
+      const origen = flyOriginRef.current
       flyOriginRef.current = null
       setLastAdded(null)
       if (isMobile && !cartOpen) {
         setAviso({ label: avisoRecuperada(recuperada.name, recuperada.articulos), key: recuperada.key })
+      }
+      if (origen && !reducedMotion) {
+        const targetEl = isMobile ? barTargetRef.current : bagTargetRef.current
+        if (targetEl) {
+          const r = targetEl.getBoundingClientRect()
+          const to = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+          // Un punto por artículo, entre 3 y 6: menos no se lee como «varios»
+          // y más convierte la pantalla en confeti. Salen escalonados y con
+          // arcos distintos, así que se ven como un chorro y no como un punto
+          // gordo. El primero es el principal: el que aterriza y pone la cifra.
+          const cuantos = Math.min(Math.max(recuperada.articulos, 3), 6)
+          const etiqueta = String(recuperada.articulos)
+          setFlights((cur) => [
+            ...cur,
+            ...Array.from({ length: cuantos }, (_, i) => ({
+              id: ++flightSeq.current,
+              from: origen,
+              to,
+              kind: (i === 0 ? "main" : "trail") as "main" | "trail",
+              delay: i * 0.09,
+              duration: 0.52,
+              tono: "verde" as const,
+              arco: 80 + i * 22,
+              etiqueta,
+            })),
+          ])
+        }
       }
       return
     }
@@ -115,9 +165,9 @@ export function useCartFeedback({
         // con salida escalonada, como en la demo que eligió el usuario.
         setFlights((cur) => [
           ...cur,
-          { id: ++flightSeq.current, from: origin, to, kind: "main", delay: 0, duration: 0.48 },
-          { id: ++flightSeq.current, from: origin, to, kind: "trail", delay: 0.09, duration: 0.42 },
-          { id: ++flightSeq.current, from: origin, to, kind: "trail", delay: 0.16, duration: 0.36 },
+          { id: ++flightSeq.current, from: origin, to, kind: "main", delay: 0, duration: 0.48, tono: "ambar", etiqueta: "+1" },
+          { id: ++flightSeq.current, from: origin, to, kind: "trail", delay: 0.09, duration: 0.42, tono: "ambar", etiqueta: "+1" },
+          { id: ++flightSeq.current, from: origin, to, kind: "trail", delay: 0.16, duration: 0.36, tono: "ambar", etiqueta: "+1" },
         ])
       }
     }
@@ -148,7 +198,7 @@ export function useCartFeedback({
       // Solo el principal aterriza: rebote de la bolsa (escritorio),
       // anillo + «+1», y el hundimiento de la barra (celular).
       setCartPulse((c) => c + 1)
-      setLandings((cur) => [...cur, { id: ++flightSeq.current, x: flight.to.x, y: flight.to.y }])
+      setLandings((cur) => [...cur, { id: ++flightSeq.current, x: flight.to.x, y: flight.to.y, tono: flight.tono, etiqueta: flight.etiqueta }])
       if (isMobile) {
         barDip.start({ y: [0, 3, 0], transition: { duration: 0.26, ease: "easeOut" } })
       }
@@ -159,7 +209,7 @@ export function useCartFeedback({
     setLandings((cur) => cur.filter((x) => x.id !== id))
   }, [])
 
-  return { lastAdded, aviso, markFlyOrigin, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
+  return { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
 }
 
 /** Los puntos en vuelo y los aterrizajes, encima de todo el POS. */
@@ -183,16 +233,26 @@ export function FlyLayer({
           (con exit correría dos y el aterrizaje se duplicaba). */}
       {flights.map((flight) => {
         const trail = flight.kind === "trail"
+        const verde = flight.tono === "verde"
         // Control de la curva: 25% del camino en x y 90px por encima del
-        // punto más alto — el mismo trazo que la demo aprobada.
+        // punto más alto — el mismo trazo que la demo aprobada. El chorro de
+        // una cuenta recuperada manda su propio arco para abrirse en abanico.
         const cx = flight.from.x + (flight.to.x - flight.from.x) * 0.25
-        const cy = Math.min(flight.from.y, flight.to.y) - 90
+        // La cima del arco no sale de la pantalla: los chips de cuentas viven
+        // pegados al borde de arriba y con 90px de arco los puntos volaban
+        // fuera del cuadro —se veía un salto, no un vuelo—. Con el tope, desde
+        // arriba el trazo se aplana en vez de perderse.
+        const cy = Math.max(14, Math.min(flight.from.y, flight.to.y) - (flight.arco ?? 90))
         const finish = () => onFlightDone(flight)
+        // Los puntos verdes son un poco más grandes y menos translúcidos que
+        // la estela ámbar: aquí la estela ES el mensaje, no un adorno.
+        const opacidadFinal = trail ? (verde ? 0.75 : 0.35) : 0.9
+        const medio = trail ? (verde ? 7 : 5.5) : 8
         const common = {
           "data-fly-dot": "",
-          className: `pointer-events-none fixed left-0 top-0 z-[60] rounded-full bg-amber-600 shadow-md ${
-            trail ? "h-[11px] w-[11px]" : "h-4 w-4"
-          }`,
+          className: `pointer-events-none fixed left-0 top-0 z-[60] rounded-full shadow-md ${
+            verde ? "bg-emerald-500" : "bg-amber-600"
+          } ${trail ? (verde ? "h-3.5 w-3.5" : "h-[11px] w-[11px]") : "h-4 w-4"}`,
           transition: { duration: flight.duration, delay: flight.delay, ease: [0.5, 0.05, 0.75, 0.5] as const },
           onAnimationComplete: finish,
         }
@@ -209,7 +269,7 @@ export function FlyLayer({
               offsetRotate: "0deg",
             }}
             initial={{ offsetDistance: "0%", scale: 1, opacity: trail ? 0 : 0.95 }}
-            animate={{ offsetDistance: "100%", scale: 0.4, opacity: trail ? 0.35 : 0.9 }}
+            animate={{ offsetDistance: "100%", scale: verde ? 0.55 : 0.4, opacity: opacidadFinal }}
           />
         ) : (
           <m.span
@@ -217,13 +277,13 @@ export function FlyLayer({
             {...common}
             // Centrado con márgenes y no con translate de Tailwind: framer
             // escribe transform completo y pisaría esas clases.
-            style={trail ? { marginLeft: -5.5, marginTop: -5.5 } : { marginLeft: -8, marginTop: -8 }}
+            style={{ marginLeft: -medio, marginTop: -medio }}
             initial={{ x: flight.from.x, y: flight.from.y, scale: 1, opacity: trail ? 0 : 0.95 }}
             animate={{
               x: flight.to.x,
-              y: [flight.from.y, Math.min(flight.from.y, flight.to.y) - 40, flight.to.y],
-              scale: 0.4,
-              opacity: trail ? 0.35 : 0.9,
+              y: [flight.from.y, Math.max(14, Math.min(flight.from.y, flight.to.y) - 40), flight.to.y],
+              scale: verde ? 0.55 : 0.4,
+              opacity: opacidadFinal,
             }}
           />
         )
@@ -234,21 +294,25 @@ export function FlyLayer({
       {landings.map((landing) => (
         <span key={landing.id} className="pointer-events-none">
           <m.span
-            className="pointer-events-none fixed z-[60] h-11 w-11 rounded-full border-[3px] border-amber-600"
+            className={`pointer-events-none fixed z-[60] h-11 w-11 rounded-full border-[3px] ${
+              landing.tono === "verde" ? "border-emerald-500" : "border-amber-600"
+            }`}
             style={{ left: landing.x - 22, top: landing.y - 22 }}
             initial={{ scale: 0.25, opacity: 0.8 }}
             animate={{ scale: 1, opacity: 0 }}
             transition={{ duration: 0.42, ease: "easeOut" }}
           />
           <m.span
-            className="pointer-events-none fixed z-[61] flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-700 px-1 text-[11px] font-bold text-white"
+            className={`pointer-events-none fixed z-[61] flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold text-white ${
+              landing.tono === "verde" ? "bg-emerald-600" : "bg-amber-700"
+            }`}
             style={{ left: landing.x - 10, top: landing.y - 40 }}
             initial={{ scale: 0.4, opacity: 0 }}
             animate={{ scale: [0.4, 1.15, 1, 0.9], opacity: [0, 1, 1, 0], y: [0, 0, 0, -6] }}
             transition={{ duration: 0.65, ease: "easeOut" }}
             onAnimationComplete={() => onLandingDone(landing.id)}
           >
-            +1
+            {landing.etiqueta}
           </m.span>
         </span>
       ))}
