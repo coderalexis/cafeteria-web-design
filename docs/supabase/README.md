@@ -103,6 +103,7 @@ En un proyecto nuevo, ejecutar en orden en el SQL Editor (o vía MCP `apply_migr
 Los archivos `01–03` no se editan; cada cambio posterior es un archivo nuevo numerado.
 
 Prueba de aislamiento entre negocios (impersonación con `set_config('request.jwt.claims', …)` + `set local role authenticated` en una transacción con rollback): usuario de A no ve menú/tickets/cajas/perfiles de B, `cash_session_summary(sesión de B)` → null, `cancel_ticket(ticket de B)` → "Ticket no encontrado.", `sales_report` solo agrega A, un insert de menú toma `business_id` de A por default y la FK compuesta rechaza padres de otro negocio.
+52. `52_p40_errores_2_dias.sql` — P40: los errores reportados viven 2 días, no 30 (aplicada como `p40_errores_2_dias`): `report_error` PARCHEADA sobre la viva con un reemplazo anclado (el plazo de la limpieza oportunista); el panel de /super enseña el mismo plazo (`ERRORES_DIAS`). Un error ya atendido no se queda saludando una semana; el que sigue pasando se reporta solo otra vez.
 
 ## C) Cómo escribe la app
 

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireSuperAdmin } from "@/lib/context"
 import { escapeHtml, sendWithResend } from "@/lib/email"
+import { ERRORES_DIAS } from "@/lib/errores"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -61,7 +62,7 @@ export interface ErrorReciente {
 }
 
 /** Para /super: los errores de los últimos días, agrupados por ruta y mensaje. */
-export async function getRecentErrors(days = 7): Promise<ActionResult<{ errors: ErrorReciente[] }>> {
+export async function getRecentErrors(days = ERRORES_DIAS): Promise<ActionResult<{ errors: ErrorReciente[] }>> {
   const { error: authError } = await requireSuperAdmin()
   if (authError) return { error: authError }
 
