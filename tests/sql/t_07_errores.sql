@@ -57,3 +57,15 @@ begin
 
   perform pruebas.como_postgres();
 end $t$;
+
+-- Migración 52: la limpieza oportunista guarda 2 días, no 30. Es aleatoria
+-- (una de cada ~50 llamadas), así que se afirma sobre la definición viva.
+do $t$
+declare v_def text;
+begin
+  select pg_get_functiondef(p.oid) into v_def
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'report_error';
+  perform pruebas.espera(position($a$interval '2 days'$a$ in v_def) > 0 and position($a$interval '30 days'$a$ in v_def) = 0,
+    'report_error limpia lo de más de 2 días');
+end $t$;

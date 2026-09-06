@@ -60,8 +60,11 @@ export interface ErrorReciente {
   lastAt: string
 }
 
+/** Cuántos días de errores se enseñan y se guardan (la limpieza del RPC usa el mismo plazo). */
+export const ERRORES_DIAS = 2
+
 /** Para /super: los errores de los últimos días, agrupados por ruta y mensaje. */
-export async function getRecentErrors(days = 7): Promise<ActionResult<{ errors: ErrorReciente[] }>> {
+export async function getRecentErrors(days = ERRORES_DIAS): Promise<ActionResult<{ errors: ErrorReciente[] }>> {
   const { error: authError } = await requireSuperAdmin()
   if (authError) return { error: authError }
 
