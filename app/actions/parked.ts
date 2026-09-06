@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { requireContext, requireRole } from "@/lib/context"
 import { dbErrorMessage } from "@/lib/db-errors"
+import { BUILD_ID } from "@/lib/version"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -63,7 +64,12 @@ export interface ParkedRecord {
  * proceso aparte porque es barato y así la limpieza ocurre justo cuando
  * alguien mira la lista.
  */
-export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[] }>> {
+/**
+ * `build` es el sello del código que corre en el servidor. El POS lo compara
+ * con el suyo en cada sondeo y, si hay un deploy más nuevo, se recarga solo
+ * en un momento tranquilo (ver `lib/version.ts`).
+ */
+export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[]; build: string }>> {
   const { error: ctxError } = await requireContext()
   if (ctxError !== null) return { error: ctxError }
 
@@ -94,7 +100,7 @@ export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[
     owedSince: r.owed_since ? new Date(r.owed_since).getTime() : null,
     owedContact: r.owed_contact,
   }))
-  return { success: true, orders }
+  return { success: true, orders, build: BUILD_ID }
 }
 
 const guardarSchema = z.object({

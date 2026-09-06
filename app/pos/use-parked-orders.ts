@@ -6,6 +6,7 @@ import { serializeCart, type CartState } from "./cart"
 // (serializeCart se usa en `park`; `update` ya recibe el carrito serializado)
 import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
 import { PARKED_MAX, type ParkedOrder } from "./parked"
+import { BUILD_ID, esErrorDeVersion, hayVersionNueva } from "@/lib/version"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
 const REFRESCO_MS = 10_000
@@ -36,6 +37,12 @@ export function useParkedOrders(businessId: string) {
   const [listo, setListo] = useState(false)
   const ref = useRef<ParkedOrder[]>([])
   const cargando = useRef(false)
+  /**
+   * Cuántos sondeos seguidos han visto un build más nuevo en el servidor
+   * (0 = ninguno). Es un contador y no un booleano para que quien lo mira
+   * vuelva a intentar la recarga en cada sondeo, no solo la primera vez.
+   */
+  const [versionNueva, setVersionNueva] = useState(0)
 
   const aplicar = useCallback((next: ParkedOrder[]) => {
     ref.current = next
@@ -48,6 +55,7 @@ export function useParkedOrders(businessId: string) {
     try {
       const r = await listParked()
       if (r.success) {
+        if (hayVersionNueva(BUILD_ID, r.build)) setVersionNueva((n) => n + 1)
         // Más reciente primero: es el que más probablemente se retoma.
         aplicar(
           r.orders
@@ -64,8 +72,11 @@ export function useParkedOrders(businessId: string) {
         )
         setListo(true)
       }
-    } catch {
-      /* sin señal: la bandeja se queda con lo último que supo */
+    } catch (e) {
+      // Tras un deploy que rotó la sal de las acciones, el servidor ya no
+      // reconoce el id de esta (404): también es «hay versión nueva». Si no,
+      // es falta de señal y la bandeja se queda con lo último que supo.
+      if (esErrorDeVersion(e)) setVersionNueva((n) => n + 1)
     } finally {
       cargando.current = false
     }
@@ -260,5 +271,5 @@ export function useParkedOrders(businessId: string) {
     [aplicar],
   )
 
-  return { orders, listo, park, update, remove, fiar, refrescar, full: orders.length >= PARKED_MAX }
+  return { orders, listo, park, update, remove, fiar, refrescar, versionNueva, full: orders.length >= PARKED_MAX }
 }

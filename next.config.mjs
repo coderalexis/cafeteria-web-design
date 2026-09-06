@@ -1,3 +1,5 @@
+import { execSync } from "node:child_process"
+
 /** @type {import('next').NextConfig} */
 
 /**
@@ -24,7 +26,29 @@ const encabezadosSeguridad = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
 ]
 
+/**
+ * Sello del build: el commit que se está construyendo. `lib/version.ts` lo
+ * compara entre la pestaña y el servidor para que un POS abierto desde antes
+ * de un deploy se recargue solo en vez de tronar con «reading 'call'».
+ *
+ * Tiene que ser DETERMINISTA: este archivo se evalúa en `next build` y otra
+ * vez en `next start`, y algo como `Date.now()` daría dos sellos distintos
+ * para el mismo build (se vio en el humo: el POS se recargaba una vez de más).
+ * En Vercel llega por `VERCEL_GIT_COMMIT_SHA`; en local se le pregunta a git.
+ * Si no hay ninguno, un sello fijo: sin recargas automáticas, pero sin bucles.
+ */
+function selloDeBuild() {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA
+  if (sha) return sha.slice(0, 12)
+  try {
+    return execSync("git rev-parse --short=12 HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim() || "local"
+  } catch {
+    return "local"
+  }
+}
+
 const nextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: selloDeBuild() },
   images: {
     // Las capturas de la landing ya van optimizadas a mano (WebP); esto
     // evita el optimizador de Vercel, que cuenta contra la cuota del plan.

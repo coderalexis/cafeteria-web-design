@@ -124,5 +124,11 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
 - Service worker: nunca reenviar `event.request` de una navegación (falla en
   arranque en frío); un `postMessage` a una página recién nacida se pierde,
   por eso la página pregunta «¿estado?» al ver la marca en el HTML.
+- **Deploy con pestañas abiertas**: una server action que revalida devuelve
+  el árbol de la página del build nuevo y la pestaña vieja truena con
+  «reading 'call'»; y si Vercel no reutilizó la caché de build, la sal de las
+  acciones rota y TODAS dan 404 («Failed to find Server Action»). `lib/version.ts`
+  cubre ambos; el sello del build tiene que ser determinista (commit), porque
+  `next.config.mjs` se evalúa varias veces por build.
 - Con `pg_get_functiondef` los anclajes del `replace` son el texto exacto de la
   migración anterior: si no se encuentra, la migración debe fallar, no seguir.
