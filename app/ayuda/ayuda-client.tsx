@@ -429,7 +429,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -464,9 +464,10 @@ export function AyudaClient({ ticket, corte }: Props) {
           <DemoCuenta />
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
-              <strong>Al abrir una cuenta, el carrito lo anuncia:</strong> «&quot;Mesa 7&quot; recuperada · 3 artículos» y las líneas
-              entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez de
-              «+ Latte», para que no se confunda con haber tocado un producto.
+              <strong>Al abrir una cuenta se ve volar al carrito:</strong> del chip de la cuenta salen unos puntos verdes que
+              aterrizan en el carrito con el número de artículos, arriba aparece «&quot;Mesa 7&quot; recuperada · 3 artículos» y las
+              líneas entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez
+              de «+ Latte», para que no se confunda con haber tocado un producto.
             </li>
             <li>
               <strong>Repetir el nombre no duplica: suma.</strong> Si tocas «Abrir cuenta» y eliges una mesa que ya

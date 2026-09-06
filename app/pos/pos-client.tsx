@@ -595,7 +595,7 @@ export default function POSClient({
   // servidor cancela la original y cobra esta con la hora original.
   const [corrigiendo, setCorrigiendo] = useState<{ id: string; folio: number; total: number } | null>(null)
   const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
-  const { lastAdded, aviso, markFlyOrigin, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
+  const { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
 
   // Aviso único si se restauró un carrito guardado
   useEffect(() => {
@@ -812,7 +812,14 @@ export default function POSClient({
    * tirar una venta a medias por contestar mal un "¿seguro?".
    */
   const resumeParked = useCallback(
-    async (order: ParkedOrder) => {
+    async (order: ParkedOrder, e?: React.MouseEvent<HTMLElement>) => {
+      // El chip se mide AHORA —después de un await, `currentTarget` ya es
+      // null—, pero el vuelo se apunta más abajo, cuando ya se sabe que la
+      // cuenta sí va a volver al carrito.
+      const desde = e ? (() => {
+        const r = e.currentTarget.getBoundingClientRect()
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+      })() : null
       const estado = rehydrateCart(order.cart, products, Date.now(), PARKED_MAX_AGE_MS)
       if (!estado || estado.lines.length === 0) {
         toast.error(
@@ -844,6 +851,7 @@ export default function POSClient({
         updatedAt: order.updatedAt,
         cartAtOpen: order.cart,
       })
+      if (desde) marcarOrigenEn(desde.x, desde.y)
       restoreLines(estado.lines)
       setRecuperada({ key: Date.now(), name: order.name, articulos: estado.lines.reduce((s, l) => s + l.quantity, 0) })
       setTicketNotes(estado.ticketNotes)
@@ -866,7 +874,7 @@ export default function POSClient({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [products, lines.length, openAccount, saveToOpenAccount, parked, cartStateNow, restoreLines, setTicketNotes],
+    [products, lines.length, openAccount, saveToOpenAccount, parked, cartStateNow, restoreLines, setTicketNotes, marcarOrigenEn],
   )
 
   const clearTip = useCallback(() => {
@@ -1433,13 +1441,18 @@ export default function POSClient({
    * hoy: si algo cambió de precio o se desactivó, esa línea no regresa (y se
    * avisa). Después de una clase se venden cinco lattes iguales seguidos.
    */
-  const repetirUltimaVenta = useCallback(() => {
+  const repetirUltimaVenta = useCallback((e?: React.MouseEvent<HTMLElement>) => {
     if (!lastSale) return
+    const desde = e ? (() => {
+      const r = e.currentTarget.getBoundingClientRect()
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    })() : null
     const estado = rehydrateCart(lastSale.payload, products, Date.now())
     if (!estado || estado.lines.length === 0) {
       toast.error("El menú cambió y ya no se puede repetir esa venta.")
       return
     }
+    if (desde) marcarOrigenEn(desde.x, desde.y)
     restoreLines(estado.lines)
     setRecuperada({ key: Date.now(), name: `Venta #${lastSale.folio}`, articulos: estado.lines.reduce((s, l) => s + l.quantity, 0) })
     vibra(12)
@@ -1447,7 +1460,7 @@ export default function POSClient({
     if (estado.lines.length < guardadas) {
       toast.info("Se repitió la venta, pero algún artículo ya no está en el menú.")
     }
-  }, [lastSale, products, restoreLines])
+  }, [lastSale, products, restoreLines, marcarOrigenEn])
   const ultimaTotal = useMemo(() => {
     if (!lastSale) return null
     const estado = rehydrateCart(lastSale.payload, products, Date.now())
@@ -1880,7 +1893,7 @@ export default function POSClient({
                   >
                     <button
                       type="button"
-                      onClick={() => void resumeParked(o)}
+                      onClick={(e) => void resumeParked(o, e)}
                       className={`flex items-center gap-1.5 py-1.5 pl-3 pr-2 text-sm font-semibold ${vieja ? "bg-amber-50 text-amber-800" : "bg-white text-stone-700"}`}
                       title={`Abrir «${o.name}» para agregarle`}
                     >
