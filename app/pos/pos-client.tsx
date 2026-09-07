@@ -70,7 +70,7 @@ import {
   parkedAccount,
   waitingLabel,
   PARKED_MAX_AGE_MS,
-  type ParkedOrder, applyCartDelta, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
+  type ParkedOrder, applyCartDelta, cuentasParaSumar, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -399,9 +399,19 @@ export default function POSClient({
 
   /** Quién suele venir a esta hora: se calcula al abrir el diálogo, con la hora de ese momento. */
   const sugeridosNombre = useMemo(
-    () => (showPark ? suggestAccountNames(visitas, new Date().getHours(), chipsDeNombre) : []),
-    [showPark, visitas, chipsDeNombre],
+    () =>
+      showPark
+        ? // Fuera los chips fijos y también las cuentas abiertas: esas ya se
+          // ofrecen arriba, con su total. Verlas dos veces a dos renglones de
+          // distancia solo hace dudar de si son la misma.
+          suggestAccountNames(visitas, new Date().getHours(), [
+            ...chipsDeNombre,
+            ...cuentasVisibles.filter((o) => !esFiado(o)).map((o) => o.name),
+          ])
+        : [],
+    [showPark, visitas, chipsDeNombre, cuentasVisibles],
   )
+
 
   /** Chips de la rejilla: solo cuentas del día, con su total al menú de hoy. */
   const chipsCuentas = useMemo(() => {
@@ -413,6 +423,22 @@ export default function POSClient({
         return { o, total: r.total, vieja: isVieja(o.savedAt, ahora) }
       })
   }, [cuentasVisibles, products])
+  /**
+   * Cuentas abiertas que se ofrecen al abrir otra (las que no son un chip
+   * fijo). El sello es el de la última escritura, para que la ronda más
+   * reciente quede a la izquierda; si el servidor no lo mandó, vale la hora
+   * en que se abrió.
+   */
+  const cuentasQueSuman = useMemo(
+    () =>
+      showPark
+        ? cuentasParaSumar(
+            chipsCuentas.map(({ o, total }) => ({ name: o.name, total, at: Date.parse(o.updatedAt) || o.savedAt })),
+            chipsDeNombre,
+          )
+        : [],
+    [showPark, chipsCuentas, chipsDeNombre],
+  )
 
   /**
    * Pasa una cuenta a «Por cobrar». Si era la que estaba abierta en este
@@ -2160,6 +2186,7 @@ export default function POSClient({
         sugerido={autoName(new Date())}
         onPark={parkCurrent}
         abiertas={chipsCuentas.map(({ o }) => o.name)}
+        paraSumar={cuentasQueSuman}
         chips={chipsDeNombre}
         sugeridos={sugeridosNombre}
       />

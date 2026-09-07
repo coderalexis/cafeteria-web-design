@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ChevronRight, HandCoins, PauseCircle, Play, Receipt, Trash2, TriangleAlert } from "lucide-react"
 import { formatCurrency } from "@/lib/format"
-import { esFiado, isVieja, parkedDetail, parkedSummary, waitingLabel, type ParkedOrder } from "./parked"
+import { esFiado, isVieja, parkedDetail, parkedSummary, waitingLabel, type CuentaAbierta, type ParkedOrder } from "./parked"
 import type { Product } from "./cart"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +25,7 @@ export function ParkDialog({
   abiertas = [],
   chips = [],
   sugeridos = [],
+  paraSumar = [],
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -41,6 +42,12 @@ export function ParkDialog({
   chips?: string[]
   /** Quién suele venir a esta hora (P33): nombres con cuenta abierta en esta franja, los últimos 60 días. */
   sugeridos?: string[]
+  /**
+   * Cuentas abiertas ahora mismo que no están entre los chips fijos (los
+   * nombres tecleados). Tocar una le suma el carrito, igual que escribir su
+   * nombre exacto: es el mismo trato que ya tienen las mesas ocupadas.
+   */
+  paraSumar?: CuentaAbierta[]
 }) {
   const [nombre, setNombre] = useState("")
   const yaAbierta = (n: string) => abiertas.some((a) => a.trim().toLowerCase() === n.trim().toLowerCase())
@@ -70,6 +77,32 @@ export function ParkDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Las cuentas abiertas van primero: si hay gente sentada, lo más
+              probable es que esta ronda sea de alguien que ya tiene cuenta.
+              Se ven con su total para no sumarle a la persona equivocada. */}
+          {paraSumar.length > 0 && (
+            <div data-para-sumar>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+                Cuentas abiertas · tocar suma a esa cuenta
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {paraSumar.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => guardar(c.name)}
+                    className="rounded-md border border-amber-400 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:border-amber-500"
+                    title={`«${c.name}» ya está abierta: se le sumará`}
+                    data-suma-cuenta
+                  >
+                    {c.name}
+                    <span className="ml-1 font-normal text-amber-700">{formatCurrency(c.total)}</span>
+                    <span className="ml-1 opacity-70">+</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Quien suele venir a esta hora, primero: Juan pasa después de
               entrenar entre 8 y 10, y a las 9 su nombre debe estar a un toque
               sin que nadie lo haya registrado en ningún lado. */}

@@ -49,6 +49,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
   { titulo: "Vender algo que no está en el menú (precio al vuelo)", donde: "POS → Más vendidos → Fuera de menú", href: "/pos", palabras: "fuera de menu precio al vuelo especial improvisado fruta sin yogurt cobrar algo que no esta en la carta producto libre otro" },
   { titulo: "Apagar o encender «Fuera de menú»", donde: "Datos y ajustes → Módulos del POS", href: "/admin/negocio#modulos", palabras: "fuera de menu modulo apagar encender precio libre" },
   { titulo: "Quién suele venir a esta hora (sugerencias al abrir cuenta)", donde: "POS → Cuenta → Abrir cuenta", href: "/pos", palabras: "sugerencia nombres clientes frecuentes suele venir a esta hora franja cuenta abierta juan" },
+  { titulo: "Sumar una ronda a una cuenta ya abierta", donde: "POS → Abrir cuenta → Cuentas abiertas", href: "/pos", palabras: "sumar agregar ronda cuenta abierta mismo nombre no duplicar juntar mesa ocupada chip mas total" },
   { titulo: "Corregir una venta ya cobrada", donde: "POS → ⋮ → Tickets del día → Corregir", href: "/pos", palabras: "corregir venta equivocada error cambiar cantidad metodo de pago editar ticket cobrado se equivoco corregida" },
   { titulo: "Gastos del mes", donde: "Gastos y utilidad", href: "/admin/gastos#variables", palabras: "gasto gastos compras reparaciones capturar gasto proveedores insumos" },
   { titulo: "Gastos fijos (renta, luz, sueldos)", donde: "Gastos y utilidad", href: "/admin/gastos#fijos", palabras: "renta luz agua internet sueldos nomina fijos cada mes lo mismo" },

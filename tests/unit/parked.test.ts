@@ -8,6 +8,7 @@ import {
   isVieja,
   lineKey,
   suggestAccountNames,
+  cuentasParaSumar,
   waitingLabel,
 } from "@/app/pos/parked"
 
@@ -177,5 +178,41 @@ describe("lineKey fuera de menú", () => {
     const c = lineKey({ productId: "custom:3", custom: { name: "Charola", price: 120 } })
     expect(a).toBe(b)
     expect(a).not.toBe(c)
+  })
+})
+
+describe("cuentasParaSumar — qué cuentas abiertas se ofrecen al abrir otra", () => {
+  const c = (name: string, total: number, at: number) => ({ name, total, at })
+
+  it("ofrece los nombres tecleados, con la ronda más reciente primero", () => {
+    const r = cuentasParaSumar([c("Juan", 85, 100), c("Sra. suéter rojo", 40, 300), c("Ana", 60, 200)])
+    expect(r.map((x) => x.name)).toEqual(["Sra. suéter rojo", "Ana", "Juan"])
+    expect(r[0].total).toBe(40)
+  })
+
+  it("deja fuera las que ya están como chip fijo: ahí se marcan solas", () => {
+    const r = cuentasParaSumar([c("Mesa 1", 50, 300), c("Juan", 85, 200)], ["Mesa 1", "Mesa 2", "Para llevar"])
+    expect(r.map((x) => x.name)).toEqual(["Juan"])
+  })
+
+  it("compara sin distinguir mayúsculas ni espacios de sobra", () => {
+    const r = cuentasParaSumar([c("  mesa 1  ", 50, 300), c("JUAN", 85, 200)], ["Mesa 1"])
+    expect(r.map((x) => x.name)).toEqual(["JUAN"])
+  })
+
+  it("no repite el mismo nombre dos veces ni ofrece vacíos", () => {
+    const r = cuentasParaSumar([c("Juan", 85, 300), c("juan", 20, 200), c("   ", 10, 100)])
+    expect(r).toHaveLength(1)
+    expect(r[0].total).toBe(85)
+  })
+
+  it("con muchas cuentas abiertas corta en el tope y respeta el orden", () => {
+    const muchas = Array.from({ length: 12 }, (_, i) => c("Cliente " + i, i, i))
+    expect(cuentasParaSumar(muchas)).toHaveLength(6)
+    expect(cuentasParaSumar(muchas, [], 3).map((x) => x.name)).toEqual(["Cliente 11", "Cliente 10", "Cliente 9"])
+  })
+
+  it("sin cuentas abiertas no ofrece nada", () => {
+    expect(cuentasParaSumar([], ["Mesa 1"])).toEqual([])
   })
 })

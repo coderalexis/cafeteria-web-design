@@ -367,6 +367,39 @@ export function suggestAccountNames(visitas: AccountVisit[], hourNow: number, ex
     .map((x) => x.name)
 }
 
+/** Una cuenta abierta que se ofrece al abrir otra: tocarla le SUMA el carrito. */
+export interface CuentaAbierta {
+  name: string
+  /** Lo que lleva acumulado, para reconocerla de un vistazo. */
+  total: number
+  /** Última vez que se le movió algo; las más recientes se ofrecen primero. */
+  at: number
+}
+
+/**
+ * Qué cuentas abiertas se ofrecen al abrir otra.
+ *
+ * Escribir un nombre que ya existe le suma a esa cuenta en vez de duplicarla,
+ * y las mesas ocupadas ya se marcan en sus chips fijos. Lo que faltaba eran
+ * las cuentas con nombre tecleado —«Juan»—: para sumarles la siguiente ronda
+ * había que volver a escribirlo letra por letra y exactamente igual. Aquí van
+ * esas, las que NO están ya como chip, con la más reciente primero: la ronda
+ * que se acaba de pedir es la que más probablemente se está sirviendo.
+ */
+export function cuentasParaSumar(abiertas: CuentaAbierta[], chips: string[] = [], limite = 6): CuentaAbierta[] {
+  const fuera = new Set(chips.map((c) => c.trim().toLowerCase()))
+  const vistas = new Set<string>()
+  return [...abiertas]
+    .sort((a, b) => b.at - a.at)
+    .filter((c) => {
+      const k = c.name.trim().toLowerCase()
+      if (!k || fuera.has(k) || vistas.has(k)) return false
+      vistas.add(k)
+      return true
+    })
+    .slice(0, limite)
+}
+
 /* ------------------------------------------------------------------ */
 /*  Lo que acaba de volver al carrito                                   */
 /* ------------------------------------------------------------------ */
