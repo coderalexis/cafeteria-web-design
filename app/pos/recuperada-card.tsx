@@ -38,7 +38,11 @@ export function RecuperadaCard({ recuperada }: { recuperada: Recuperada | null }
           transition={{ type: "spring", stiffness: 380, damping: 30 }}
           role="status"
           data-recuperada-card
-          className="pointer-events-none fixed inset-x-2 z-50 rounded-2xl border border-emerald-300 bg-emerald-50/95 px-4 py-3 shadow-lg backdrop-blur"
+          // Fondo OPACO, no translúcido: encima va el encabezado del POS y con
+          // un velo se leían las dos capas a la vez. El desenfoque tampoco
+          // sirve de red —no todos los navegadores lo pintan— así que el
+          // color tapa por sí solo.
+          className="pointer-events-none fixed inset-x-2 z-50 rounded-2xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 shadow-xl"
           // La muesca del iPhone: la tarjeta se cuelga debajo de ella, nunca
           // detrás. En un teléfono sin muesca, el mínimo la separa del borde.
           style={{ top: "max(0.5rem, env(safe-area-inset-top))" }}
@@ -58,6 +62,13 @@ export function RecuperadaCard({ recuperada }: { recuperada: Recuperada | null }
                 {recuperada.articulos} artículo{recuperada.articulos === 1 ? "" : "s"} ·{" "}
                 {formatCurrency(recuperada.total)}
               </p>
+              {/* Cambiar de cuenta son dos cosas a la vez; la segunda va aquí
+                  y no en otro aviso, que salía encima de este. */}
+              {recuperada.guardada && (
+                <p className="mt-1 truncate border-t border-emerald-200 pt-1 text-xs text-emerald-700">
+                  «{recuperada.guardada}» quedó guardada
+                </p>
+              )}
             </div>
           </div>
         </m.div>

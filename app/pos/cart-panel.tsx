@@ -86,7 +86,8 @@ export interface CartPanelProps {
   parkedEnabled: boolean
   openAccount: OpenAccountRef | null
   cuentasVisibles: ParkedOrder[]
-  saveToOpenAccount: () => Promise<boolean>
+  /** Guarda la ronda en la cuenta abierta; devuelve si se pudo y bajo qué nombre quedó. */
+  saveToOpenAccount: () => Promise<{ ok: boolean; guardadaComo: string | null }>
   setShowPark: (open: boolean) => void
   setShowTray: (open: boolean) => void
   // Lealtad

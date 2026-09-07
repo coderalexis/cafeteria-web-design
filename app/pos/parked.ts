@@ -434,6 +434,12 @@ export interface Recuperada {
   detalle: string
   /** Lo que suma la cuenta al menú de hoy. */
   total: number
+  /**
+   * Qué se puso a salvo para hacerle sitio, si había algo en el carrito.
+   * Va en el MISMO anuncio: cambiar de cuenta son dos cosas a la vez y dos
+   * avisos sueltos se encimaban arriba de la pantalla.
+   */
+  guardada?: string
 }
 
 /**
