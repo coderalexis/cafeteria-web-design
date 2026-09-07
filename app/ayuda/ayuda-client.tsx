@@ -429,7 +429,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito sumar ronda a una cuenta abierta sin teclear el nombre dos personas mismo nombre otro juan guardar con la hora",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito tarjeta que baja en celular que trae la cuenta sumar ronda a una cuenta abierta sin teclear el nombre dos personas mismo nombre otro juan guardar con la hora",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -466,8 +466,10 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               <strong>Al abrir una cuenta se ve volar al carrito:</strong> del chip de la cuenta salen unos puntos verdes que
               aterrizan en el carrito con el número de artículos, arriba aparece «&quot;Mesa 7&quot; recuperada · 3 artículos» y las
-              líneas entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez
-              de «+ Latte», para que no se confunda con haber tocado un producto.
+              líneas entran una por una. En <strong>celular</strong>, como el carrito va en la hoja cerrada, baja además una
+              tarjeta verde que dice de qué cuenta es, <em>qué</em> trae y cuánto suma («2× Latte, Americano y 1 más · 3
+              artículos · $195»). Se va sola en un par de segundos y no estorba: si tocas encima de ella, el toque llega al
+              producto que está debajo.
             </li>
             <li>
               <strong>Repetir el nombre no duplica: suma.</strong> Si tocas «Abrir cuenta» y eliges una mesa que ya

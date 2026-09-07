@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { m, useAnimationControls, useReducedMotion } from "framer-motion"
 import { getLinePrice, type CartLine } from "./cart"
-import { avisoRecuperada, type Recuperada } from "./parked"
+import type { Recuperada } from "./parked"
 import { vibra } from "./pos-utils"
 
 /** ¿El navegador sabe animar sobre una curva? (Safari viejo no; ahí el
@@ -33,7 +33,7 @@ type Landing = { id: number; x: number; y: number; tono: Tono; etiqueta: string 
 /**
  * Lo que confirma un toque en el menú: el punto que vuela al carrito (con su
  * estela y su aterrizaje) y, en celular, el aviso en la barra de abajo con lo
- * que acaba de entrar. Vive en un hook porque necesita comparar el carrito
+ * que acaba de entrar. Lo de «volvió una cuenta» lo cuenta `RecuperadaCard`. Vive en un hook porque necesita comparar el carrito
  * anterior con el nuevo, y esa comparación es una sola aunque la pinten dos
  * cosas distintas.
  */
@@ -57,11 +57,11 @@ export function useCartFeedback({
   // vibración corta. Con la hoja abierta no hace falta: el carrito se ve.
   const [lastAdded, setLastAdded] = useState<{ label: string; price: number; key: number } | null>(null)
   const prevLinesRef = useRef<CartLine[]>(lines)
-  // ── "Volvió la cuenta" (móvil) ──
-  // Al abrir una cuenta el carrito cambia entero; eso no es «un artículo
-  // más» y la barra no debe decir «+ Latte $40» como si se hubiera tocado
-  // algo. Dice lo que pasó: qué cuenta volvió y con cuántos artículos.
-  const [aviso, setAviso] = useState<{ label: string; key: number } | null>(null)
+  // ── "Volvió la cuenta" ──
+  // Al abrir una cuenta el carrito cambia entero; eso no es «un artículo más»
+  // y la barra no debe decir «+ Latte $40» como si se hubiera tocado algo. Lo
+  // que pasó lo anuncia `RecuperadaCard`: la barra es demasiado chica para
+  // contarlo y ahí no cabía QUÉ volvió. Aquí solo se apaga el «+ Latte».
   const recuperadaKeyRef = useRef<number | null>(null)
 
   // ── Vuelo al carrito ──
@@ -109,9 +109,6 @@ export function useCartFeedback({
       const origen = flyOriginRef.current
       flyOriginRef.current = null
       setLastAdded(null)
-      if (isMobile && !cartOpen) {
-        setAviso({ label: avisoRecuperada(recuperada.name, recuperada.articulos), key: recuperada.key })
-      }
       if (origen && !reducedMotion) {
         const targetEl = isMobile ? barTargetRef.current : bagTargetRef.current
         if (targetEl) {
@@ -184,11 +181,6 @@ export function useCartFeedback({
     const t = setTimeout(() => setLastAdded(null), 1800)
     return () => clearTimeout(t)
   }, [lastAdded])
-  useEffect(() => {
-    if (!aviso) return
-    const t = setTimeout(() => setAviso(null), 2600)
-    return () => clearTimeout(t)
-  }, [aviso])
 
   /** Terminó de volar un punto: se retira y, si era el principal, aterriza. */
   const completeFlight = useCallback(
@@ -209,7 +201,7 @@ export function useCartFeedback({
     setLandings((cur) => cur.filter((x) => x.id !== id))
   }, [])
 
-  return { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
+  return { lastAdded, markFlyOrigin, marcarOrigenEn, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
 }
 
 /** Los puntos en vuelo y los aterrizajes, encima de todo el POS. */

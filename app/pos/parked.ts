@@ -4,6 +4,7 @@ import {
   getLineLabel,
   getLinePrice,
   rehydrateCart,
+  type CartLine,
   type PersistedCart,
   type Product,
 } from "./cart"
@@ -429,6 +430,26 @@ export interface Recuperada {
   key: number
   name: string
   articulos: number
+  /** Qué volvió, en corto: «2× Latte, Americano y 1 más». */
+  detalle: string
+  /** Lo que suma la cuenta al menú de hoy. */
+  total: number
+}
+
+/**
+ * Qué volvió al carrito, en una línea corta.
+ *
+ * En celular el carrito vive en una hoja cerrada: sin esto, quien retoma una
+ * cuenta ve «volvió algo» pero no PUEDE ver qué, y para comprobar que es la
+ * mesa correcta tiene que abrir la hoja. Se nombran los primeros y el resto
+ * se cuenta; la cantidad solo se dice cuando es más de uno, que es cuando
+ * importa.
+ */
+export function detalleRecuperada(lines: CartLine[], max = 2): string {
+  const nombres = lines.map((l) => (l.quantity > 1 ? `${l.quantity}× ${l.product.name}` : l.product.name))
+  if (nombres.length <= max) return nombres.join(", ")
+  const resto = nombres.length - max
+  return `${nombres.slice(0, max).join(", ")} y ${resto} más`
 }
 
 /**

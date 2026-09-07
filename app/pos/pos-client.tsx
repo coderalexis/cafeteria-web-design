@@ -19,7 +19,7 @@ import {
   Search,
   Lock,
   ChevronUp,
-  Star, PauseCircle, ChevronRight, RotateCcw, ArchiveRestore, Sparkles } from "lucide-react"
+  Star, PauseCircle, ChevronRight, RotateCcw, Sparkles } from "lucide-react"
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
@@ -59,6 +59,7 @@ import { ModifierSheet } from "./modifier-sheet"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
 import { AccountDialog } from "./account-dialog"
 import { useParkedOrders } from "./use-parked-orders"
+import { RecuperadaCard } from "./recuperada-card"
 import { esErrorDeVersion, marcarRecargaPorVersion } from "@/lib/version"
 import {
   autoName,
@@ -70,7 +71,7 @@ import {
   parkedAccount,
   waitingLabel,
   PARKED_MAX_AGE_MS,
-  type ParkedOrder, applyCartDelta, cuentasParaSumar, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
+  type ParkedOrder, applyCartDelta, cuentasParaSumar, detalleRecuperada, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
 import { DiscountDialog } from "./discount-dialog"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { CashTenderDialog } from "./cash-tender-dialog"
@@ -621,7 +622,7 @@ export default function POSClient({
   // servidor cancela la original y cobra esta con la hora original.
   const [corrigiendo, setCorrigiendo] = useState<{ id: string; folio: number; total: number } | null>(null)
   const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
-  const { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
+  const { lastAdded, markFlyOrigin, marcarOrigenEn, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
 
   // Aviso único si se restauró un carrito guardado
   useEffect(() => {
@@ -879,7 +880,13 @@ export default function POSClient({
       })
       if (desde) marcarOrigenEn(desde.x, desde.y)
       restoreLines(estado.lines)
-      setRecuperada({ key: Date.now(), name: order.name, articulos: estado.lines.reduce((s, l) => s + l.quantity, 0) })
+      setRecuperada({
+        key: Date.now(),
+        name: order.name,
+        articulos: estado.lines.reduce((s, l) => s + l.quantity, 0),
+        detalle: detalleRecuperada(estado.lines),
+        total: cartSubtotal(estado.lines),
+      })
       setTicketNotes(estado.ticketNotes)
       clearTip()
       setShowTray(false)
@@ -1006,6 +1013,8 @@ export default function POSClient({
         key: Date.now(),
         name: `Venta #${ticket.folio}`,
         articulos: estado.lines.reduce((s, l) => s + l.quantity, 0),
+        detalle: detalleRecuperada(estado.lines),
+        total: cartSubtotal(estado.lines),
       })
       setShowTray(false)
       if (isMobile) setCartOpen(true)
@@ -1480,7 +1489,13 @@ export default function POSClient({
     }
     if (desde) marcarOrigenEn(desde.x, desde.y)
     restoreLines(estado.lines)
-    setRecuperada({ key: Date.now(), name: `Venta #${lastSale.folio}`, articulos: estado.lines.reduce((s, l) => s + l.quantity, 0) })
+    setRecuperada({
+      key: Date.now(),
+      name: `Venta #${lastSale.folio}`,
+      articulos: estado.lines.reduce((s, l) => s + l.quantity, 0),
+      detalle: detalleRecuperada(estado.lines),
+      total: cartSubtotal(estado.lines),
+    })
     vibra(12)
     const guardadas = (lastSale.payload as { lines?: unknown[] }).lines?.length ?? 0
     if (estado.lines.length < guardadas) {
@@ -1991,12 +2006,7 @@ export default function POSClient({
                   className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
                   onClick={() => setCartOpen(true)}
                 >
-                  {aviso ? (
-                    <span key={aviso.key} className="flex min-w-0 items-center gap-1.5 text-emerald-700" data-recuperada>
-                      <ArchiveRestore className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate">{aviso.label}</span>
-                    </span>
-                  ) : lastAdded ? (
+                  {lastAdded ? (
                     <span key={lastAdded.key} className="flex min-w-0 items-center gap-1.5 text-amber-700">
                       <Plus className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">{lastAdded.label}</span>
@@ -2077,6 +2087,11 @@ export default function POSClient({
           </Sheet>
         </>
       )}
+
+      {/* El anuncio de «volvió esta cuenta», solo en celular: en escritorio
+          el carrito está a la vista y ya lo dice su franja verde. Con la hoja
+          abierta tampoco hace falta —se ven las líneas entrando—. */}
+      {isMobile && !cartOpen && <RecuperadaCard recuperada={recuperada} />}
 
       <FlyLayer
         flights={feedback.flights}

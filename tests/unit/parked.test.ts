@@ -4,6 +4,7 @@ import {
   PARKED_VIEJA_MS,
   autoName,
   avisoRecuperada,
+  detalleRecuperada,
   conflictName,
   isVieja,
   lineKey,
@@ -240,5 +241,34 @@ describe("nombreConHora — distinguir dos personas que se llaman igual", () => 
 
   it("sin nombre queda solo la hora", () => {
     expect(nombreConHora("   ", alas(23, 59))).toBe("23:59")
+  })
+})
+
+describe("detalleRecuperada — qué volvió, en una línea", () => {
+  const linea = (name: string, quantity: number) => ({ product: { name }, quantity })
+  // Solo se usan `product.name` y `quantity`; el resto de CartLine no pinta aquí.
+  const lineas = (...xs: { product: { name: string }; quantity: number }[]) =>
+    xs as unknown as Parameters<typeof detalleRecuperada>[0]
+
+  it("nombra los artículos cuando son pocos", () => {
+    expect(detalleRecuperada(lineas(linea("Latte", 1), linea("Americano", 1)))).toBe("Latte, Americano")
+  })
+
+  it("dice la cantidad solo cuando es más de uno", () => {
+    expect(detalleRecuperada(lineas(linea("Latte", 2), linea("Americano", 1)))).toBe("2× Latte, Americano")
+  })
+
+  it("con muchos, nombra los primeros y cuenta el resto", () => {
+    const r = detalleRecuperada(lineas(linea("Latte", 1), linea("Americano", 1), linea("Croissant", 1), linea("Jugo", 1)))
+    expect(r).toBe("Latte, Americano y 2 más")
+  })
+
+  it("respeta cuántos se nombran", () => {
+    const r = detalleRecuperada(lineas(linea("Latte", 1), linea("Americano", 1), linea("Croissant", 1)), 1)
+    expect(r).toBe("Latte y 2 más")
+  })
+
+  it("sin líneas no dice nada", () => {
+    expect(detalleRecuperada(lineas())).toBe("")
   })
 })
