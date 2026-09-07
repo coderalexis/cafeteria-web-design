@@ -41,7 +41,7 @@ import { formatPhone } from "./loyalty-dialog"
 import type { LoyaltyCustomer } from "@/app/actions/loyalty"
 import type { OpenSession } from "./cash-session-dialog"
 import { getLinePrice, type CartLine, type PaymentMethod, type Product, type SizeOption, type TicketDiscount } from "./cart"
-import { gestoEnTarjeta, vibra, PRESION_LARGA_MS, QUICK_NOTES, TIP_OPTIONS, UMBRAL_GESTO, type TipChoice, montoParcial } from "./pos-utils"
+import { gestoEnTarjeta, vibra, PRESION_LARGA_MS, QUICK_NOTES, TIP_OPTIONS, UMBRAL_GESTO, type TipChoice } from "./pos-utils"
 import { avisoRecuperada, type Recuperada, type ParkedOrder } from "./parked"
 import type { usePosCart } from "./use-pos-cart"
 
@@ -145,13 +145,6 @@ export interface CartPanelProps {
   takeoutCharge: number
   total: number
   due: number
-  /**
-   * Cuánto del total se enseña mientras una cuenta aterriza (1 = todo). Los
-   * tres importes visibles se escalan con ESTE mismo número: si cada uno
-   * subiera por su cuenta, durante medio segundo el subtotal, el total y el
-   * botón de cobrar dirían cosas distintas.
-   */
-  factorLlegada: number
   // Cobro
   openSession: OpenSession | null
   canCharge: boolean
@@ -189,7 +182,7 @@ export function CartPanel(p: CartPanelProps) {
     tipChoice, setTipChoice, tipCustomInput, setTipCustomInput, tipAmount,
     moreOpen, toggleMore, extrasResumen, ticketNotes, setTicketNotes, takeoutFee,
     discount, setDiscount, setShowDiscount,
-    subtotal, discountAmount, discountInvalid, promo, promoDiscount, takeoutCharge, total, due, factorLlegada,
+    subtotal, discountAmount, discountInvalid, promo, promoDiscount, takeoutCharge, total, due,
     openSession, canCharge, isProcessing, finalizeSale, setShowCashDialog, practica,
   } = p
   const [editingNoteFor, setEditingNoteFor] = useState<string | null>(null)
@@ -1013,18 +1006,12 @@ export function CartPanel(p: CartPanelProps) {
           )}
         </div>
         <div className="shrink-0 space-y-3 p-4 pt-3">
-          {/* Subtotal / descuento / total. Mientras una cuenta aterriza, el
-              bloque se tiñe de verde y las cifras suben: el dinero es lo que
-              se mira, así que es ahí donde mejor se lee «esto acaba de
-              entrar». Ver `factorDeLlegada` en pos-utils. */}
-          <div
-            className={`space-y-1 rounded-lg transition-colors ${factorLlegada < 1 ? "bg-emerald-50/70 ring-1 ring-emerald-200" : ""}`}
-            data-llenando={factorLlegada < 1 ? "" : undefined}
-          >
+          {/* Subtotal / descuento / total */}
+          <div className="space-y-1">
             {(discount || subtotal > 0) && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-stone-500">Subtotal</span>
-                <span className="text-stone-600">{formatCurrency(montoParcial(subtotal, factorLlegada))}</span>
+                <span className="text-stone-600">{formatCurrency(subtotal)}</span>
               </div>
             )}
             {takeoutCharge > 0 && (
@@ -1068,7 +1055,7 @@ export function CartPanel(p: CartPanelProps) {
                   tipAmount > 0 ? "text-base font-semibold text-stone-700" : "text-2xl font-bold text-stone-800"
                 }
               >
-                {formatCurrency(montoParcial(total, factorLlegada))}
+                {formatCurrency(total)}
               </span>
             </div>
             {tipAmount > 0 && (
@@ -1079,7 +1066,7 @@ export function CartPanel(p: CartPanelProps) {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-base font-medium text-stone-500">A cobrar</span>
-                  <span className="text-2xl font-bold text-stone-800">{formatCurrency(montoParcial(due, factorLlegada))}</span>
+                  <span className="text-2xl font-bold text-stone-800">{formatCurrency(due)}</span>
                 </div>
               </>
             )}
@@ -1121,10 +1108,10 @@ export function CartPanel(p: CartPanelProps) {
               {isProcessing
                 ? "Procesando..."
                 : corrigiendo
-                  ? `Corregir #${corrigiendo.folio} · ${formatCurrency(montoParcial(due, factorLlegada))} · ${paymentLabel(paymentMethod)}`
+                  ? `Corregir #${corrigiendo.folio} · ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`
                   : paymentMethod === "fiado"
-                    ? `Fiar ${formatCurrency(montoParcial(due, factorLlegada))}${creditCustomer ? ` a ${creditCustomer.name}` : " · ¿a quién?"}`
-                    : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(montoParcial(due, factorLlegada))} · ${paymentLabel(paymentMethod)}`}
+                    ? `Fiar ${formatCurrency(due)}${creditCustomer ? ` a ${creditCustomer.name}` : " · ¿a quién?"}`
+                    : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)} · ${paymentLabel(paymentMethod)}`}
               <Kbd className="absolute right-3 top-1/2 -translate-y-1/2 border-white/40 bg-white/20 text-white">F2</Kbd>
             </Button>
           ) : (
