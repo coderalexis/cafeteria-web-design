@@ -429,7 +429,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito sumar ronda a una cuenta abierta sin teclear el nombre",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito sumar ronda a una cuenta abierta sin teclear el nombre dos personas mismo nombre otro juan guardar con la hora",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -474,7 +474,9 @@ export function AyudaClient({ ticket, corte }: Props) {
               tiene cuenta (el chip se marca con <strong>+</strong>), lo del carrito <em>se le agrega</em> a esa
               cuenta en vez de crear otra igual. Arriba del todo, en <strong>«Cuentas abiertas»</strong>, salen las
               que tienen nombre escrito —«Juan», «Sra. suéter rojo»— con lo que llevan acumulado: tocar una le suma
-              la ronda sin volver a teclear el nombre igualito.
+              la ronda sin volver a teclear el nombre igualito. Y si es <em>otra</em> persona que se llama igual,
+              debajo del aviso hay un enlace para guardarla aparte con su hora («Juan 14:40»), y así no se le suma
+              a quien no era.
             </li>
             <li>
               Las cuentas son <strong>de la cafetería</strong>, no del aparato: puedes tomar el pedido en el celular y

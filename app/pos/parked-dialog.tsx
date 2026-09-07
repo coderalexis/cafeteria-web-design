@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ChevronRight, HandCoins, PauseCircle, Play, Receipt, Trash2, TriangleAlert } from "lucide-react"
 import { formatCurrency } from "@/lib/format"
-import { esFiado, isVieja, parkedDetail, parkedSummary, waitingLabel, type CuentaAbierta, type ParkedOrder } from "./parked"
+import { esFiado, isVieja, nombreConHora, parkedDetail, parkedSummary, waitingLabel, type CuentaAbierta, type ParkedOrder } from "./parked"
 import type { Product } from "./cart"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -169,9 +169,24 @@ export function ParkDialog({
             }}
           />
           {escrita ? (
-            <p className="text-xs font-medium text-amber-800">
-              «{nombre.trim()}» ya está abierta: esto se le sumará a esa cuenta.
-            </p>
+            /* Dos personas se llaman igual y llegan casi a la vez. Sumar es lo
+               correcto la mayoría de las veces —es la misma mesa pidiendo otra
+               ronda—, pero cuando NO lo es hay que poder decirlo aquí: sin esta
+               salida, la segunda cuenta se fundía con la primera en silencio y
+               solo se notaba al cobrar. La hora es lo que las distingue. */
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-amber-800">
+                «{nombre.trim()}» ya está abierta: esto se le sumará a esa cuenta.
+              </p>
+              <button
+                type="button"
+                onClick={() => guardar(nombreConHora(nombre, new Date()))}
+                className="text-xs font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+                data-otro-igual
+              >
+                Es otro: guardar aparte como «{nombreConHora(nombre, new Date())}»
+              </button>
+            </div>
           ) : (
             <p className="text-xs text-stone-400">
               Un nombre ayuda a reconocerla después. Si lo dejas vacío se llamará «{sugerido}».

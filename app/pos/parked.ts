@@ -78,6 +78,26 @@ export function autoName(now: Date): string {
   return `Pedido ${hh}:${mm}`
 }
 
+/**
+ * El mismo nombre con la hora pegada: «Juan» → «Juan 14:40».
+ *
+ * Dos personas se llaman igual y llegan con media hora de diferencia. Si la
+ * segunda se guarda como «Juan» a secas, su ronda se le suma al primero y
+ * nadie se entera hasta cobrar. La hora en que se abrió es lo que las
+ * distingue justo donde hay que elegir: en el chip.
+ *
+ * Es idempotente: volver a pasarle un nombre que ya trae hora la reemplaza,
+ * no la encadena. Y la hora nunca se pierde por el tope de 40 letras — lo que
+ * se recorta es el nombre, que es lo que se puede reconocer a medias.
+ */
+export function nombreConHora(name: string, now: Date): string {
+  const hh = String(now.getHours()).padStart(2, "0")
+  const mm = String(now.getMinutes()).padStart(2, "0")
+  const hora = `${hh}:${mm}`
+  const base = name.trim().replace(/ \d{1,2}:\d{2}$/, "").trim().slice(0, 40 - hora.length - 1)
+  return base ? `${base} ${hora}` : hora
+}
+
 /** Un renglón del pedido tal como hay que prepararlo. */
 export interface ParkedLine {
   label: string
