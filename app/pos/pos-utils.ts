@@ -66,3 +66,39 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   const tag = target.tagName
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable
 }
+
+/* ------------------------------------------------------------------ */
+/*  El total subiendo mientras una cuenta aterriza                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cuánto dura el conteo del total al recuperar una cuenta.
+ *
+ * Los puntos verdes tardan ~520 ms en llegar y el último se retrasa otro
+ * tanto: con 650 ms el número termina de subir justo cuando cae el último,
+ * así se lee como una sola cosa —«esto entró»— y no como dos animaciones.
+ */
+export const DURACION_LLEGADA_MS = 650
+
+/**
+ * De 0 a 1 con freno al final (easeOutCubic): arranca rápido, para que el
+ * número se mueva de inmediato, y llega despacio a la cifra buena, que es la
+ * que hay que leer.
+ */
+export function factorDeLlegada(transcurrido: number, duracion = DURACION_LLEGADA_MS): number {
+  if (duracion <= 0) return 1
+  const t = Math.min(1, Math.max(0, transcurrido / duracion))
+  return 1 - Math.pow(1 - t, 3)
+}
+
+/**
+ * El importe que se enseña a media llegada. Todos los importes del carrito
+ * (subtotal, total y el botón de cobrar) se escalan con el MISMO factor: si
+ * subieran por su cuenta, durante medio segundo la pantalla mostraría cifras
+ * que no cuadran entre sí. Al terminar, el factor es 1 y cada uno vale
+ * exactamente lo que el servidor va a cobrar.
+ */
+export function montoParcial(monto: number, factor: number): number {
+  if (factor >= 1) return monto
+  return Math.round(monto * factor * 100) / 100
+}
