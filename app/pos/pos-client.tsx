@@ -90,7 +90,7 @@ import { ReceiptView, type CompletedSale } from "./receipt-view"
 import { FlyLayer, useCartFeedback } from "./use-cart-feedback"
 import { usePromoPreview } from "./use-promo-preview"
 import { usePosShortcuts } from "./use-pos-shortcuts"
-import { cashSuggestions, vibra, MORE_OPTIONS_KEY, type TipChoice } from "./pos-utils"
+import { cashSuggestions, montoParcial, vibra, MORE_OPTIONS_KEY, type TipChoice } from "./pos-utils"
 import {
   cartItemCount,
   cartSubtotal,
@@ -621,7 +621,7 @@ export default function POSClient({
   // servidor cancela la original y cobra esta con la hora original.
   const [corrigiendo, setCorrigiendo] = useState<{ id: string; folio: number; total: number } | null>(null)
   const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
-  const { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
+  const { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, cartPulse, factorLlegada, barDip, barTargetRef, bagTargetRef } = feedback
 
   // Aviso único si se restauró un carrito guardado
   useEffect(() => {
@@ -1641,6 +1641,7 @@ export default function POSClient({
       cartPulse={cartPulse}
       bagTargetRef={bagTargetRef}
       recuperada={recuperada}
+      factorLlegada={factorLlegada}
       corrigiendo={corrigiendo ? { folio: corrigiendo.folio } : null}
       cancelarCorreccion={cancelarCorreccion}
       creditEnabled={creditEnabled}
@@ -1988,7 +1989,15 @@ export default function POSClient({
                 <Button
                   ref={barTargetRef}
                   data-recorrido="carrito-barra"
-                  className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
+                  /* Mientras aterriza una cuenta la barra se tiñe de verde: en
+                     celular el carrito va en la hoja cerrada, así que esta
+                     barra es todo lo que se ve del dinero que acaba de entrar. */
+                  data-llenando={factorLlegada < 1 ? "" : undefined}
+                  className={`h-12 flex-1 min-w-0 rounded-xl border text-base font-bold text-stone-800 justify-between px-4 transition-colors ${
+                    factorLlegada < 1
+                      ? "border-emerald-300 bg-emerald-50 hover:bg-emerald-50"
+                      : "border-stone-200 bg-white hover:bg-stone-50"
+                  }`}
                   onClick={() => setCartOpen(true)}
                 >
                   {aviso ? (
@@ -2006,7 +2015,7 @@ export default function POSClient({
                     <span className="flex min-w-0 items-center gap-2">
                       <ShoppingBag className="h-5 w-5 shrink-0" />
                       <span className="truncate">
-                        {itemCount} artículo{itemCount === 1 ? "" : "s"} · {formatCurrency(total)}
+                        {itemCount} artículo{itemCount === 1 ? "" : "s"} · {formatCurrency(montoParcial(total, factorLlegada))}
                       </span>
                     </span>
                   )}
@@ -2048,7 +2057,9 @@ export default function POSClient({
                     title={`Cobrar · ${paymentLabel(paymentMethod)}`}
                     data-recorrido="cobrar"
                   >
-                    {isProcessing ? "Procesando…" : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)}`}
+                    {isProcessing
+                      ? "Procesando…"
+                      : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(montoParcial(due, factorLlegada))}`}
                   </Button>
                 ) : (
                   <Button
