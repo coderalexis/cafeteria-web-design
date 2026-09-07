@@ -9,6 +9,7 @@ import {
   lineKey,
   suggestAccountNames,
   cuentasParaSumar,
+  nombreConHora,
   waitingLabel,
 } from "@/app/pos/parked"
 
@@ -214,5 +215,30 @@ describe("cuentasParaSumar — qué cuentas abiertas se ofrecen al abrir otra", 
 
   it("sin cuentas abiertas no ofrece nada", () => {
     expect(cuentasParaSumar([], ["Mesa 1"])).toEqual([])
+  })
+})
+
+describe("nombreConHora — distinguir dos personas que se llaman igual", () => {
+  const alas = (h: number, m: number) => new Date(2026, 8, 7, h, m)
+
+  it("pega la hora al nombre", () => {
+    expect(nombreConHora("Juan", alas(14, 40))).toBe("Juan 14:40")
+    expect(nombreConHora("  alexis  ", alas(9, 5))).toBe("alexis 09:05")
+  })
+
+  it("no encadena horas: la reemplaza", () => {
+    expect(nombreConHora("Juan 14:40", alas(15, 10))).toBe("Juan 15:10")
+    expect(nombreConHora(nombreConHora("Juan", alas(14, 40)), alas(15, 10))).toBe("Juan 15:10")
+  })
+
+  it("recorta el nombre, nunca la hora", () => {
+    const largo = "Sra. del suéter rojo con el perro chihuahua"
+    const r = nombreConHora(largo, alas(8, 0))
+    expect(r.length).toBeLessThanOrEqual(40)
+    expect(r.endsWith(" 08:00")).toBe(true)
+  })
+
+  it("sin nombre queda solo la hora", () => {
+    expect(nombreConHora("   ", alas(23, 59))).toBe("23:59")
   })
 })
