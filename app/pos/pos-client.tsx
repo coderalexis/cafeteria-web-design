@@ -768,6 +768,13 @@ export default function POSClient({
   )
 
   /**
+   * Qué pasó al poner a salvo la ronda que estaba en el carrito: si se pudo
+   * seguir adelante y bajo qué nombre quedó, para que quien llama pueda
+   * contarlo en su propio mensaje en vez de soltar otro aviso encima.
+   */
+  type Guardado = { ok: boolean; guardadaComo: string | null }
+
+  /**
    * Guarda la ronda actual EN la cuenta que está abierta.
    *
    * Este es el camino normal de una cafetería con mesas: la cuenta se abre una
@@ -778,8 +785,8 @@ export default function POSClient({
    * se guarda aparte con nombre reconocible. Son productos ya servidos; una
    * ronda perdida en silencio es comida que nunca se cobra.
    */
-  const saveToOpenAccount = useCallback(async (): Promise<boolean> => {
-    if (!openAccount || lines.length === 0) return false
+  const saveToOpenAccount = useCallback(async ({ callado = false } = {}): Promise<Guardado> => {
+    if (!openAccount || lines.length === 0) return { ok: false, guardadaComo: null }
     // El sello más fresco que se conoce: el de la lista que el sondeo mantiene
     // al día, no el de cuando se abrió la cuenta. Con el de entonces, un
     // teléfono que se reiniciaba a media ronda «chocaba» contra su propia
@@ -787,12 +794,12 @@ export default function POSClient({
     const enLista = parked.orders.find((o) => o.id === openAccount.id)
     const mio = serializeCart(cartStateNow(), Date.now())
     let r = await parked.update(openAccount.id, enLista?.updatedAt || openAccount.updatedAt, mio)
-    if (!r) return false // el hook ya avisó
+    if (!r) return { ok: false, guardadaComo: null } // el hook ya avisó
     if (!r.saved && r.current && openAccount.cartAtOpen) {
       // Sí cambió mientras estaba abierta: se junta en la misma cuenta.
       const junto = applyCartDelta(r.current.cart, openAccount.cartAtOpen, mio)
       r = await parked.update(openAccount.id, r.current.updatedAt, junto)
-      if (!r) return false
+      if (!r) return { ok: false, guardadaComo: null }
       if (r.saved) toast.info(`«${openAccount.name}» tenía cambios de otro aparato: se juntaron en la misma cuenta.`)
     }
     if (r.saved) {
@@ -800,8 +807,11 @@ export default function POSClient({
       clearCart()
       setOpenAccount(null)
       vibra(12)
-      toast.success(`Guardado en «${openAccount.name}».`)
-      return true
+      // Callado cuando quien llama va a decirlo mejor: al cambiar de cuenta,
+      // este aviso y el de «volvió la otra» salían los dos arriba y se
+      // encimaban. Uno solo cuenta las dos mitades del mismo movimiento.
+      if (!callado) toast.success(`Guardado en «${openAccount.name}».`)
+      return { ok: true, guardadaComo: openAccount.name }
     }
     const alterno = conflictName(
       openAccount.name,
@@ -811,7 +821,7 @@ export default function POSClient({
       toast.error(
         `«${openAccount.name}» cambió en otro aparato y la bandeja está llena. Cobra o descarta una cuenta y vuelve a guardar.`,
       )
-      return false
+      return { ok: false, guardadaComo: null }
     }
     clearTip()
     clearCart()
@@ -823,7 +833,9 @@ export default function POSClient({
         : `«${openAccount.name}» volvió a cambiar mientras se guardaba. Para no perder nada, esto se guardó como «${alterno}»: ábrela y júntalas.`,
       { duration: 12000 },
     )
-    return true
+    // Se guardó, pero con otro nombre y con su propia explicación larga: la
+    // tarjeta no debe decir además «quedó guardada», que sería media verdad.
+    return { ok: true, guardadaComo: null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAccount, lines.length, parked, cartStateNow, clearCart])
 
@@ -855,20 +867,27 @@ export default function POSClient({
         )
         return
       }
+      // Qué se puso a salvo antes de traer la otra cuenta. En celular lo dice
+      // la tarjeta —«Mesa 2» volvió · «Mesa 1» quedó guardada—, en un solo
+      // mensaje: dos avisos a la vez arriba se encimaban y no se leía ninguno.
+      let guardada: string | undefined
       if (lines.length > 0) {
         // Lo que está en el carrito va a su sitio: a su propia cuenta si ya
         // tenía una, o a una nueva si era una venta suelta.
         if (openAccount) {
           // Si no se pudo poner a salvo, NO se sigue: abrir la otra cuenta
           // reemplazaría el carrito y esas líneas se perderían.
-          if (!(await saveToOpenAccount())) return
+          const g = await saveToOpenAccount({ callado: isMobile })
+          if (!g.ok) return
+          if (isMobile && g.guardadaComo) guardada = g.guardadaComo
         } else {
           const auto = autoName(new Date())
           if (!parked.park(cartStateNow(), auto)) {
             toast.error("La bandeja está llena: cobra o descarta una cuenta antes de cambiar.")
             return
           }
-          toast.info(`Lo que tenías en el carrito se guardó como «${auto}».`)
+          if (isMobile) guardada = auto
+          else toast.info(`Lo que tenías en el carrito se guardó como «${auto}».`)
         }
       }
       setOpenAccount({
@@ -886,6 +905,7 @@ export default function POSClient({
         articulos: estado.lines.reduce((s, l) => s + l.quantity, 0),
         detalle: detalleRecuperada(estado.lines),
         total: cartSubtotal(estado.lines),
+        guardada,
       })
       setTicketNotes(estado.ticketNotes)
       clearTip()
@@ -964,16 +984,20 @@ export default function POSClient({
         })
         return
       }
+      let guardada: string | undefined
       if (lines.length > 0) {
         if (openAccount) {
-          if (!(await saveToOpenAccount())) return
+          const g = await saveToOpenAccount({ callado: isMobile })
+          if (!g.ok) return
+          if (isMobile && g.guardadaComo) guardada = g.guardadaComo
         } else {
           const auto = autoName(new Date())
           if (!parked.park(cartStateNow(), auto)) {
             toast.error("La bandeja está llena: cobra o descarta una cuenta antes de corregir.")
             return
           }
-          toast.info(`Lo que tenías en el carrito se guardó como «${auto}».`)
+          if (isMobile) guardada = auto
+          else toast.info(`Lo que tenías en el carrito se guardó como «${auto}».`)
         }
       }
       setOpenAccount(null)
@@ -1015,6 +1039,7 @@ export default function POSClient({
         articulos: estado.lines.reduce((s, l) => s + l.quantity, 0),
         detalle: detalleRecuperada(estado.lines),
         total: cartSubtotal(estado.lines),
+        guardada,
       })
       setShowTray(false)
       if (isMobile) setCartOpen(true)
