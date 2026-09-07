@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { m, useAnimationControls, useReducedMotion } from "framer-motion"
 import { getLinePrice, type CartLine } from "./cart"
 import { avisoRecuperada, type Recuperada } from "./parked"
-import { factorDeLlegada, vibra } from "./pos-utils"
+import { vibra } from "./pos-utils"
 
 /** ¿El navegador sabe animar sobre una curva? (Safari viejo no; ahí el
  *  vuelo cae al arco de tres cuadros.) En SSR no existe CSS. */
@@ -79,14 +79,6 @@ export function useCartFeedback({
   // punto. Los dispara SOLO el punto principal — la estela aterriza muda.
   const [landings, setLandings] = useState<Landing[]>([])
   const [cartPulse, setCartPulse] = useState(0)
-  /**
-   * Cuánto del total se enseña mientras la cuenta aterriza: 1 es «ya está
-   * todo». Sube de 0 a 1 solo al recuperar una cuenta, nunca al agregar un
-   * artículo — ahí el número tiene que ser exacto desde el primer cuadro,
-   * porque puede haber una mano yendo al botón de cobrar.
-   */
-  const [factorLlegada, setFactorLlegada] = useState(1)
-  const cuentaRegresiva = useRef<number | null>(null)
   const barDip = useAnimationControls()
   const barTargetRef = useRef<HTMLButtonElement>(null)
   const bagTargetRef = useRef<HTMLSpanElement>(null)
@@ -119,20 +111,6 @@ export function useCartFeedback({
       setLastAdded(null)
       if (isMobile && !cartOpen) {
         setAviso({ label: avisoRecuperada(recuperada.name, recuperada.articulos), key: recuperada.key })
-      }
-      if (!reducedMotion) {
-        // El total sube mientras caen los puntos. Con movimiento reducido no:
-        // ahí el número aparece completo de una vez.
-        if (cuentaRegresiva.current !== null) cancelAnimationFrame(cuentaRegresiva.current)
-        const t0 = performance.now()
-        setFactorLlegada(0)
-        const paso = () => {
-          const f = factorDeLlegada(performance.now() - t0)
-          setFactorLlegada(f)
-          if (f < 1) cuentaRegresiva.current = requestAnimationFrame(paso)
-          else cuentaRegresiva.current = null
-        }
-        cuentaRegresiva.current = requestAnimationFrame(paso)
       }
       if (origen && !reducedMotion) {
         const targetEl = isMobile ? barTargetRef.current : bagTargetRef.current
@@ -211,12 +189,6 @@ export function useCartFeedback({
     const t = setTimeout(() => setAviso(null), 2600)
     return () => clearTimeout(t)
   }, [aviso])
-  useEffect(
-    () => () => {
-      if (cuentaRegresiva.current !== null) cancelAnimationFrame(cuentaRegresiva.current)
-    },
-    [],
-  )
 
   /** Terminó de volar un punto: se retira y, si era el principal, aterriza. */
   const completeFlight = useCallback(
@@ -237,7 +209,7 @@ export function useCartFeedback({
     setLandings((cur) => cur.filter((x) => x.id !== id))
   }, [])
 
-  return { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, flights, landings, cartPulse, factorLlegada, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
+  return { lastAdded, aviso, markFlyOrigin, marcarOrigenEn, flights, landings, cartPulse, barDip, barTargetRef, bagTargetRef, completeFlight, completeLanding }
 }
 
 /** Los puntos en vuelo y los aterrizajes, encima de todo el POS. */

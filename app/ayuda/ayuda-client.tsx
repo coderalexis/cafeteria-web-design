@@ -465,8 +465,8 @@ export function AyudaClient({ ticket, corte }: Props) {
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
             <li>
               <strong>Al abrir una cuenta se ve volar al carrito:</strong> del chip de la cuenta salen unos puntos verdes que
-              aterrizan en el carrito con el número de artículos, el total <em>sube</em> hasta lo que lleva esa cuenta
-              mientras caen, arriba aparece «&quot;Mesa 7&quot; recuperada · 3 artículos» y las líneas entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez
+              aterrizan en el carrito con el número de artículos, arriba aparece «&quot;Mesa 7&quot; recuperada · 3 artículos» y las
+              líneas entran una por una. Es la confirmación de que volvió completa; en celular lo dice la barra de abajo en vez
               de «+ Latte», para que no se confunda con haber tocado un producto.
             </li>
             <li>
