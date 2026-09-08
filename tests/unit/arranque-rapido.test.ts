@@ -16,17 +16,29 @@ describe("decidirMensaje", () => {
     })
   })
 
-  it("hubo deploy o cambió quién está dentro: recargar", () => {
+  it("hubo deploy: recargar, y esa SÍ se puede frenar", () => {
     expect(decidirMensaje({ tipo: "fresco", cambioDeBuild: true, cambioDeIdentidad: false })).toEqual({
       tipo: "recargar",
+      motivo: "build",
     })
+  })
+
+  it("cambió quién está dentro: recargar sin freno posible", () => {
     expect(decidirMensaje({ tipo: "fresco", cambioDeBuild: false, cambioDeIdentidad: true })).toEqual({
       tipo: "recargar",
+      motivo: "identidad",
+    })
+  })
+
+  it("si cambiaron las dos, manda la identidad: enseñar lo de otra persona no se frena", () => {
+    expect(decidirMensaje({ tipo: "fresco", cambioDeBuild: true, cambioDeIdentidad: true })).toEqual({
+      tipo: "recargar",
+      motivo: "identidad",
     })
   })
 
   it("redirigido (sesión vencida): recargar para seguir la redirección real", () => {
-    expect(decidirMensaje({ tipo: "redirigido" })).toEqual({ tipo: "recargar" })
+    expect(decidirMensaje({ tipo: "redirigido" })).toEqual({ tipo: "recargar", motivo: "redirigido" })
   })
 
   it("el worker no sabe (se reinició): ante la duda, refrescar", () => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { PIDE_PRECARGA, PREGUNTA_ESTADO, decidirMensaje, frenoRefresco, type Accion } from "@/lib/arranque-rapido"
+import { marcarRecargaPorVersion } from "@/lib/version"
 
 const CLAVE_FRENO = "pos-arranque-refrescos"
 /** Si el worker no contesta en este tiempo, se refresca de todos modos. */
@@ -59,7 +60,15 @@ export function ArranqueRapido() {
       window.clearTimeout(temporizador)
       setActualizando(false)
       if (accion.tipo === "refrescar") refrescar()
-      else if (accion.tipo === "recargar") window.location.reload()
+      else if (accion.tipo === "recargar") {
+        // La del deploy comparte freno con el aviso de versión nueva (una
+        // recarga por minuto, `lib/version.ts`): así las dos vías no se
+        // recargan a dúo, y un servidor que alternara builds no deja la
+        // pantalla en bucle. Si el freno está puesto, la página se queda con
+        // lo guardado —que funciona— hasta el siguiente intento.
+        if (accion.motivo === "build" && !marcarRecargaPorVersion()) return
+        window.location.reload()
+      }
     }
 
     const onMensaje = (e: MessageEvent) => {

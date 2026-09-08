@@ -34,8 +34,17 @@ export type Accion =
   | { tipo: "esperar" }
   /** Pedir los datos frescos sin recargar (router.refresh). */
   | { tipo: "refrescar" }
-  /** Recargar la página completa. */
-  | { tipo: "recargar" }
+  /**
+   * Recargar la página completa, y por qué.
+   *
+   * El motivo importa porque solo UNA de las tres se puede frenar. Si el
+   * servidor alternara entre dos builds —la ventana de un despliegue, dos
+   * regiones desacompasadas—, «cambió el código» se cumpliría en cada visita
+   * y la página se recargaría sin parar, con la fila esperando. Las otras dos
+   * no admiten freno: entró otra persona, o el servidor ya no da el POS, y
+   * seguir mostrando lo guardado sería enseñar lo que no es.
+   */
+  | { tipo: "recargar"; motivo: "build" | "identidad" | "redirigido" }
   | { tipo: "nada" }
 
 function esMensaje(m: unknown): m is MensajeDelSW {
@@ -64,9 +73,13 @@ export function decidirMensaje(m: unknown): Accion {
     case "pendiente":
       return { tipo: "esperar" }
     case "fresco":
-      return m.cambioDeBuild || m.cambioDeIdentidad ? { tipo: "recargar" } : { tipo: "refrescar" }
+      // La identidad manda sobre el build: si además entró otra persona, esta
+      // recarga no se puede frenar.
+      if (m.cambioDeIdentidad) return { tipo: "recargar", motivo: "identidad" }
+      if (m.cambioDeBuild) return { tipo: "recargar", motivo: "build" }
+      return { tipo: "refrescar" }
     case "redirigido":
-      return { tipo: "recargar" }
+      return { tipo: "recargar", motivo: "redirigido" }
     case "desconocido":
       return { tipo: "refrescar" }
     case "sin-red":
