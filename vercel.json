@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/pruebas",
-      "schedule": "0 15 * * *"
+      "schedule": "0 10 * * *"
     }
   ],
   "regions": [

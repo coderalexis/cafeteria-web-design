@@ -152,6 +152,8 @@ interface POSClientProps {
   openSession: OpenSession | null
   /** Lo que se dejó de fondo en el último corte (P27): se sugiere al abrir caja. */
   suggestedFloat: number | null
+  /** La caja anterior la cerró el barrido, no una persona: hay que avisarlo. */
+  avisoCierre: { titulo: string; detalle: string; clave: string } | null
   /** Nombres con cuenta abierta por hora, últimos 60 días (P33): «quién suele venir a esta hora». */
   visitas: AccountVisit[]
   /** ¿Hay alguna promoción encendida? Si no, el carrito no consulta promociones (P34). */
@@ -209,6 +211,7 @@ export default function POSClient({
   initialTotalSales,
   openSession,
   suggestedFloat,
+  avisoCierre,
   visitas,
   hayPromociones,
   creditEnabled,
@@ -291,6 +294,19 @@ export default function POSClient({
   const cola = useOfflineQueue(businessId)
   const [showQueueReview, setShowQueueReview] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  // Se avisa UNA vez por cierre, no en cada recarga, y solo mientras no haya
+  // caja abierta: en cuanto abre la suya, el aviso ya no viene a cuento.
+  useEffect(() => {
+    if (!avisoCierre || openSession) return
+    const clave = `aviso-cierre:${avisoCierre.clave}`
+    try {
+      if (sessionStorage.getItem(clave)) return
+      sessionStorage.setItem(clave, "1")
+    } catch {
+      /* sin almacenamiento: se avisa igual, aunque se repita */
+    }
+    toast.info(avisoCierre.titulo, { description: avisoCierre.detalle, duration: 12000 })
+  }, [avisoCierre, openSession])
   // "Más opciones": nota, «Para llevar» y descuento son de cada tantas ventas,
   // no de cada venta — y eran las que obligaban a desplazar dentro del bloque
   // de cobro. Plegadas, lo de siempre (método, efectivo, propina, total, botón)
@@ -2147,6 +2163,7 @@ export default function POSClient({
         onOpenChange={setShowCashDialog}
         session={openSession}
         suggestedFloat={suggestedFloat}
+        avisoCierre={avisoCierre}
         parkedCount={parkedEnabled ? cuentasVisibles.length : 0}
         parkedOld={parkedEnabled ? cuentasViejas : []}
         cardFeePct={cardFeePct}
