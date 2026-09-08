@@ -699,6 +699,9 @@ export function AyudaClient({ ticket, corte }: Props) {
             carrito tal como se cobró, la ajustas y vuelves a cobrar. La original queda cancelada sola con el motivo
             «Corregida: ahora es el ticket #N» y la nueva conserva la hora original, así el corte y los reportes quedan
             bien. Solo mientras la caja de esa venta siga abierta; después, lo que queda es cancelarla.
+            Si te arrepientes a medio camino, <strong>Dejarla como estaba</strong> —el botón de la franja
+            azul de arriba del carrito— vacía el carrito y la venta original se queda intacta: no cancela
+            nada.
           </li>
           <li>
             Cancelar <strong>pide motivo</strong> y deja la venta marcada como cancelada (no se borra). Deja de contar
