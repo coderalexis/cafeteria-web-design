@@ -21,6 +21,7 @@ import {
   Stamp,
   StickyNote,
   Trash2,
+  Undo2,
   X,
   Gift,
 } from "lucide-react"
@@ -407,20 +408,26 @@ export function CartPanel(p: CartPanelProps) {
           porque cobrar aquí cancela la original. */}
       {corrigiendo && (
         <div
-          className="flex shrink-0 items-center justify-between gap-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-900"
+          className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-900"
           data-corrigiendo
         >
-          <span className="flex min-w-0 items-center gap-2">
+          <span className="flex min-w-0 flex-1 items-center gap-2">
             <Pencil className="h-4 w-4 shrink-0 text-sky-700" />
             <span className="truncate">
               <strong>Corrigiendo la venta #{corrigiendo.folio}</strong> · al cobrar se sustituye
             </span>
           </span>
+          {/* La única salida de un modo donde el siguiente toque sustituye
+              una venta real. Como enlace subrayado de 12 px se perdía: era lo
+              más chico de la franja, azul sobre azul y con un blanco de 16 px
+              de alto. Va como botón, con 44 px para el pulgar, y en celular
+              baja a su propio renglón para no pelear el ancho con el texto. */}
           <button
             type="button"
             onClick={cancelarCorreccion}
-            className="shrink-0 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900"
+            className="flex min-h-[44px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-sm font-semibold text-sky-800 hover:border-sky-400 hover:bg-sky-100 sm:w-auto"
           >
+            <Undo2 className="h-4 w-4 shrink-0" />
             Dejarla como estaba
           </button>
         </div>
