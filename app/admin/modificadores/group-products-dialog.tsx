@@ -103,7 +103,7 @@ export function GroupProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg p-0 flex max-h-[85vh] flex-col">
+      <DialogContent className="flex max-w-lg flex-col overflow-y-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-stone-200 px-5 pt-5 pb-4">
           <DialogTitle className="text-lg">¿En qué productos va?</DialogTitle>
           <DialogDescription>

@@ -17,7 +17,7 @@ export function MenuPackDialog() {
         Agregar paquete
       </Button>
       <Dialog open={abierto} onOpenChange={setAbierto}>
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Agregar productos por paquete</DialogTitle>
             <DialogDescription>

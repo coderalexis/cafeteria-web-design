@@ -64,7 +64,7 @@ export function RecentOrdersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col p-0">
+      <DialogContent className="flex max-w-lg flex-col overflow-y-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-stone-200 px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">

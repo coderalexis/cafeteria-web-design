@@ -266,7 +266,7 @@ function DialogPromo({
 
   return (
     <Dialog open={valor != null} onOpenChange={(o) => !o && onCerrar()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{d.id ? "Editar promoción" : "Nueva promoción"}</DialogTitle>
           <DialogDescription>

@@ -30,7 +30,7 @@ export function ShortcutsDialog({
       {/* Con tope y desplazamiento: en una tablet acostada (768 px de alto) la
           lista completa de atajos más el bloque de letra medía 771 px y se
           cortaba por abajo. */}
-      <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
+      <DialogContent className="max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5 text-amber-700" />
