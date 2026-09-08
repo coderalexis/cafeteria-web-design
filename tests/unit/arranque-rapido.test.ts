@@ -90,6 +90,7 @@ type PosSW = {
   esNavegacionAlPos: (r: { method: string; mode: string; url: string }, origen: string) => boolean
   marcarDesdeCache: (html: string) => string
   cabecerasParaServir: (originales: Headers) => Headers
+  esGuardadoViejo: (nombre: string) => boolean
 }
 
 function cargarSW(): PosSW {
@@ -117,6 +118,19 @@ describe("sw-pos.js", () => {
   it("usa el mismo nombre de guardado que la página borra al pasar por /login", () => {
     expect(sw.SHELL).toBe(CACHE_SHELL)
     expect(sw.RUTA).toBe("/pos")
+  })
+
+  it("al activarse tira lo guardado por versiones anteriores, y nada más", () => {
+    // Lo propio de ahora se queda.
+    expect(sw.esGuardadoViejo(sw.SHELL)).toBe(false)
+    expect(sw.esGuardadoViejo(sw.ESTATICO)).toBe(false)
+    // Lo propio de antes se va: es justo lo que haría ver la pantalla de ayer
+    // a quien tiene la app instalada.
+    expect(sw.esGuardadoViejo("pos-shell-v1")).toBe(true)
+    expect(sw.esGuardadoViejo("pos-estatico-v1")).toBe(true)
+    // Lo ajeno no se toca: en el mismo origen puede haber guardados de otros.
+    expect(sw.esGuardadoViejo("workbox-precache")).toBe(false)
+    expect(sw.esGuardadoViejo("next-image")).toBe(false)
   })
 
   it("lee la identidad que pone el layout y no inventa una si falta", () => {

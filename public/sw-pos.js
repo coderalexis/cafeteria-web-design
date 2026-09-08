@@ -28,8 +28,13 @@
  * alcance /pos. `lib/arranque-rapido.ts` es su contraparte en la página.
  */
 
-const SHELL = "pos-shell-v1" // la página de /pos: un solo registro
-const ESTATICO = "pos-estatico-v1" // /_next/static/* que esa página usa
+// El número va en el NOMBRE a propósito. Subirlo es la única forma de
+// garantizar que, tras un cambio en este archivo, nadie siga viendo lo
+// guardado por la versión anterior: al activarse, lo de nombres viejos se
+// tira. Sin eso, quien tiene la app instalada abriría con la pantalla de ayer
+// —servida al instante— y solo la vería cambiar un segundo después.
+const SHELL = "pos-shell-v2" // la página de /pos: un solo registro
+const ESTATICO = "pos-estatico-v2" // /_next/static/* que esa página usa
 const RUTA = "/pos"
 const MARCA_IDENTIDAD = '<meta name="pos-identidad"'
 const MARCA_DESDE_CACHE = '<meta name="pos-desde-cache" content="1"/>'
@@ -114,6 +119,7 @@ async function guardarShell(respuesta, html) {
   if (faltan.length > 0) await estatico.addAll(faltan)
   const shell = await self.caches.open(SHELL)
   await shell.put(RUTA, respuesta)
+  await limpiarViejos()
 }
 
 // Tras un deploy, lo del build anterior ya no sirve para nada.
@@ -319,8 +325,43 @@ self.addEventListener("install", (evento) => {
   evento.waitUntil(precargar())
 })
 
+/**
+ * ¿Este guardado es de una versión anterior de este mismo worker?
+ *
+ * Solo se tocan los que llevan nuestro prefijo: en el mismo origen puede
+ * haber guardados de otras partes de la app, y borrar lo ajeno sería peor
+ * que dejar de más.
+ */
+function esGuardadoViejo(nombre) {
+  return nombre.startsWith("pos-") && nombre !== SHELL && nombre !== ESTATICO
+}
+
+/**
+ * Tira lo guardado por versiones anteriores de este worker.
+ *
+ * Se llama al activarse Y cada vez que se guarda la página, y no solo lo
+ * primero: mientras el worker nuevo se activa, el que sale todavía tiene su
+ * petición en vuelo y vuelve a crear los guardados viejos justo después de
+ * borrarlos. Repetirlo al guardar hace que la cuenta cuadre igual, sin
+ * depender de quién termine primero.
+ */
+async function limpiarViejos() {
+  try {
+    for (const nombre of await self.caches.keys()) {
+      if (esGuardadoViejo(nombre)) await self.caches.delete(nombre)
+    }
+  } catch {
+    // Sin acceso al almacén no hay nada que limpiar.
+  }
+}
+
 self.addEventListener("activate", (evento) => {
-  evento.waitUntil(self.clients.claim())
+  evento.waitUntil(
+    (async () => {
+      await limpiarViejos()
+      await self.clients.claim()
+    })(),
+  )
 })
 
 self.addEventListener("fetch", (evento) => {
@@ -338,4 +379,4 @@ self.addEventListener("fetch", (evento) => {
 })
 
 // Para las pruebas unitarias, que cargan este archivo con un `self` fingido.
-self.__pos = { SHELL, ESTATICO, RUTA, identidadDe, urlsEstaticas, huellaDe, esNavegacionAlPos, marcarDesdeCache, cabecerasParaServir }
+self.__pos = { SHELL, ESTATICO, RUTA, identidadDe, urlsEstaticas, huellaDe, esNavegacionAlPos, marcarDesdeCache, cabecerasParaServir, esGuardadoViejo }

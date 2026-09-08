@@ -469,7 +469,9 @@ export function AyudaClient({ ticket, corte }: Props) {
               líneas entran una por una. En <strong>celular</strong>, como el carrito va en la hoja cerrada, baja además una
               tarjeta verde que dice de qué cuenta es, <em>qué</em> trae y cuánto suma («2× Latte, Americano y 1 más · 3
               artículos · $195»). Se va sola en un par de segundos y no estorba: si tocas encima de ella, el toque llega al
-              producto que está debajo.
+              producto que está debajo. Y si tenías otra cuenta abierta, la misma tarjeta te dice dónde quedó lo que
+              estabas cobrando («&quot;Mesa 1&quot; quedó guardada»): cambiar de cuenta son dos cosas a la vez y se
+              cuentan juntas, no en dos avisos encimados.
             </li>
             <li>
               <strong>Repetir el nombre no duplica: suma.</strong> Si tocas «Abrir cuenta» y eliges una mesa que ya
@@ -822,7 +824,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Smartphone,
       titulo: "En tablet o celular",
       palabras:
-        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket hora pico otra vez repetir ultima venta aviso corto tiles grandes arranca al instante recarga lento cargar linea ambar actualizando",
+        "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket hora pico otra vez repetir ultima venta aviso corto tiles grandes arranca al instante recarga lento cargar linea ambar actualizando actualizacion version nueva mejoras solas sin reinstalar app instalada",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
@@ -870,6 +872,12 @@ export function AyudaClient({ ticket, corte }: Props) {
             <strong>Arranca al instante:</strong> desde la segunda vez, el POS abre en el celular con la última
             pantalla que recibió (menú y favoritos) y se pone al día solo en unos segundos; mientras, una línea ámbar
             arriba avisa. Si ese día hubo una actualización del sistema, se recarga una vez por su cuenta.
+          </li>
+          <li>
+            <strong>Las mejoras te llegan solas, también con la app instalada.</strong> No hay que reinstalar nada ni
+            borrar nada: al abrirla, el POS comprueba si hay una versión nueva y se pone al día. Si estabas cobrando
+            justo en ese momento, te lo dice («Hay una versión nueva. Se recarga y vuelves a cobrar») y tu carrito no
+            se pierde. Si abriste la app y sigues viendo algo viejo, ciérrala del todo y vuelve a abrirla.
           </li>
         </ul>
       ),
