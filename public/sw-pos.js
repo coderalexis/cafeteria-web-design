@@ -239,7 +239,6 @@ async function actualizarDesdeRed(clienteId, habiaGuardado) {
   const cambioDeIdentidad = anterior != null && identidadDe(anterior) !== identidad
   try {
     await guardarShell(respuesta.clone(), html)
-    if (cambioDeBuild) await podarEstatico(html)
   } catch {
     // No se pudo completar el guardado (p. ej. un chunk no bajó): se queda la
     // página anterior, que sí está completa. La siguiente visita reintenta.
@@ -247,6 +246,12 @@ async function actualizarDesdeRed(clienteId, habiaGuardado) {
     return respuesta
   }
   if (habiaGuardado) await avisar(clienteId, { tipo: "fresco", cambioDeBuild, cambioDeIdentidad })
+  // La poda del build anterior va DESPUÉS de avisar, y no antes: mientras se
+  // avisa, la página vieja sigue viva con su código, y parte de ese código
+  // llega a demanda —el motor de gestos del carrito, por ejemplo—. Podando
+  // primero se le quitaba de debajo de los pies justo en el instante en que
+  // se le pedía recargar, y un gesto muerto no avisa de nada.
+  if (cambioDeBuild) await podarEstatico(html)
   return respuesta
 }
 
@@ -270,12 +275,27 @@ async function navegar(evento) {
 /* ── /_next/static: nunca cambia, así que primero el guardado ──────── */
 
 async function estatico(request) {
-  const cache = await self.caches.open(ESTATICO)
-  const guardado = await cache.match(request, { ignoreVary: true })
-  if (guardado) return guardado
-  const respuesta = await self.fetch(request)
-  if (respuesta.ok) await cache.put(request, respuesta.clone())
-  return respuesta
+  // Guardar es una MEJORA, no un requisito: si algo del guardado falla —sin
+  // espacio en el teléfono, modo privado, el almacén cerrado— hay que servir
+  // el archivo igual. Antes no: el worker ya se había comprometido a
+  // responder esta petición, así que un error de cuota se llevaba por delante
+  // un trozo de código y la pantalla quedaba rota, sin nada que lo explicara.
+  try {
+    const cache = await self.caches.open(ESTATICO)
+    const guardado = await cache.match(request, { ignoreVary: true })
+    if (guardado) return guardado
+    const respuesta = await self.fetch(request)
+    if (respuesta.ok) {
+      try {
+        await cache.put(request, respuesta.clone())
+      } catch {
+        // No cupo. Se sirve lo que ya se bajó y la próxima vez se reintenta.
+      }
+    }
+    return respuesta
+  } catch {
+    return self.fetch(request)
+  }
 }
 
 /* ── Ciclo de vida ─────────────────────────────────────────────────── */
