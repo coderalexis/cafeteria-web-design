@@ -1,4 +1,5 @@
 import { dateStringInTz, zonedMidnightUtc } from "./dates"
+import { formatCurrency, formatDate, formatTime } from "./format"
 
 /**
  * Cuándo una caja abierta deja de ser «un turno en curso» y pasa a ser un
@@ -87,6 +88,45 @@ export function sessionState(
     hoursOpen: Math.round(((now.getTime() - openedAt.getTime()) / HORA) * 10) / 10,
     deadline,
     fromEarlierDay: dateStringInTz(timezone, openedAt) !== dateStringInTz(timezone, now),
+  }
+}
+
+/**
+ * Lo que se le dice a quien llega y encuentra la caja cerrada sin haberla
+ * cerrado ella.
+ *
+ * `autoCloseReason` escribe el motivo en `closing_notes`, dentro del corte,
+ * donde nadie lo lee. Esto es lo mismo contado en la pantalla y en el momento
+ * en que importa: una caja que «se cerró sola» sin explicación es justo lo que
+ * asusta a quien está por cobrar.
+ */
+export interface AvisoCierreAutomatico {
+  titulo: string
+  detalle: string
+}
+
+export function avisoCierreAutomatico(args: {
+  closedAt: Date
+  timezone: string
+  closingTime: string | null | undefined
+  expectedCash: number | null
+  now?: Date
+}): AvisoCierreAutomatico {
+  const { closedAt, timezone, closingTime, expectedCash, now = new Date() } = args
+  const hora = formatTime(closedAt, timezone)
+  const cuando =
+    dateStringInTz(timezone, closedAt) === dateStringInTz(timezone, now)
+      ? `hoy a las ${hora}`
+      : `el ${formatDate(closedAt, timezone)} a las ${hora}`
+  const motivo = parseClosingTime(closingTime)
+    ? `ya había pasado tu hora de cierre (${normalizeClosingTime(closingTime)}) más ${GRACIA_HORAS} h de gracia`
+    : `llevaba más de ${HORAS_SIN_HORARIO} h abierta`
+  // Sin arqueo no hay diferencia que enseñar; el esperado es todo lo que hay.
+  const dinero =
+    expectedCash != null ? ` Se esperaban ${formatCurrency(expectedCash)} en efectivo, que nadie contó.` : ""
+  return {
+    titulo: `Tu caja se cerró sola ${cuando}`,
+    detalle: `Quedó abierta del turno anterior y ${motivo}.${dinero}`,
   }
 }
 

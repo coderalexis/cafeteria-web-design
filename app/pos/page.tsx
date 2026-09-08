@@ -7,6 +7,7 @@ import { homePathFor, isManager } from "@/lib/context-shape"
 import { parseBusinessSettings } from "@/lib/settings"
 import { businessDayRange } from "@/lib/dates"
 import { sweepStaleSession } from "@/lib/stale-cash"
+import { avisoCierreAutomatico } from "@/lib/cash-session"
 import POSClient from "./pos-client"
 
 /* ------------------------------------------------------------------ */
@@ -117,6 +118,39 @@ export default async function POSPage() {
     .order("closed_at", { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  // Sin caja abierta, la anterior pudo cerrarla el barrido de madrugada. Hay
+  // que decirlo: el motivo solo vivía en `closing_notes`, dentro de un corte
+  // que la dueña no abre, así que ella solo veía una caja cerrada que no
+  // cerró. Se consulta únicamente cuando no hay caja: en el caso normal no
+  // cuesta ni un viaje.
+  const cierreSolo = session
+    ? null
+    : (
+        await supabase
+          .from("cash_sessions")
+          .select("closed_at, expected_cash")
+          .eq("business_id", businessId)
+          .eq("status", "cerrada")
+          .eq("auto_closed", true)
+          .order("closed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ).data
+
+  // Solo el del último día: un cierre de la semana pasada ya no explica nada.
+  const avisoCierre =
+    cierreSolo?.closed_at && Date.now() - new Date(cierreSolo.closed_at).getTime() < 24 * 3_600_000
+      ? {
+          ...avisoCierreAutomatico({
+            closedAt: new Date(cierreSolo.closed_at),
+            timezone: ctx.business.timezone,
+            closingTime: settings.closingTime,
+            expectedCash: cierreSolo.expected_cash,
+          }),
+          clave: cierreSolo.closed_at,
+        }
+      : null
 
   /* ── Transform categories ───────────────────────────────────────── */
   const categories = [
@@ -279,6 +313,7 @@ export default async function POSPage() {
           : null
       }
       suggestedFloat={ultimoCorte?.next_float ?? null}
+      avisoCierre={avisoCierre}
       visitas={Array.isArray(visitas) ? (visitas as unknown as AccountVisit[]) : []}
       hayPromociones={(promosActivas ?? 0) > 0}
       creditEnabled={settings.credit}

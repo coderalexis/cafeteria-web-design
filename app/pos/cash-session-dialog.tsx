@@ -43,6 +43,7 @@ interface Props {
   session: OpenSession | null
   /** Lo que se dejó de fondo en el último corte: se sugiere al abrir (P27). */
   suggestedFloat?: number | null
+  avisoCierre?: { titulo: string; detalle: string } | null
   /** Cuentas abiertas sin cobrar, solo para avisar al cerrar. */
   parkedCount?: number
   /**
@@ -64,14 +65,14 @@ function parseMoney(value: string): number | null {
   return value.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n
 }
 
-export function CashSessionDialog({ open, onOpenChange, session, suggestedFloat = null, parkedCount = 0, parkedOld = [], cardFeePct = 0, pendingUploads = 0 }: Props) {
+export function CashSessionDialog({ open, onOpenChange, session, suggestedFloat = null, avisoCierre = null, parkedCount = 0, parkedOld = [], cardFeePct = 0, pendingUploads = 0 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         {session ? (
           <CloseSessionForm session={session} parkedCount={parkedCount} parkedOld={parkedOld} cardFeePct={cardFeePct} pendingUploads={pendingUploads} onDone={() => onOpenChange(false)} />
         ) : (
-          <OpenSessionForm onDone={() => onOpenChange(false)} suggestedFloat={suggestedFloat} />
+          <OpenSessionForm onDone={() => onOpenChange(false)} suggestedFloat={suggestedFloat} avisoCierre={avisoCierre} />
         )}
       </DialogContent>
     </Dialog>
@@ -81,7 +82,15 @@ export function CashSessionDialog({ open, onOpenChange, session, suggestedFloat 
 /* ------------------------------------------------------------------ */
 /*  Abrir caja                                                         */
 /* ------------------------------------------------------------------ */
-function OpenSessionForm({ onDone, suggestedFloat }: { onDone: () => void; suggestedFloat: number | null }) {
+function OpenSessionForm({
+  onDone,
+  suggestedFloat,
+  avisoCierre,
+}: {
+  onDone: () => void
+  suggestedFloat: number | null
+  avisoCierre: { titulo: string; detalle: string } | null
+}) {
   const router = useRouter()
   const business = useBusiness()
   // Arranca con lo que se dejó anoche: casi siempre es exactamente eso.
@@ -122,6 +131,14 @@ function OpenSessionForm({ onDone, suggestedFloat }: { onDone: () => void; sugge
       </DialogHeader>
 
       <div className="space-y-4 pt-2">
+        {/* Aquí llega quien encontró la caja cerrada sin haberla cerrado: es el
+            único punto por el que pasa sí o sí antes de poder cobrar. */}
+        {avisoCierre && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-semibold">{avisoCierre.titulo}</p>
+            <p className="mt-0.5 text-amber-800">{avisoCierre.detalle}</p>
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="opening-float">Fondo inicial (efectivo en caja)</Label>
           <Input

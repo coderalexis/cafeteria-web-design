@@ -1411,7 +1411,8 @@ export function AyudaClient({ ticket, corte }: Props) {
               <strong>Hora de cierre</strong>: a qué hora cierras tu café. Con eso, una caja que se quedó abierta se
               cierra sola {GRACIA_HORAS} horas después de esa hora —sin arqueo, y marcada como automática— en lugar de
               esperar al tope de {HORAS_SIN_HORARIO} horas que aplica cuando no la has configurado. Ponla: es la
-              diferencia entre un cierre a tu hora y uno a media tarde.
+              diferencia entre un cierre a tu hora y uno a media tarde. El sistema la cierra de madrugada, con el
+              café cerrado, y a la mañana siguiente el POS te dice que pasó y cuánto efectivo se esperaba.
             </li>
             <li>
               <strong>Seguridad de caja</strong>: activa el bloqueo por inactividad y el POS se bloquea solo; se
