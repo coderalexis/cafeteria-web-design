@@ -11,7 +11,14 @@ const ScrollArea = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
-    className={cn('relative overflow-hidden', className)}
+    /* Columna flexible, y el visor de abajo es su único hijo que crece: así el
+       visor mide lo que mide ESTA caja, venga su alto de un `flex-1` o de un
+       `max-h`. Antes el visor pedía el 100 % del padre, y un porcentaje contra
+       un padre sin alto fijo —lo normal dentro de un diálogo, que solo tiene
+       máximo— no se resuelve: el visor crecía hasta su contenido, el marco lo
+       recortaba y no quedaba NADA que desplazar. Así se quedó la dueña de una
+       cafetería sin poder bajar por sus tickets del día. */
+    className={cn('relative flex flex-col overflow-hidden', className)}
     {...props}
   >
     {/* [&>div]:!block — Radix envuelve el contenido en un div con
@@ -23,7 +30,7 @@ const ScrollArea = React.forwardRef<
         queda en el 100 % del visor y ahí sí manda el min-w-0 + truncate.
         Lleva ! porque el display de Radix es estilo en línea. Todas nuestras
         listas son verticales, así que no perdemos ningún scroll horizontal. */}
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
+    <ScrollAreaPrimitive.Viewport className="min-h-0 w-full flex-1 rounded-[inherit] [&>div]:!block">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />

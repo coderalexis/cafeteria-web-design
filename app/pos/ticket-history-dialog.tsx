@@ -103,7 +103,7 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0">
+        <DialogContent className="flex max-w-2xl flex-col gap-0 overflow-y-hidden p-0">
           <DialogHeader className="px-6 pt-6 pb-3 border-b border-stone-200">
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-amber-700" />

@@ -119,3 +119,14 @@
     animation: none;
   }
 }
+
+/* Alto máximo de un diálogo: el 85 % de lo que se VE.
+   Dos declaraciones a propósito: `dvh` mide la pantalla útil de verdad (sin la
+   barra del navegador), pero Safari solo lo entiende desde iOS 16.4. Un
+   teléfono más viejo se queda con `vh`, que es aproximado pero acota; sin la
+   primera línea, ahí no habría tope ninguno y el diálogo se saldría de la
+   pantalla sin forma de alcanzarlo. */
+.max-h-dialogo {
+  max-height: 85vh;
+  max-height: 85dvh;
+}

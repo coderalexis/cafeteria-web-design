@@ -22,7 +22,7 @@ export function ProductInfoDialog({
 }) {
   return (
     <Dialog open={product !== null} onOpenChange={(abierto) => !abierto && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-sm overflow-y-auto">
+      <DialogContent className="max-w-sm overflow-y-auto">
         {product && (
           <>
             <DialogHeader>

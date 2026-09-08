@@ -112,7 +112,7 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
 
   return (
     <Dialog open={pending !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+      <DialogContent className="flex max-w-md flex-col gap-0 overflow-hidden overflow-y-hidden p-0">
         {pending && (
           <>
             <DialogHeader className="px-5 pt-5 pb-3 border-b border-stone-200">
@@ -130,7 +130,10 @@ export function ModifierSheet({ pending, onClose, onConfirm }: Props) {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="px-5 py-4 space-y-5 max-h-[60vh] overflow-y-auto">
+            {/* Crece hasta donde queda, no hasta un 60 % fijo: con encabezado y
+                pie sumados, ese 60 % dejaba el botón de confirmar fuera en un
+                teléfono chico. Ahora la lista cede y los extremos se quedan. */}
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
               {groups.map((g) => {
                 const selected = selection[g.id] ?? []
                 const invalid = invalidGroups.includes(g)

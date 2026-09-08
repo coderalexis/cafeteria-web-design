@@ -124,6 +124,14 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
 - Service worker: nunca reenviar `event.request` de una navegación (falla en
   arranque en frío); un `postMessage` a una página recién nacida se pierde,
   por eso la página pregunta «¿estado?» al ver la marca en el HTML.
+- **Diálogos y listas en celular**: el diálogo base ya acota su alto
+  (`max-h-dialogo`, con reserva `vh` para Safari anterior a iOS 16.4) y se
+  desplaza solo; quien traiga su propia zona desplazable pasa
+  `overflow-y-hidden`. El visor de `ScrollArea` va con `flex-1 min-h-0`,
+  NUNCA con `h-full`: un porcentaje contra un padre que solo tiene `max-h`
+  —lo normal dentro de un diálogo— no se resuelve, el visor crece hasta su
+  contenido y no queda NADA que desplazar. Así se quedó una dueña sin poder
+  bajar por sus tickets ni cerrar la caja desde el iPhone.
 - **Deploy con pestañas abiertas**: una server action que revalida devuelve
   el árbol de la página del build nuevo y la pestaña vieja truena con
   «reading 'call'»; y si Vercel no reutilizó la caché de build, la sal de las
