@@ -9,7 +9,7 @@
  */
 
 /** Nombre del guardado de la página del POS; el mismo que usa el service worker. */
-export const CACHE_SHELL = "pos-shell-v1"
+export const CACHE_SHELL = "pos-shell-v2"
 
 /** Mensaje con el que la página pregunta al worker por el resultado de la red. */
 export const PREGUNTA_ESTADO = { tipo: "¿estado?" } as const
