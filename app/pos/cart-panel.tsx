@@ -811,7 +811,7 @@ export function CartPanel(p: CartPanelProps) {
                 >
                   <Icon className="h-4 w-4" />
                   {info.shortLabel}
-                  <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
+                  <Kbd className="absolute top-1 left-1/2 -translate-x-1/2">{index + 1}</Kbd>
                 </button>
               )
             })}
