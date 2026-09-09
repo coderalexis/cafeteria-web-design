@@ -566,6 +566,12 @@ export function AyudaClient({ ticket, corte }: Props) {
               abierta con el resto</strong>, para cobrárselo al otro con su propia forma de pago. Son{" "}
               <em>dos ventas</em>, no una partida a la mitad: cada ticket lleva su método, y el corte y los
               reportes siguen cuadrando.
+              {esApto(["celular", "tablet"]) && (
+                <>
+                  {" "}En pantalla chica el botón es <strong>solo el ícono</strong> —dos mitades— arriba del
+                  carrito, junto al de guardar.
+                </>
+              )}
             </li>
             <li>
               <strong>Salir de una cuenta no la borra.</strong> Con una cuenta abierta, el botón de arriba dice{" "}
@@ -573,6 +579,12 @@ export function AyudaClient({ ticket, corte }: Props) {
               guardado</em>. Es la salida para cuando te equivocaste y ya no recuerdas cómo estaba — el sistema sí
               se acuerda. «Vaciar», con el bote rojo, solo sale en una venta suelta, que es donde los artículos sí
               se pierden.
+              {esApto(["celular", "tablet"]) && (
+                <>
+                  {" "}En pantalla chica es <strong>la flecha que sale de la puerta</strong>, a la derecha de las
+                  dos mitades; la <strong>X</strong> ámbar de al lado no sale de la cuenta, solo cierra el carrito.
+                </>
+              )}
             </li>
             <li>
               <strong>Si te cambias de cuenta con algo sin guardar, te pregunta.</strong> «¿Guardar los cambios en
