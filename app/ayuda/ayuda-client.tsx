@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import {
+  APARATOS,
+  detectarAparato,
+  esTactil,
+  NOMBRE_APARATO,
+  verbos,
+  type Aparato,
+} from "@/lib/aparato"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import {
   ArrowLeft,
@@ -115,6 +123,9 @@ function Acciones({ lista, sesion }: { lista?: Accion[]; sesion: Sesion | null }
   )
 }
 
+/** Con qué aparato lee cada quien: se recuerda por navegador. */
+const APARATO_KEY = "ayuda-aparato"
+
 function normalizar(texto: string): string {
   return texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
 }
@@ -185,6 +196,42 @@ export function AyudaClient({ ticket, corte }: Props) {
     }
   }, [])
 
+  // ¿Con qué está leyendo? La guía se escribió desde el celular —43 «{v.toca}»
+  // y ni un «haz clic»— y todos leían lo mismo, incluidas las partes de un
+  // aparato que no tienen delante. Se resuelve ya montada (el servidor no
+  // sabe qué hay del otro lado) y se puede cambiar a mano a propósito: el
+  // caso de verdad es la dueña leyendo en su computadora lo que hará su
+  // cajera en el celular.
+  const [aparato, setAparato] = useState<Aparato>("celular")
+  useEffect(() => {
+    let guardado: string | null = null
+    try {
+      guardado = window.localStorage.getItem(APARATO_KEY)
+    } catch {
+      /* sin almacenamiento: se detecta cada vez */
+    }
+    if (guardado && (APARATOS as readonly string[]).includes(guardado)) {
+      setAparato(guardado as Aparato)
+      return
+    }
+    setAparato(
+      detectarAparato({
+        ancho: window.innerWidth,
+        punteroGrueso: window.matchMedia("(pointer: coarse)").matches,
+      }),
+    )
+  }, [])
+  const elegirAparato = (elegido: Aparato) => {
+    setAparato(elegido)
+    try {
+      window.localStorage.setItem(APARATO_KEY, elegido)
+    } catch {
+      /* que no se recuerde no impide leer */
+    }
+  }
+  const v = verbos(aparato)
+  const tactil = esTactil(aparato)
+
   const SECCIONES: SeccionDef[] = [
     {
       id: "entrar",
@@ -231,24 +278,24 @@ export function AyudaClient({ ticket, corte }: Props) {
         <>
           <ol className="space-y-3">
             <Step n={1} title="Abre la caja">
-              Al entrar verás el botón rojo <strong>Caja cerrada</strong>. Tócalo, escribe el{" "}
+              Al entrar verás el botón rojo <strong>Caja cerrada</strong>. {v.Tocalo}, escribe el{" "}
               <strong>fondo inicial</strong> (el efectivo con el que empiezas) y confirma. Sin caja abierta no se puede
               cobrar.
             </Step>
             <Step n={2} title="Arma el pedido">
-              Toca un producto para agregarlo; si tiene tamaños, elige uno. Si tiene extras (tipo de leche, shots), te
-              los pregunta ahí mismo, y siempre puedes cambiarlos después tocando <strong>cambiar</strong> en la línea
+              {v.Toca} un producto para agregarlo; si tiene tamaños, elige uno. Si tiene extras (tipo de leche, shots), te
+              los pregunta ahí mismo, y siempre puedes cambiarlos después {v.tocando} <strong>cambiar</strong> en la línea
               del carrito. El icono <SlidersHorizontal className="inline h-3.5 w-3.5 align-text-bottom" /> marca los
               productos que tienen opciones. En Negocio → Módulos del POS puedes pedir que solo se pregunte lo
               obligatorio, y en Menú → Modificadores dejar una opción por omisión (leche deslactosada, por ejemplo) para
               no contestar siempre lo mismo. Puedes buscar por nombre, y en la pestaña <strong>Todos</strong> aparece{" "}
-              <strong>Más vendidos</strong>: lo del último mes, a un toque.
+              <strong>Más vendidos</strong>: lo del último mes, a un {v.toque}.
             </Step>
           </ol>
           <DemoPOS />
           <ol className="mt-4 space-y-3">
             <Step n={3} title="Ajusta cantidades y notas">
-              Con <strong>+ / −</strong> cambias la cantidad (y tocándola la tecleas: 12 conchas sin doce toques). Cada
+              Con <strong>+ / −</strong> cambias la cantidad (y {v.tocandola} la tecleas: 12 conchas sin doce {v.toques}). Cada
               línea tiene su menú <strong>⋯</strong> con duplicar, nota del artículo («sin azúcar») y quitar — o usa
               los <strong>gestos</strong> de la siguiente sección, que es más rápido. Abajo van método de pago,
               efectivo y propina; lo ocasional (<strong>Para llevar / Aquí</strong>, la nota del ticket y el descuento)
@@ -257,7 +304,7 @@ export function AyudaClient({ ticket, corte }: Props) {
               chip muestra el monto («Para llevar +$5») y se suma solo al total.
             </Step>
             <Step n={4} title="Elige método de pago y cobra">
-              Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, tócala antes de cobrar.
+              Efectivo, Transferencia o Tarjeta. Si el cliente deja <strong>propina</strong>, {v.tocala} antes de cobrar.
               Pulsa <strong>Cobrar</strong>: aparece el ticket registrado con su <strong>folio</strong>; desde ahí
               imprimes el <strong>Ticket</strong> para el cliente y la <strong>Comanda</strong> (sin precios) para quien
               prepara. <strong>Compartir ticket</strong> lo manda por WhatsApp — útil si no hay impresora. En{" "}
@@ -266,9 +313,9 @@ export function AyudaClient({ ticket, corte }: Props) {
               lo abre si lo necesitas.
             </Step>
             <Step n={5} title="Atajos del carrito">
-              Tocando las <strong>opciones</strong> de una línea (el renglón «+ leche de avena») las cambias sin
+              {v.Tocando} las <strong>opciones</strong> de una línea (el renglón «+ leche de avena») las cambias sin
               rearmarla. Con el carrito vacío aparece <strong>Repetir última venta</strong>, y el detalle completo de
-              cualquier línea está a un toque — mira la sección de gestos aquí abajo.
+              cualquier línea está a un {v.toque} — mira la sección de gestos aquí abajo.
             </Step>
             <Step n={6} title="Si te equivocaste antes de cobrar">
               <strong>−</strong> en una línea de cantidad 1 la quita; también puedes deslizarla a la izquierda, usar su
@@ -290,21 +337,21 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Menos toques:</strong> si un producto solo pregunta una cosa de una sola opción (¿qué leche?),
-            tocar la opción lo agrega de inmediato, sin «Agregar». Y en celular el cobro es instantáneo: al tocar
+            <strong>Menos {v.toques}:</strong> si un producto solo pregunta una cosa de una sola opción (¿qué leche?),{" "}
+            {v.tocar} la opción lo agrega de inmediato, sin «Agregar». Y en celular el cobro es instantáneo: al {v.tocar}{" "}
             Cobrar, el carrito queda libre para el siguiente y el servidor confirma por detrás; si algo no pasa, el
             carrito regresa con el motivo.
           </li>
           <li>
             <strong>Tu primera venta, de la mano:</strong> menú <strong>⋮</strong> → <strong>Aprender</strong> →{" "}
             <strong>Tu primera venta</strong> (en celular, también desde la tarjeta de la primera vez). Son cinco pasos
-            sobre el POS real, en práctica: toca un producto, mira tu línea, di cómo paga, cobra. Cada paso avanza
+            sobre el POS real, en práctica: {v.toca} un producto, mira tu línea, di cómo paga, cobra. Cada paso avanza
             cuando lo haces, y al final te dice en cuántos segundos vendiste. Se puede repetir las veces que quieras,
             por ejemplo cuando entra alguien nuevo a la caja; en <strong>Aprender</strong> también están la práctica y
             lecturas de un minuto.
           </li>
           <li>
-            Para aprender el POS tocando, sin miedo a ensuciar las ventas reales: menú <strong>⋮</strong> →{" "}
+            Para aprender el POS {v.tocandoSolo}, sin miedo a ensuciar las ventas reales: menú <strong>⋮</strong> →{" "}
             <strong>Practicar sin registrar</strong> (en celular, también desde el botón <strong>Practicar</strong> de
             la tarjeta de la primera vez). Solo entra con el carrito vacío y sin una cuenta abierta.
           </li>
@@ -319,7 +366,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             Sales con <strong>Salir</strong> en la franja (o desde ⋮). Al salir el carrito se vacía, para que lo que
-            armaste practicando no pueda cobrarse de verdad un toque después. Si recargas la página, el modo práctica
+            armaste practicando no pueda cobrarse de verdad un {v.toque} después. Si recargas la página, el modo práctica
             se apaga solo.
           </li>
         </ul>
@@ -329,22 +376,28 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "gestos",
       grupo: "cajero",
       icon: Hand,
-      titulo: "La línea del carrito: toca, desliza, mantén",
+      titulo: tactil ? "La línea del carrito: toca, desliza, mantén" : "La línea del carrito: clic y menú ⋯",
       palabras:
         "gestos deslizar arrastrar duplicar quitar eliminar mantener presionado nota detalle ventana tocar linea articulo tres puntos",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
       nodo: (
         <>
           <p className="text-sm text-stone-600">
-            Cada línea del carrito responde a la mano, para no andar cazando iconos con fila de clientes. Todo esto
-            también está en el menú <strong>⋯</strong> de la línea — los gestos son el atajo, no el único camino.
+            {tactil
+              ? "Cada línea del carrito responde a la mano, para no andar cazando iconos con fila de clientes. Todo esto también está en el menú ⋯ de la línea — los gestos son el atajo, no el único camino."
+              : "Cada línea del carrito abre su menú ⋯ con todo lo que se le puede hacer. Los gestos de deslizar y mantener presionado que verás mencionados son del celular y la tablet; con ratón, el menú es el camino."}
           </p>
           <ul className="mt-3 space-y-2 text-sm text-stone-600">
             <li>
-              <strong>Tócala</strong> y se abre su <strong>ventana de detalle</strong>: nombre completo (sin
+              <strong>{v.Tocala}</strong> y se abre su <strong>ventana de detalle</strong>: nombre completo (sin
               recortes), descripción, opciones con su precio, nota, cantidad y el total de esa línea. Útil cuando el
               nombre es largo y en la fila se lee cortado.
             </li>
+            {/* Deslizar y mantener presionado no existen con ratón: en una
+                computadora estas dos líneas solo enseñarían gestos que no
+                funcionan. El menú ⋯ hace lo mismo y sí está en los dos. */}
+            {tactil && (
+              <>
             <li>
               <strong>Deslízala a la derecha</strong> → <span className="font-semibold text-emerald-700">duplica</span>{" "}
               («otro igual»). <strong>A la izquierda</strong> →{" "}
@@ -353,14 +406,24 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               <strong>Mantenla presionada</strong> medio segundo (vibra como aviso), suelta, y se abre la{" "}
-              <strong>nota del artículo</strong> con el teclado listo. Escribes «sin azúcar», tocas cualquier espacio
+              <strong>nota del artículo</strong> con el teclado listo. Escribes «sin azúcar», {v.tocas} cualquier espacio
               libre, y quedó.
             </li>
+              </>
+            )}
+            {!tactil && (
+              <li>
+                <strong>El menú ⋯ de la línea</strong> tiene lo mismo que los gestos del celular:{" "}
+                <strong>duplicar</strong>, <strong>quitar</strong> y <strong>nota</strong>. Y con el teclado es aún
+                más rápido: los números eligen tamaño, <strong>F2</strong> cobra y <strong>Ctrl+⌫</strong> vacía el
+                carrito.
+              </li>
+            )}
           </ul>
           <DemoGestos />
           <p className="mt-3 text-xs text-stone-400">
             Ejemplos rápidos: piden «otro latte igual» → desliza a la derecha. «Mejor sin el pan» → desliza esa línea a
-            la izquierda. «El mío sin azúcar» → mantén presionado y escribe. «¿Este cuánto era?» → tócala y ves sus
+            la izquierda. «El mío sin azúcar» → mantén presionado y escribe. «¿Este cuánto era?» → {v.tocala} y ves sus
             cuentas.
           </p>
         </>
@@ -439,20 +502,20 @@ export function AyudaClient({ ticket, corte }: Props) {
           </p>
           <ol className="mt-3 space-y-3">
             <Step n={1} title="Abre la cuenta">
-              Con artículos en el carrito, toca <strong>Cuenta</strong> —en el celular está en la barra de abajo,
+              Con artículos en el carrito, {v.toca} <strong>Cuenta</strong> —en el celular está en la barra de abajo,
               junto a Cobrar; en tablet o computadora, arriba del carrito—. Ponle nombre con los botones
               rápidos (<em>Mesa 1</em>, <em>Barra</em>…) o escríbelo (<em>«Sra. suéter rojo»</em>). Si lo dejas vacío
               se llama con la hora. El carrito queda libre para atender al siguiente. Las mesas que ya tienen cuenta
               <strong> salen primero</strong>, para no buscarlas entre las vacías.
             </Step>
             <Step n={2} title="Súmale las rondas que pidan">
-              Cada cuenta abierta aparece como un <strong>chip arriba de los productos</strong>, con su total. Toca{" "}
-              <strong>Mesa 1</strong>, agrega lo nuevo y toca <strong>Guardar</strong> — en el celular el botón está
+              Cada cuenta abierta aparece como un <strong>chip arriba de los productos</strong>, con su total. {v.Toca}{" "}
+              <strong>Mesa 1</strong>, agrega lo nuevo y {v.toca} <strong>Guardar</strong> — en el celular el botón está
               en la barra de abajo, y <em>el nombre ya no hay que volver a escribirlo</em>. Arriba del carrito verás
               en todo momento de qué mesa es lo que estás anotando.
             </Step>
             <Step n={3} title="«¿Me trae la cuenta?»">
-              En <strong>Cuentas</strong>, toca la mesa y luego <strong>Ver la cuenta</strong>: sale el desglose con
+              En <strong>Cuentas</strong>, {v.toca} la mesa y luego <strong>Ver la cuenta</strong>: sale el desglose con
               precios y total para enseñárselo, imprimirlo o mandarlo por WhatsApp. Dice{" "}
               <em>«pendiente de pago»</em> porque todavía no es un ticket.
             </Step>
@@ -468,16 +531,16 @@ export function AyudaClient({ ticket, corte }: Props) {
               aterrizan en el carrito con el número de artículos, arriba aparece «&quot;Mesa 7&quot; recuperada · 3 artículos» y las
               líneas entran una por una. En <strong>celular</strong>, como el carrito va en la hoja cerrada, baja además una
               tarjeta verde que dice de qué cuenta es, <em>qué</em> trae y cuánto suma («2× Latte, Americano y 1 más · 3
-              artículos · $195»). Se va sola en un par de segundos y no estorba: si tocas encima de ella, el toque llega al
+              artículos · $195»). Se va sola en un par de segundos y no estorba: si {v.tocasSolo} encima de ella, el {v.toque} llega al
               producto que está debajo. Y si tenías otra cuenta abierta, la misma tarjeta te dice dónde quedó lo que
               estabas cobrando («&quot;Mesa 1&quot; quedó guardada»): cambiar de cuenta son dos cosas a la vez y se
               cuentan juntas, no en dos avisos encimados.
             </li>
             <li>
-              <strong>Repetir el nombre no duplica: suma.</strong> Si tocas «Abrir cuenta» y eliges una mesa que ya
+              <strong>Repetir el nombre no duplica: suma.</strong> Si {v.tocas} «Abrir cuenta» y eliges una mesa que ya
               tiene cuenta (el chip se marca con <strong>+</strong>), lo del carrito <em>se le agrega</em> a esa
               cuenta en vez de crear otra igual. Arriba del todo, en <strong>«Cuentas abiertas»</strong>, salen las
-              que tienen nombre escrito —«Juan», «Sra. suéter rojo»— con lo que llevan acumulado: tocar una le suma
+              que tienen nombre escrito —«Juan», «Sra. suéter rojo»— con lo que llevan acumulado: {v.tocar} una le suma
               la ronda sin volver a teclear el nombre igualito. Y si es <em>otra</em> persona que se llama igual,
               debajo del aviso hay un enlace para guardarla aparte con su hora («Juan 14:40»), y así no se le suma
               a quien no era.
@@ -500,7 +563,7 @@ export function AyudaClient({ ticket, corte }: Props) {
               se te nombran al cerrar la caja, para que no se te pasen. Se borran solas después de una semana.
             </li>
             <li>
-              <strong>Si se fue sin pagar</strong>, ábrela y toca <strong>«Se fue sin pagar»</strong>. Anota su
+              <strong>Si se fue sin pagar</strong>, ábrela y {v.toca} <strong>«Se fue sin pagar»</strong>. Anota su
               teléfono si lo tienes. La cuenta pasa a la sección <strong>Por cobrar</strong>: deja de estorbar la
               lista del día, <em>ya no caduca nunca</em>, y aparece en <strong>Tu dinero → Por cobrar</strong> con
               lo que te deben en total. Ahí <strong>no se registra ninguna venta</strong>: eso pasa el día que te
@@ -607,7 +670,7 @@ export function AyudaClient({ ticket, corte }: Props) {
               cajón; se cobra cuando la persona abona (⋮ → Fiados y abonos). La propina no se fía.
             </li>
             <li>
-              Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>. Toca{" "}
+              Con <strong>Efectivo</strong> aparece el campo <strong>Recibido</strong>. {v.Toca}{" "}
               <strong>«Teclado y montos rápidos»</strong> y se abre en grande, con teclas de dedo: los billetes se{" "}
               <strong>calculan según el total</strong> (para una cuenta de $87 ofrece $90, $100 y $200) y{" "}
               <strong>Exacto</strong> pone el importe justo. El sistema calcula el <strong>cambio</strong> mientras
@@ -647,13 +710,13 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            «Quiero la fruta picada, pero sin yogurt». Para lo que piden y no está en la carta, toca{" "}
+            «Quiero la fruta picada, pero sin yogurt». Para lo que piden y no está en la carta, {v.toca}{" "}
             <strong>Fuera de menú</strong> (el último tile de «Más vendidos») o, si lo buscaste y no salió,{" "}
             <strong>Vender «…» fuera de menú</strong> debajo de la búsqueda. Escribes qué es y cuánto, y entra al
             carrito como un renglón más, con ese nombre y ese precio.
           </li>
           <li>
-            Lo que ya vendiste así aparece como <strong>chips</strong> con su último precio: un toque lo pone. La
+            Lo que ya vendiste así aparece como <strong>chips</strong> con su último precio: un {v.toque} lo pone. La
             cantidad se cambia en el carrito como en cualquier renglón, y admite nota.
           </li>
           <li>
@@ -680,9 +743,9 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             <strong>En el celular, las cuentas viven junto al pulgar:</strong> una franja arriba de la barra de abajo,
-            siempre a la vista, con cada cuenta y su monto. Tocar el nombre la abre en el carrito para agregarle; tocar{" "}
-            <strong>Cobrar</strong> la cobra directo en efectivo sin tocar lo que ya llevas en el carrito, con un segundo
-            toque de confirmación («¿$85? Sí») para que un roce no cobre nada. Si la cuenta cambió mientras la tenías
+            siempre a la vista, con cada cuenta y su monto. {v.Tocar} el nombre la abre en el carrito para agregarle; {v.tocar}{" "}
+            <strong>Cobrar</strong> la cobra directo en efectivo sin tocar lo que ya llevas en el carrito, con un segundo{" "}
+            {v.toque} de confirmación («¿$85? Sí») para que un roce no cobre nada. Si la cuenta cambió mientras la tenías
             abierta, lo tuyo se junta en la misma cuenta; ya no se crea una «Mesa 1 (2)».
           </li>
           <li>
@@ -694,7 +757,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             <strong>Corregir en vez de cancelar:</strong> si una venta salió mal (un latte de más, otro tamaño, quedó en
-            efectivo y pagó con tarjeta), en Tickets del día toca{" "}
+            efectivo y pagó con tarjeta), en Tickets del día {v.toca}{" "}
             <Pencil className="inline h-3.5 w-3.5 align-text-bottom" /> <strong>Corregir</strong>: la venta se carga al
             carrito tal como se cobró, la ajustas y vuelves a cobrar. La original queda cancelada sola con el motivo
             «Corregida: ahora es el ticket #N» y la nueva conserva la hora original, así el corte y los reportes quedan
@@ -726,7 +789,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </p>
           <ol className="mt-3 space-y-3">
             <Step n={1} title="Pide el número">
-              En el carrito toca <strong>Tarjeta de sellos</strong>, escribe el teléfono (10 dígitos) y{" "}
+              En el carrito {v.toca} <strong>Tarjeta de sellos</strong>, escribe el teléfono (10 dígitos) y{" "}
               <strong>Buscar</strong>. Si es nuevo, se registra ahí mismo — el nombre es opcional. Queda un gafete en
               la venta: «Lupita · 7/10».
             </Step>
@@ -735,7 +798,7 @@ export function AyudaClient({ ticket, corte }: Props) {
               10») y el sistema te avisa cuando alguien completa.
             </Step>
             <Step n={3} title="Canjea el premio">
-              Cuando el gafete diga que hay premio, toca <strong>Canjear premio</strong> y elige{" "}
+              Cuando el gafete diga que hay premio, {v.toca} <strong>Canjear premio</strong> y elige{" "}
               <strong>qué artículo sale gratis</strong> (una unidad). Se aplica como descuento con motivo «Premio de
               lealtad» y los sellos vuelven a empezar. La visita del canje no gana sello.
             </Step>
@@ -767,7 +830,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <>
           <ol className="space-y-3">
-            <Step n={1} title="Toca el botón verde «Caja abierta»">
+            <Step n={1} title={`${v.Toca} el botón verde «Caja abierta»`}>
               Verás las ventas del turno por método de pago y el <strong>efectivo esperado</strong> = fondo inicial +
               ventas en efectivo + <strong>propinas cobradas en efectivo</strong> + entradas − salidas (las canceladas
               no cuentan).
@@ -825,7 +888,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "movil",
       grupo: "cajero",
       icon: Smartphone,
-      titulo: "En tablet o celular",
+      titulo: tactil ? "En tablet o celular" : "En tablet o celular (lo que verá tu equipo)",
       palabras:
         "instalar app pantalla inicio android ipad iphone barra inferior cobrar directo rendija minimizar celular buscador lupa primera vez tarjeta arranque practicar aviso folio ver ticket hora pico otra vez repetir ultima venta aviso corto tiles grandes arranca al instante recarga lento cargar linea ambar actualizando actualizacion version nueva mejoras solas sin reinstalar app instalada",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }],
@@ -834,28 +897,31 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             <strong>Hora pico:</strong> los «Más vendidos» son tiles grandes a dos columnas; después de cobrar sale un
             aviso corto con «Ver ticket» en vez de la pantalla del recibo; y con el carrito vacío la barra ofrece{" "}
-            <strong>Otra vez</strong>, que vuelve a poner la última venta en el carrito para cobrarla de un toque.
+            <strong>Otra vez</strong>, que vuelve a poner la última venta en el carrito para cobrarla de un {v.toque}.
           </li>
           <li>
-            <strong>La primera vez en un celular</strong> aparece una tarjeta con los dos pasos de una venta (toca el
-            producto, toca Cobrar) y tres botones: <strong>Practicar sin registrar</strong>, <strong>Ver la guía</strong>{" "}
-            y <strong>Entendido</strong>. Se va con un toque y no vuelve a salir en ese aparato.
+            <strong>La primera vez en un celular</strong> aparece una tarjeta con los dos pasos de una venta ({v.toca} el
+            producto, {v.toca} Cobrar) y tres botones: <strong>Practicar sin registrar</strong>, <strong>Ver la guía</strong>{" "}
+            y <strong>Entendido</strong>. Se va con un {v.toque} y no vuelve a salir en ese aparato.
           </li>
           <li>
-            En celular el carrito vive en la <strong>barra inferior</strong>, partida en dos: la izquierda muestra los
-            artículos (y anuncia lo recién agregado: «+ Latte · Grande $50», con una vibración) y la derecha es{" "}
-            <strong>Cobrar directo</strong> — la venta común de «dos cosas y ya» sale sin abrir el carrito. En
-            pantallas grandes el carrito va como columna a la derecha.
+            <strong>Dónde vive el carrito, según la pantalla.</strong> En <strong>celular</strong> va en la{" "}
+            <strong>barra inferior</strong>, partida en dos: la izquierda muestra los artículos (y anuncia lo recién
+            agregado: «+ Latte · Grande $50», con una vibración) y la derecha es <strong>Cobrar directo</strong> — la
+            venta común de «dos cosas y ya» sale sin abrir el carrito. En una <strong>tablet acostada</strong> —y en
+            computadora— el carrito es una <strong>columna fija a la derecha</strong>, siempre a la vista: ahí no hay
+            barra inferior ni «Cobrar directo». Una tablet <strong>de pie</strong> se comporta como el celular. Es la
+            misma venta; solo cambia dónde está el total.
           </li>
           <li>
-            <strong>Ejemplo completo en celular</strong>: toca Espresso → toca Chico → el punto vuela al carrito y la
-            barra dice qué entró → toca <strong>Cobrar</strong>. Dos artículos en efectivo exacto son{" "}
-            <strong>tres toques</strong>. Al cobrar no se abre el ticket: sale un <strong>aviso</strong> con el folio,
+            <strong>Ejemplo completo en celular</strong>: {v.toca} Espresso → {v.toca} Chico → el punto vuela al carrito y la
+            barra dice qué entró → {v.toca} <strong>Cobrar</strong>. Dos artículos en efectivo exacto son{" "}
+            <strong>tres {v.toques}</strong>. Al cobrar no se abre el ticket: sale un <strong>aviso</strong> con el folio,
             el monto y el cambio, y ya puedes seguir con el siguiente cliente (<strong>Ver ticket</strong> lo abre si
             hace falta). Si tu café imprime en automático o usa la nota QR, el ticket sí aparece, como en tablet.
           </li>
           <li>
-            Al abrir el carrito queda una <strong>rendija</strong> arriba: tócala para minimizarlo (también está la{" "}
+            Al abrir el carrito queda una <strong>rendija</strong> arriba: {v.tocala} para minimizarlo (también está la{" "}
             <strong>X</strong> ámbar). Y al bajar por los productos, el encabezado <strong>se encoge</strong> para dar
             espacio — la <strong>lupa</strong> reabre el buscador.
           </li>
@@ -901,13 +967,13 @@ export function AyudaClient({ ticket, corte }: Props) {
             El menú <strong>no se cierra</strong> mientras ajustas, para que puedas probar uno y otro.
           </li>
           <li>
-            <strong>También en la administración</strong>: abajo a la izquierda, toca tu nombre y ahí están los mismos{" "}
+            <strong>También en la administración</strong>: abajo a la izquierda, {v.toca} tu nombre y ahí están los mismos{" "}
             <strong>A−</strong> y <strong>A+</strong>. Es la <strong>misma preferencia</strong> que el punto de venta:
             si agrandas la letra en la tablet del mostrador, el panel de esa tablet también la agranda. La ajustas por
             tus ojos, no por la sección donde estés.
           </li>
           <li>
-            Los productos con una <strong>«i»</strong> en la esquina traen descripción: tócala y se abre lo que lleva,
+            Los productos con una <strong>«i»</strong> en la esquina traen descripción: {v.tocala} y se abre lo que lleva,
             sus precios por tamaño y las opciones que se le pueden pedir. Sirve para contestar «¿qué trae?» sin buscar
             la carta. <strong>No agrega nada al carrito</strong>; es solo de consulta.
           </li>
@@ -1035,8 +1101,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Al tocar en el POS</strong>, dentro de cada producto: <strong>Fijar en el inicio</strong> lo deja
-            siempre en «Más vendidos», en el orden en que lo fijes; y <strong>Preguntar extras al tocar</strong> se
+            <strong>Al {v.tocarSolo} en el POS</strong>, dentro de cada producto: <strong>Fijar en el inicio</strong> lo deja
+            siempre en «Más vendidos», en el orden en que lo fijes; y <strong>Preguntar extras al {v.tocarSolo}</strong> se
             puede apagar donde casi nadie elige nada (el sistema te dice en cuántas ventas llevaron extras), para que
             entre directo y los extras se cambien desde la línea. Lo obligatorio se pregunta siempre.
           </li>
@@ -1052,7 +1118,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             junto: no hay forma de dejar el producto sin precio ni la pregunta sin enganchar.
           </li>
           <li>
-            <strong>Categorías</strong>: son las pestañas del POS. La pantalla es una lista; <strong>toca una</strong>{" "}
+            <strong>Categorías</strong>: son las pestañas del POS. La pantalla es una lista; <strong>{v.toca} una</strong>{" "}
             para editarla y <strong>Nueva categoría</strong> para agregar. De cada una puedes cambiar su nombre, su{" "}
             <strong>color</strong> —que pinta su pestaña y una franja en sus productos, para ubicarlos más rápido— y
             una <strong>nota</strong> que sale bajo el título en la carta del QR («Incluyen café del día y fruta»).
@@ -1064,7 +1130,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             <strong>Productos</strong>: cada uno tiene una o más <strong>variantes</strong> (tamaños con precio). Un
-            producto con una sola variante llamada <code>Único</code> se vende con un toque. Desde el editor puedes
+            producto con una sola variante llamada <code>Único</code> se vende con un {v.toque}. Desde el editor puedes
             ocultar del POS un producto o una variante (<em>Desactivar</em>).
           </li>
           <li>
@@ -1237,10 +1303,10 @@ export function AyudaClient({ ticket, corte }: Props) {
               opción cuesta extra, se cobra. <strong>Ninguna</strong> vuelve a elegir en cada venta.
             </li>
             <li>
-              <strong>Cuándo preguntar</strong>: en <strong>Negocio → Módulos del POS → «Extras al tocar un
-              producto»</strong> eliges entre <em>preguntar al tocar el producto</em> (lo normal: la leche se pregunta
+              <strong>Cuándo preguntar</strong>: en <strong>Negocio → Módulos del POS → «Extras al {v.tocar} un
+              producto»</strong> eliges entre <em>preguntar al {v.tocar} el producto</em> (lo normal: la leche se pregunta
               cuando el cliente pide, no al final) y <em>preguntar solo si hay que elegir uno</em>, para el café donde
-              casi nadie cambia nada: el producto entra al carrito de un toque, con su opción por omisión si la tiene,
+              casi nadie cambia nada: el producto entra al carrito de un {v.toque}, con su opción por omisión si la tiene,
               y los extras opcionales se ponen desde <strong>cambiar</strong> en la línea. Los grupos obligatorios se
               preguntan siempre.
             </li>
@@ -1263,7 +1329,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Toda la categoría de un toque:</strong> en «¿En qué productos va?», cada categoría trae la casilla{" "}
+            <strong>Toda la categoría de un {v.toque}:</strong> en «¿En qué productos va?», cada categoría trae la casilla{" "}
             <strong>Toda la categoría</strong>; así «Tipo de leche» entra en todas las bebidas calientes sin marcarlas una por
             una (y se puede desmarcar alguna después).
           </li>
@@ -1364,7 +1430,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               ¿El cliente dijo que no quería ticket y se arrepintió? No hay que rehacer nada: entra a{" "}
-              <strong>⋮ → Tickets del día</strong>, busca su venta y toca el botón del <strong>QR</strong>. Ahí
+              <strong>⋮ → Tickets del día</strong>, busca su venta y {v.toca} el botón del <strong>QR</strong>. Ahí
               también puedes <strong>copiar el enlace</strong> para mandárselo por mensaje si ya se fue.
             </li>
             <li>
@@ -1378,14 +1444,14 @@ export function AyudaClient({ ticket, corte }: Props) {
               <strong>Cuentas abiertas</strong>, <strong>Fiados</strong> (cuentas por persona con abonos) o{" "}
               <strong>Fuera de menú</strong> (precio decidido en caja); define
               cuántas <strong>mesas</strong> tienes y qué otros botones
-              salen al abrir una cuenta; decide cuándo se preguntan los <strong>extras</strong> al tocar un producto
-              (al tocarlo, o solo si hay que elegir uno); ajusta cada cuánto se actualiza{" "}
+              salen al abrir una cuenta; decide cuándo se preguntan los <strong>extras</strong> al {v.tocar} un producto
+              (al {v.tocarlo}, o solo si hay que elegir uno); ajusta cada cuánto se actualiza{" "}
               <strong>«Por preparar»</strong>; y pone el <strong>descuento máximo en caja</strong> (dueños y
               administradores no tienen tope). Ese límite se aplica en el servidor, no solo en la pantalla.
             </li>
             <li>
               <strong>Impresión al cobrar</strong>: elige qué imprimir en automático al registrar cada venta (ticket,
-              comanda o ambos) y el cajero se ahorra esos toques. Si el navegador bloquea la ventana, el POS avisa y
+              comanda o ambos) y el cajero se ahorra esos {v.toques}. Si el navegador bloquea la ventana, el POS avisa y
               quedan los botones manuales.
             </li>
             <li>
@@ -1499,7 +1565,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             </ul>
           </li>
           <li>
-            <strong>¿Le quedó mal el correo a alguien?</strong> Toca a esa persona y corrige su{" "}
+            <strong>¿Le quedó mal el correo a alguien?</strong> {v.TocaSolo} a esa persona y corrige su{" "}
             <strong>correo de acceso</strong>: con el correo equivocado no puede entrar ni recibir el de recuperación,
             así que no puede arreglarlo sola. Solo el dueño puede cambiar el correo de otro dueño.
           </li>
@@ -1540,7 +1606,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             cuando un cliente regresa con su ticket).
           </li>
           <li>
-            Toca un ticket para ver el detalle, <strong>reimprimirlo</strong> o <strong>cancelarlo</strong> con motivo.
+            {v.Toca} un ticket para ver el detalle, <strong>reimprimirlo</strong> o <strong>cancelarlo</strong> con motivo.
           </li>
           <li>
             <strong>CSV</strong> descarga el detalle del periodo (se abre en Excel) con folio, fecha, cajero, método,
@@ -1598,7 +1664,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             </li>
             <li>
               Arriba, el <strong>total que te deben</strong>. Abajo cada persona con los días que lleva y su
-              teléfono, que puedes tocar para marcarle directo.
+              teléfono: {v.tocalo} para marcarle directo.
             </li>
             <li>
               <strong>Esto no son ventas.</strong> No cuentan en tus reportes, ni en Análisis, ni en ningún corte.
@@ -1663,9 +1729,11 @@ export function AyudaClient({ ticket, corte }: Props) {
         .sort((a, b) => b.aciertos - a.aciertos)
         .map((r) => r.s)
     },
-    // El arreglo se rearma cada render pero su contenido es estable.
+    // El arreglo se rearma cada render, pero su CONTENIDO ya no es estable:
+    // cambia con el aparato (los verbos y las partes que solo aplican a uno).
+    // Sin `aparato` aquí, cambiar el interruptor no cambiaba ni una palabra.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [q],
+    [q, aparato],
   )
 
   /* ── Scrollspy: la última sección cuyo inicio ya pasó bajo el
@@ -1859,9 +1927,33 @@ export function AyudaClient({ ticket, corte }: Props) {
 
         {/* ── Contenido ─────────────────────────────────────────── */}
         <main className="min-w-0">
+          {/* Arranca en lo que detecta, pero se cambia a mano: quien
+              administra suele leer en la computadora lo que su cajera hará
+              en el celular. Se recuerda por navegador. */}
+          <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-stone-200 bg-white px-3 py-2.5 print:hidden">
+            <span className="text-sm font-medium text-stone-600">Estoy usando:</span>
+            <div className="flex gap-1.5" role="group" aria-label="Aparato con el que lees la guía">
+              {APARATOS.map((opcion) => (
+                <button
+                  key={opcion}
+                  type="button"
+                  onClick={() => elegirAparato(opcion)}
+                  aria-pressed={aparato === opcion}
+                  className={`blanco-comodo rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    aparato === opcion
+                      ? "border-amber-500 bg-amber-50 text-amber-800"
+                      : "border-stone-200 bg-white text-stone-500 hover:border-amber-300 hover:text-amber-700"
+                  }`}
+                >
+                  {NOMBRE_APARATO[opcion]}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-stone-400">Las instrucciones y los ejemplos cambian con lo que elijas.</span>
+          </div>
           <p className="mb-6 text-sm text-stone-500 print:mb-4">
             Cómo se opera la caja día a día y cómo se administra el negocio. Las cajas grises son{" "}
-            <strong>demos para practicar</strong> — tócalas sin miedo, aquí no se cobra nada. Imprime esta guía si la
+            <strong>demos para practicar</strong> — {v.tocalas} sin miedo, aquí no se cobra nada. Imprime esta guía si la
             quieres junto a la caja.
           </p>
 
