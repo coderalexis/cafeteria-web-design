@@ -31,7 +31,7 @@ export function DemoPOS() {
     { id: "crepas", label: "Crepas", clases: COLOR_CLASSES.rose },
   ]
   return (
-    <MarcoDemo titulo="Así se ve — puedes tocar las pestañas">
+    <MarcoDemo titulo="Pruébalo — cambia de pestaña">
       <div className="rounded-lg bg-stone-50 p-3">
         <div className="flex flex-wrap gap-1.5">
           {chips.map((c) => (
@@ -402,7 +402,7 @@ export function DemoGestos() {
           {estado === "nota" && (
             <input
               autoFocus
-              placeholder="ej. sin azúcar — y toca afuera para guardar"
+              placeholder="ej. sin azúcar — sal del campo para guardar"
               defaultValue={nota}
               maxLength={60}
               onBlur={(e) => {
