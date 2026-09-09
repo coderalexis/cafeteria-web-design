@@ -1854,13 +1854,19 @@ export default function POSClient({
             {/* Más vendidos: un toque para los productos de siempre */}
             {(favorites.length > 0 || customItemsEnabled) && !searchLower && activeCategory === "todos" && (
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1 flex items-center gap-1.5">
+                <h3 className="compacto-si-bajo text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1 flex items-center gap-1.5">
                   <Star className="h-3.5 w-3.5 text-amber-500" />
                   Más vendidos
                 </h3>
                 {/* En celular son tiles grandes a dos columnas: en la hora pico
                     la pantalla útil son estos ocho productos, no la carta entera. */}
-                <div className={isMobile ? "grid grid-cols-2 gap-2" : "flex flex-wrap gap-2"} data-favoritos>
+                {/* Dos columnas grandes son lo correcto en un celular. En una
+                    tablet de pie (600 px de ancho) esa misma rejilla ocupaba
+                    202 px donde una fila que envuelve ocupa ~90. */}
+                <div
+                  className={`una-fila-si-bajo ${isMobile ? "grid grid-cols-2 gap-2 min-[500px]:flex min-[500px]:flex-wrap" : "flex flex-wrap gap-2"}`}
+                  data-favoritos
+                >
                   {favorites.map(({ product, size }) => (
                     <m.button
                       key={size?.variantId ?? product.id}

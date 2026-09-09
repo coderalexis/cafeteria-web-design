@@ -137,6 +137,44 @@
    —hasta 18 px medidos en escritorio—. El hueco solo existe donde la pista se
    dibuja (puntero fino): en tablet y celular el Kbd ni se pinta, y ahí el alto
    es lo que más se cuida, porque es el aparato de verdad. */
+/* Una tablet de 10.4" acostada mide 1000x600: por ancho entra en el POS de
+   escritorio, pero se toca con el dedo y el alto es escasísimo. Estas tres
+   reglas ajustan por CÓMO se toca y CUÁNTO alto hay, no por el ancho, que
+   es lo único que miran los cortes de Tailwind.
+
+   Van con el elemento delante (`button.`, `span.`) a propósito: compiten
+   contra utilidades de Tailwind de la misma especificidad y el orden de la
+   hoja no está de nuestro lado. */
+@media (pointer: coarse) {
+  /* 44 px es el mínimo para un dedo; el corte `md:` los encogía por creer
+     que un aparato ancho se maneja con ratón. */
+  input.blanco-comodo,
+  button.blanco-comodo {
+    min-height: 44px;
+  }
+}
+
+@media (max-height: 700px) {
+  /* Lo que se ahorre aquí arriba se ve abajo, en la lista de lo que se
+     está cobrando: con 600 px de alto solo quedaban 62 px para ella. */
+  header.compacto-si-bajo {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+  h3.compacto-si-bajo {
+    margin-bottom: 0.25rem;
+  }
+  /* Rótulos que el ícono de al lado ya explica. */
+  span.oculto-si-bajo {
+    display: none;
+  }
+  /* Los favoritos pasan de bloque que envuelve a una sola fila que rueda. */
+  div.una-fila-si-bajo {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   /* `button.` y no `.` a secas: compite contra `py-*` de Tailwind, que tiene
      la misma especificidad, y quién gana dependería del orden en la hoja
