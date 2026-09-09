@@ -2366,8 +2366,12 @@ export default function POSClient({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>
+            {/* Rojo y «Vaciar» solo cuando de verdad se pierde algo. Con una
+                cuenta abierta no se pierde nada —la fila del servidor no se
+                toca—, y un botón rojo ahí es lo último que ve quien está
+                decidiendo si se atreve. */}
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className={openAccount ? undefined : "bg-red-600 hover:bg-red-700"}
               onClick={() => {
                 clearCart()
                 clearTip()
@@ -2377,7 +2381,7 @@ export default function POSClient({
                 setConfirmClear(false)
               }}
             >
-              Vaciar
+              {openAccount ? "Salir" : "Vaciar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

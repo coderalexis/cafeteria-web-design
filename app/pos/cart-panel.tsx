@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Stamp,
   StickyNote,
+  LogOut,
   SplitSquareHorizontal,
   Trash2,
   Undo2,
@@ -305,16 +306,30 @@ export function CartPanel(p: CartPanelProps) {
                     <span className="oculto-si-bajo hidden md:inline">Separar</span>
                   </Button>
                 )}
+                {/* Con una cuenta abierta esto NO destruye nada: la cuenta
+                    se queda con lo último guardado y solo se limpia la
+                    pantalla. El diálogo ya lo decía, pero el botón —bote de
+                    basura, «Vaciar», hover rojo— decía lo contrario ANTES de
+                    tocarlo, que es cuando se decide. Nadie toca un bote de
+                    basura por miedo a perder la mesa. */}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 px-2 text-stone-400 hover:text-red-600 hover:bg-red-50 gap-1"
+                  className={`h-8 px-2 gap-1 ${
+                    openAccount
+                      ? "text-stone-500 hover:bg-stone-100 hover:text-stone-700"
+                      : "text-stone-400 hover:bg-red-50 hover:text-red-600"
+                  }`}
                   onClick={() => setConfirmClear(true)}
-                  title="Vaciar carrito (Ctrl+⌫)"
-                  aria-label="Vaciar carrito"
+                  title={
+                    openAccount
+                      ? `Salir de «${openAccount.name}» sin cambiarla: se queda con lo que tiene guardado (Ctrl+⌫)`
+                      : "Vaciar carrito (Ctrl+⌫)"
+                  }
+                  aria-label={openAccount ? `Salir de ${openAccount.name} sin cambiarla` : "Vaciar carrito"}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="oculto-si-bajo hidden md:inline">Vaciar</span>
+                  {openAccount ? <LogOut className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  <span className="oculto-si-bajo hidden md:inline">{openAccount ? "Salir" : "Vaciar"}</span>
                 </Button>
               </>
             )}
