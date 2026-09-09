@@ -129,6 +129,11 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
   `audit_events`; las sumas se afirman como dueño o como `postgres`.
 - JSX: comillas dobles literales rompen `react/no-unescaped-entities`
   (`&quot;`). La sangría de las listas de la guía varía (10 o 12 espacios).
+- **Un salto de línea entre texto y una expresión `{…}` NO deja espacio**
+  (entre dos textos, sí). Al cambiar palabras por expresiones en `/ayuda`
+  salieron «al hacer clic enCobrar» y «un segundoclic»; hace falta `{" "}`
+  explícito. No lo caza tsc, ni lint, ni una prueba: la única forma de verlo
+  es **renderizar y leer el texto resultante**.
 - Herramientas de edición: `\uXXXX` y `\\` se convierten al escribir; para
   BOM o escapes en JS usar `String.fromCharCode`. Scripts largos se escriben
   con Write, no con heredocs (se truncan ~6 KB).
