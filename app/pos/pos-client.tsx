@@ -70,6 +70,7 @@ import {
   mergeParkedCarts,
   parkedSummary,
   parkedAccount,
+  cambiosPendientes,
   repartirCuenta,
   waitingLabel,
   PARKED_MAX_AGE_MS,
@@ -869,14 +870,19 @@ export default function POSClient({
    * tirar una venta a medias por contestar mal un "¿seguro?".
    */
   const resumeParked = useCallback(
-    async (order: ParkedOrder, e?: React.MouseEvent<HTMLElement>) => {
+    async (
+      order: ParkedOrder,
+      e?: React.MouseEvent<HTMLElement>,
+      /** Lo que respondió el diálogo; sin esto, se pregunta. */
+      respuesta?: { guardar: boolean; desde?: { x: number; y: number } | null },
+    ) => {
       // El chip se mide AHORA —después de un await, `currentTarget` ya es
       // null—, pero el vuelo se apunta más abajo, cuando ya se sabe que la
       // cuenta sí va a volver al carrito.
       const desde = e ? (() => {
         const r = e.currentTarget.getBoundingClientRect()
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-      })() : null
+      })() : (respuesta?.desde ?? null)
       const estado = rehydrateCart(order.cart, products, Date.now(), PARKED_MAX_AGE_MS)
       if (!estado || estado.lines.length === 0) {
         toast.error(
@@ -885,6 +891,19 @@ export default function POSClient({
         )
         return
       }
+      // Cambiarse de mesa guardaba SIEMPRE lo que hubiera en pantalla, y eso
+      // incluía las equivocaciones: bastaba subir una cantidad sin querer y
+      // tocar otra cuenta para dejarla mal, sin verlo. Ahora se pregunta,
+      // pero solo cuando hay algo que preguntar: si lo que está en pantalla
+      // es lo mismo que la cuenta ya tiene guardado, cambiarse sigue siendo
+      // un solo toque —que es el gesto de toda la hora pico—.
+      if (openAccount && lines.length > 0 && !respuesta) {
+        const cambios = cambiosPendientes(openAccount.cartAtOpen, serializeCart(cartStateNow(), Date.now()))
+        if (cambios.hay) {
+          setCambioDeCuenta({ order, desde, cambios, nombre: openAccount.name })
+          return
+        }
+      }
       // Qué se puso a salvo antes de traer la otra cuenta. En celular lo dice
       // la tarjeta —«Mesa 2» volvió · «Mesa 1» quedó guardada—, en un solo
       // mensaje: dos avisos a la vez arriba se encimaban y no se leía ninguno.
@@ -892,7 +911,10 @@ export default function POSClient({
       if (lines.length > 0) {
         // Lo que está en el carrito va a su sitio: a su propia cuenta si ya
         // tenía una, o a una nueva si era una venta suelta.
-        if (openAccount) {
+        if (openAccount && respuesta?.guardar === false) {
+          // Dijo que no: la cuenta se queda con lo último guardado y lo de
+          // pantalla se descarta. La fila del servidor no se toca.
+        } else if (openAccount) {
           // Si no se pudo poner a salvo, NO se sigue: abrir la otra cuenta
           // reemplazaría el carrito y esas líneas se perderían.
           const g = await saveToOpenAccount({ callado: isMobile })
@@ -1155,6 +1177,13 @@ export default function POSClient({
   // cuenta se suelta antes de que termine la animación de salida, y leer el
   // nombre de `openAccount` —o borrarlo al cerrar— dejaba «Separar «»» a la
   // vista esos milisegundos.
+  /** Cambio de cuenta en pausa: hay algo sin guardar y falta la respuesta. */
+  const [cambioDeCuenta, setCambioDeCuenta] = useState<{
+    order: ParkedOrder
+    desde: { x: number; y: number } | null
+    cambios: { piezasGuardadas: number; piezasAhora: number }
+    nombre: string
+  } | null>(null)
   const [dividirAbierto, setDividirAbierto] = useState(false)
   const [nombreDividir, setNombreDividir] = useState("")
   /**
@@ -2217,6 +2246,46 @@ export default function POSClient({
         onRecorrido={empezarRecorrido}
         onPracticar={togglePractica}
       />
+      {/* Cambiarse de cuenta con algo sin guardar: se pregunta UNA vez y
+          solo si de verdad cambió algo. Las tres salidas son explícitas
+          —guardar, descartar, volver— porque aquí se decide qué le queda
+          anotado a una mesa que todavía no paga. */}
+      <AlertDialog open={cambioDeCuenta !== null} onOpenChange={(abierto) => !abierto && setCambioDeCuenta(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardar los cambios en «{cambioDeCuenta?.nombre}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cambioDeCuenta && cambioDeCuenta.cambios.piezasGuardadas > 0
+                ? `«${cambioDeCuenta.nombre}» tiene ${cambioDeCuenta.cambios.piezasGuardadas} ${
+                    cambioDeCuenta.cambios.piezasGuardadas === 1 ? "artículo guardado" : "artículos guardados"
+                  } y en pantalla hay ${cambioDeCuenta.cambios.piezasAhora}. Si no los guardas, la cuenta se queda como estaba.`
+                : "Lo que hay en pantalla no está guardado en la cuenta. Si no lo guardas, se descarta."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const p = cambioDeCuenta
+                setCambioDeCuenta(null)
+                if (p) void resumeParked(p.order, undefined, { guardar: false, desde: p.desde })
+              }}
+            >
+              Cambiar sin guardar
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                const p = cambioDeCuenta
+                setCambioDeCuenta(null)
+                if (p) void resumeParked(p.order, undefined, { guardar: true, desde: p.desde })
+              }}
+            >
+              Guardar y cambiar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <DividirCuentaDialog
         open={dividirAbierto}
         onOpenChange={setDividirAbierto}

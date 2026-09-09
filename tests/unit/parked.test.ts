@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { CartLine, Product } from "@/app/pos/cart"
+import type { CartLine, PersistedCart, Product } from "@/app/pos/cart"
 import {
   applyCartDelta,
   PARKED_VIEJA_MS,
@@ -14,6 +14,7 @@ import {
   nombreConHora,
   waitingLabel,
   repartirCuenta,
+  cambiosPendientes,
 } from "@/app/pos/parked"
 
 const MIN = 60_000
@@ -343,5 +344,66 @@ describe("repartirCuenta", () => {
     const copia = JSON.parse(JSON.stringify(lineas))
     repartirCuenta(lineas, { a: 1 }, contador())
     expect(JSON.parse(JSON.stringify(lineas))).toEqual(copia)
+  })
+})
+
+// Antes de cambiarse de mesa hay que saber si lo que está en pantalla ya se
+// guardó. Preguntar siempre sería ruido; no preguntar nunca pierde rondas.
+describe("cambiosPendientes", () => {
+  const cart = (lineas: Array<[string, number]>, extra: Record<string, unknown> = {}): PersistedCart =>
+    ({
+      v: 3,
+      savedAt: 0,
+      saleRef: "r",
+      paymentMethod: "efectivo",
+      ticketNotes: "",
+      cashReceivedInput: "",
+      discount: null,
+      lines: lineas.map(([productId, quantity], i) => ({
+        lineId: `l${i}`,
+        productId,
+        sizeLabel: null,
+        modifierIds: [],
+        quantity,
+        notes: "",
+      })),
+      ...extra,
+    }) as unknown as PersistedCart
+
+  it("sin tocar nada, no hay nada que preguntar", () => {
+    const a = cart([["p1", 2], ["p2", 1]])
+    expect(cambiosPendientes(a, cart([["p1", 2], ["p2", 1]])).hay).toBe(false)
+  })
+
+  it("el orden de los renglones no es un cambio", () => {
+    expect(cambiosPendientes(cart([["p1", 2], ["p2", 1]]), cart([["p2", 1], ["p1", 2]])).hay).toBe(false)
+  })
+
+  it("dos renglones del mismo producto son lo mismo que uno con la suma", () => {
+    // Es lo que pasa al separar una cuenta: la línea se parte en dos.
+    expect(cambiosPendientes(cart([["p1", 3]]), cart([["p1", 1], ["p1", 2]])).hay).toBe(false)
+  })
+
+  it("agregar, quitar y cambiar la cantidad SÍ se preguntan", () => {
+    const base = cart([["p1", 2]])
+    expect(cambiosPendientes(base, cart([["p1", 3]])).hay).toBe(true)
+    expect(cambiosPendientes(base, cart([["p1", 1]])).hay).toBe(true)
+    expect(cambiosPendientes(base, cart([["p1", 2], ["p2", 1]])).hay).toBe(true)
+    expect(cambiosPendientes(base, cart([])).hay).toBe(true)
+  })
+
+  it("cambiar de producto con la misma cantidad también cuenta", () => {
+    expect(cambiosPendientes(cart([["p1", 2]]), cart([["p2", 2]])).hay).toBe(true)
+  })
+
+  it("dice cuántas piezas había y cuántas hay, para poder contarlo en el aviso", () => {
+    const r = cambiosPendientes(cart([["p1", 3]]), cart([["p1", 1], ["p2", 4]]))
+    expect(r.piezasGuardadas).toBe(3)
+    expect(r.piezasAhora).toBe(5)
+  })
+
+  it("sin referencia de lo guardado, solo hay cambios si hay algo en pantalla", () => {
+    expect(cambiosPendientes(null, cart([["p1", 1]])).hay).toBe(true)
+    expect(cambiosPendientes(undefined, cart([])).hay).toBe(false)
   })
 })

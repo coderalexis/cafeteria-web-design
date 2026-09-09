@@ -514,3 +514,54 @@ export function repartirCuenta(
   }
   return { cobrar, queda }
 }
+
+/** Piezas agrupadas por QUÉ son, no por renglón: dos renglones iguales suman. */
+function piezasPorContenido(cart: PersistedCart): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const l of cart.lines) {
+    const k = lineKey(l)
+    m.set(k, (m.get(k) ?? 0) + l.quantity)
+  }
+  return m
+}
+
+export interface CambiosCuenta {
+  /** Lo que hay en pantalla difiere de lo que la cuenta tiene guardado. */
+  hay: boolean
+  piezasGuardadas: number
+  piezasAhora: number
+}
+
+/**
+ * ¿Hay cambios sin guardar en la cuenta que está abierta?
+ *
+ * Se compara contra lo que la cuenta tenía AL ABRIRLA, no contra el último
+ * guardado del servidor: lo que la cajera puede haber tocado es esto.
+ *
+ * Se mira el CONTENIDO y no los renglones: mover un artículo de un renglón a
+ * otro sin cambiar cantidades no es un cambio para quien vende, y preguntar
+ * por eso convertiría el aviso en ruido que se aprende a ignorar. Por lo mismo
+ * el `lineId` no entra: al partir una línea nace uno nuevo sin que cambie ni
+ * una pieza.
+ */
+export function cambiosPendientes(
+  guardado: PersistedCart | null | undefined,
+  ahora: PersistedCart,
+): CambiosCuenta {
+  const piezas = (c?: PersistedCart | null) => (c?.lines ?? []).reduce((s, l) => s + l.quantity, 0)
+  const piezasGuardadas = piezas(guardado)
+  const piezasAhora = piezas(ahora)
+  if (!guardado) return { hay: piezasAhora > 0, piezasGuardadas: 0, piezasAhora }
+  const antes = piezasPorContenido(guardado)
+  const despues = piezasPorContenido(ahora)
+  let hay = antes.size !== despues.size
+  if (!hay) {
+    for (const [k, n] of antes) {
+      if (despues.get(k) !== n) {
+        hay = true
+        break
+      }
+    }
+  }
+  return { hay, piezasGuardadas, piezasAhora }
+}
