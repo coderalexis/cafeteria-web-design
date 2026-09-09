@@ -53,6 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
+import { DividirCuentaDialog } from "./dividir-cuenta-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { RecentOrdersDialog } from "./recent-orders-dialog"
 import { ModifierSheet } from "./modifier-sheet"
@@ -69,6 +70,8 @@ import {
   mergeParkedCarts,
   parkedSummary,
   parkedAccount,
+  cambiosPendientes,
+  repartirCuenta,
   waitingLabel,
   PARKED_MAX_AGE_MS,
   type ParkedOrder, applyCartDelta, cuentasParaSumar, detalleRecuperada, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
@@ -867,14 +870,19 @@ export default function POSClient({
    * tirar una venta a medias por contestar mal un "¿seguro?".
    */
   const resumeParked = useCallback(
-    async (order: ParkedOrder, e?: React.MouseEvent<HTMLElement>) => {
+    async (
+      order: ParkedOrder,
+      e?: React.MouseEvent<HTMLElement>,
+      /** Lo que respondió el diálogo; sin esto, se pregunta. */
+      respuesta?: { guardar: boolean; desde?: { x: number; y: number } | null },
+    ) => {
       // El chip se mide AHORA —después de un await, `currentTarget` ya es
       // null—, pero el vuelo se apunta más abajo, cuando ya se sabe que la
       // cuenta sí va a volver al carrito.
       const desde = e ? (() => {
         const r = e.currentTarget.getBoundingClientRect()
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-      })() : null
+      })() : (respuesta?.desde ?? null)
       const estado = rehydrateCart(order.cart, products, Date.now(), PARKED_MAX_AGE_MS)
       if (!estado || estado.lines.length === 0) {
         toast.error(
@@ -883,6 +891,19 @@ export default function POSClient({
         )
         return
       }
+      // Cambiarse de mesa guardaba SIEMPRE lo que hubiera en pantalla, y eso
+      // incluía las equivocaciones: bastaba subir una cantidad sin querer y
+      // tocar otra cuenta para dejarla mal, sin verlo. Ahora se pregunta,
+      // pero solo cuando hay algo que preguntar: si lo que está en pantalla
+      // es lo mismo que la cuenta ya tiene guardado, cambiarse sigue siendo
+      // un solo toque —que es el gesto de toda la hora pico—.
+      if (openAccount && lines.length > 0 && !respuesta) {
+        const cambios = cambiosPendientes(openAccount.cartAtOpen, serializeCart(cartStateNow(), Date.now()))
+        if (cambios.hay) {
+          setCambioDeCuenta({ order, desde, cambios, nombre: openAccount.name })
+          return
+        }
+      }
       // Qué se puso a salvo antes de traer la otra cuenta. En celular lo dice
       // la tarjeta —«Mesa 2» volvió · «Mesa 1» quedó guardada—, en un solo
       // mensaje: dos avisos a la vez arriba se encimaban y no se leía ninguno.
@@ -890,7 +911,10 @@ export default function POSClient({
       if (lines.length > 0) {
         // Lo que está en el carrito va a su sitio: a su propia cuenta si ya
         // tenía una, o a una nueva si era una venta suelta.
-        if (openAccount) {
+        if (openAccount && respuesta?.guardar === false) {
+          // Dijo que no: la cuenta se queda con lo último guardado y lo de
+          // pantalla se descarta. La fila del servidor no se toca.
+        } else if (openAccount) {
           // Si no se pudo poner a salvo, NO se sigue: abrir la otra cuenta
           // reemplazaría el carrito y esas líneas se perderían.
           const g = await saveToOpenAccount({ callado: isMobile })
@@ -1149,6 +1173,59 @@ export default function POSClient({
    * resto de las veces sobrevive a propósito—. Se hace después de que el
    * servidor confirmó la venta (o de que quedó en la cola), nunca antes.
    */
+  // Abierto y nombre van SEPARADOS, y el nombre no se limpia al cerrar: la
+  // cuenta se suelta antes de que termine la animación de salida, y leer el
+  // nombre de `openAccount` —o borrarlo al cerrar— dejaba «Separar «»» a la
+  // vista esos milisegundos.
+  /** Cambio de cuenta en pausa: hay algo sin guardar y falta la respuesta. */
+  const [cambioDeCuenta, setCambioDeCuenta] = useState<{
+    order: ParkedOrder
+    desde: { x: number; y: number } | null
+    cambios: { piezasGuardadas: number; piezasAhora: number }
+    nombre: string
+  } | null>(null)
+  const [dividirAbierto, setDividirAbierto] = useState(false)
+  const [nombreDividir, setNombreDividir] = useState("")
+  /**
+   * Separar la cuenta: se cobra una parte y el resto sigue abierto.
+   *
+   * «Somos dos, cada quien lo suyo» es lo que más pasa en una mesa, y NO es
+   * un pago mixto: son dos ventas, cada una con su método. Por eso se
+   * reparten artículos y no se parte el cobro — partirlo obligaría a
+   * redefinir qué significa «ventas en efectivo» en el corte y en todos los
+   * reportes.
+   *
+   * Lo que se queda vuelve a la cuenta ANTES de tocar el carrito: si el
+   * servidor rechaza el guardado, no se ha perdido ni un artículo.
+   */
+  const dividirCuenta = useCallback(
+    async (elegido: Record<string, number>) => {
+      if (!openAccount) return
+      const { cobrar, queda } = repartirCuenta(lines, elegido, () => crypto.randomUUID())
+      if (cobrar.length === 0 || queda.length === 0) return
+      const r = await parked.update(
+        openAccount.id,
+        openAccount.updatedAt,
+        serializeCart({ ...cartStateNow(), lines: queda }, Date.now()),
+      )
+      if (!r?.saved) {
+        toast.error(
+          `Alguien movió «${openAccount.name}» desde otro aparato. Ábrela otra vez y sepárala.`,
+          { duration: 8000 },
+        )
+        return
+      }
+      const nombre = openAccount.name
+      restoreLines(cobrar)
+      // El carrito deja de ser la cuenta: lo que se cobre ahora es una venta
+      // suelta, y la cuenta sigue viva con el resto. Si esto no se limpiara,
+      // al cobrar se borraría la cuenta entera con todo y lo que queda.
+      setOpenAccount(null)
+      toast.success(`Separaste «${nombre}»: cobra esto y el resto sigue abierto.`, { duration: 6000 })
+    },
+    [openAccount, lines, parked, cartStateNow, restoreLines],
+  )
+
   const cerrarCuentaCobrada = useCallback(() => {
     if (!openAccount) return
     parked.remove(openAccount.id)
@@ -1664,6 +1741,11 @@ export default function POSClient({
   const cartPanel = (
     <CartPanel
       onRepeatLast={repetirUltimaVenta}
+      onDividir={() => {
+        if (!openAccount) return
+        setNombreDividir(openAccount.name)
+        setDividirAbierto(true)
+      }}
       lines={lines}
       products={products}
       itemCount={itemCount}
@@ -2164,6 +2246,53 @@ export default function POSClient({
         onRecorrido={empezarRecorrido}
         onPracticar={togglePractica}
       />
+      {/* Cambiarse de cuenta con algo sin guardar: se pregunta UNA vez y
+          solo si de verdad cambió algo. Las tres salidas son explícitas
+          —guardar, descartar, volver— porque aquí se decide qué le queda
+          anotado a una mesa que todavía no paga. */}
+      <AlertDialog open={cambioDeCuenta !== null} onOpenChange={(abierto) => !abierto && setCambioDeCuenta(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardar los cambios en «{cambioDeCuenta?.nombre}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cambioDeCuenta && cambioDeCuenta.cambios.piezasGuardadas > 0
+                ? `«${cambioDeCuenta.nombre}» tiene ${cambioDeCuenta.cambios.piezasGuardadas} ${
+                    cambioDeCuenta.cambios.piezasGuardadas === 1 ? "artículo guardado" : "artículos guardados"
+                  } y en pantalla hay ${cambioDeCuenta.cambios.piezasAhora}. Si no los guardas, la cuenta se queda como estaba.`
+                : "Lo que hay en pantalla no está guardado en la cuenta. Si no lo guardas, se descarta."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const p = cambioDeCuenta
+                setCambioDeCuenta(null)
+                if (p) void resumeParked(p.order, undefined, { guardar: false, desde: p.desde })
+              }}
+            >
+              Cambiar sin guardar
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                const p = cambioDeCuenta
+                setCambioDeCuenta(null)
+                if (p) void resumeParked(p.order, undefined, { guardar: true, desde: p.desde })
+              }}
+            >
+              Guardar y cambiar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <DividirCuentaDialog
+        open={dividirAbierto}
+        onOpenChange={setDividirAbierto}
+        lines={lines}
+        accountName={nombreDividir}
+        onConfirm={(elegido) => void dividirCuenta(elegido)}
+      />
       <CashSessionDialog
         open={showCashDialog}
         onOpenChange={setShowCashDialog}
@@ -2306,8 +2435,12 @@ export default function POSClient({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>
+            {/* Rojo y «Vaciar» solo cuando de verdad se pierde algo. Con una
+                cuenta abierta no se pierde nada —la fila del servidor no se
+                toca—, y un botón rojo ahí es lo último que ve quien está
+                decidiendo si se atreve. */}
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className={openAccount ? undefined : "bg-red-600 hover:bg-red-700"}
               onClick={() => {
                 clearCart()
                 clearTip()
@@ -2317,7 +2450,7 @@ export default function POSClient({
                 setConfirmClear(false)
               }}
             >
-              Vaciar
+              {openAccount ? "Salir" : "Vaciar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

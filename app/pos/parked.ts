@@ -470,3 +470,98 @@ export function avisoRecuperada(name: string, articulos: number): string {
   return `«${name}» recuperada · ${n} artículo${n === 1 ? "" : "s"}`
 }
 
+
+/** Lo que se cobra ahora y lo que sigue abierto en la cuenta. */
+export interface Reparto {
+  cobrar: CartLine[]
+  queda: CartLine[]
+}
+
+/**
+ * Reparte una cuenta entre lo que se cobra ahora y lo que se queda.
+ *
+ * Existe para el caso más común de una mesa: «somos dos, cada quien lo suyo».
+ * Eso NO es un pago mixto —un ticket con varias formas de pago—, son dos
+ * ventas, cada una con su método; por eso se resuelve repartiendo artículos y
+ * no partiendo el cobro, que obligaría a redefinir qué significa «ventas en
+ * efectivo» en el corte y en todos los reportes.
+ *
+ * `elegido` va por `lineId` y en PIEZAS, no en líneas: «dos de los tres
+ * lattes» es lo normal al separar una mesa. La parte que se queda se clona con
+ * id nuevo porque dos renglones con el mismo `lineId` se pisarían al editarse.
+ *
+ * Nada de precios aquí: al cobrar, el servidor los recalcula igual que
+ * siempre. Esto solo mueve renglones.
+ */
+export function repartirCuenta(
+  lines: CartLine[],
+  elegido: Record<string, number>,
+  nuevoId: () => string,
+): Reparto {
+  const cobrar: CartLine[] = []
+  const queda: CartLine[] = []
+  for (const l of lines) {
+    const pedido = elegido[l.lineId]
+    const n = Math.max(0, Math.min(l.quantity, Math.floor(Number.isFinite(pedido) ? (pedido as number) : 0)))
+    if (n === 0) {
+      queda.push(l)
+    } else if (n === l.quantity) {
+      cobrar.push(l)
+    } else {
+      cobrar.push({ ...l, quantity: n })
+      queda.push({ ...l, lineId: nuevoId(), quantity: l.quantity - n })
+    }
+  }
+  return { cobrar, queda }
+}
+
+/** Piezas agrupadas por QUÉ son, no por renglón: dos renglones iguales suman. */
+function piezasPorContenido(cart: PersistedCart): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const l of cart.lines) {
+    const k = lineKey(l)
+    m.set(k, (m.get(k) ?? 0) + l.quantity)
+  }
+  return m
+}
+
+export interface CambiosCuenta {
+  /** Lo que hay en pantalla difiere de lo que la cuenta tiene guardado. */
+  hay: boolean
+  piezasGuardadas: number
+  piezasAhora: number
+}
+
+/**
+ * ¿Hay cambios sin guardar en la cuenta que está abierta?
+ *
+ * Se compara contra lo que la cuenta tenía AL ABRIRLA, no contra el último
+ * guardado del servidor: lo que la cajera puede haber tocado es esto.
+ *
+ * Se mira el CONTENIDO y no los renglones: mover un artículo de un renglón a
+ * otro sin cambiar cantidades no es un cambio para quien vende, y preguntar
+ * por eso convertiría el aviso en ruido que se aprende a ignorar. Por lo mismo
+ * el `lineId` no entra: al partir una línea nace uno nuevo sin que cambie ni
+ * una pieza.
+ */
+export function cambiosPendientes(
+  guardado: PersistedCart | null | undefined,
+  ahora: PersistedCart,
+): CambiosCuenta {
+  const piezas = (c?: PersistedCart | null) => (c?.lines ?? []).reduce((s, l) => s + l.quantity, 0)
+  const piezasGuardadas = piezas(guardado)
+  const piezasAhora = piezas(ahora)
+  if (!guardado) return { hay: piezasAhora > 0, piezasGuardadas: 0, piezasAhora }
+  const antes = piezasPorContenido(guardado)
+  const despues = piezasPorContenido(ahora)
+  let hay = antes.size !== despues.size
+  if (!hay) {
+    for (const [k, n] of antes) {
+      if (despues.get(k) !== n) {
+        hay = true
+        break
+      }
+    }
+  }
+  return { hay, piezasGuardadas, piezasAhora }
+}

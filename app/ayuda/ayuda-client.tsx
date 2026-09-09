@@ -505,7 +505,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: PauseCircle,
       titulo: "Cuentas abiertas",
       palabras:
-        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito tarjeta que baja en celular que trae la cuenta sumar ronda a una cuenta abierta sin teclear el nombre dos personas mismo nombre otro juan guardar con la hora",
+        "cuenta cuentas abrir mesa mesas guardar pausar retomar bandeja indeciso fila pendiente cobrar al final comer trae la cuenta fiado debe deuda por cobrar sin pagar condonar franja cobrar directo desde la barra junta cuentas mismo nombre quien suele venir a esta hora sugerencia de nombres clientes frecuentes recuperada volvio completa anuncio confirmacion animacion puntos verdes vuelan al carrito tarjeta que baja en celular que trae la cuenta sumar ronda a una cuenta abierta sin teclear el nombre dos personas mismo nombre otro juan guardar con la hora separar dividir la cuenta cada quien paga lo suyo somos dos partir mesa entre varios pagar por separado distintas formas de pago salir sin guardar descartar cambios equivoque cantidad volver como estaba",
       acciones: [{ etiqueta: "Ir al POS", href: "/pos" }, { etiqueta: "Activar y mesas: Módulos del POS", href: "/admin/negocio#modulos", admin: true }],
       nodo: (
         <>
@@ -557,6 +557,29 @@ export function AyudaClient({ ticket, corte }: Props) {
               la ronda sin volver a teclear el nombre igualito. Y si es <em>otra</em> persona que se llama igual,
               debajo del aviso hay un enlace para guardarla aparte con su hora («Juan 14:40»), y así no se le suma
               a quien no era.
+            </li>
+            <li>
+              <strong>«Somos dos y cada quien paga lo suyo»:</strong> con la cuenta abierta, {v.toca}{" "}
+              <strong>Separar</strong>, arriba del carrito. Eliges con <strong>−</strong> y <strong>+</strong>{" "}
+              cuántas piezas se cobran ahora —«dos de los tres lattes»— y ves los dos totales a la vez: lo que se
+              cobra y lo que queda. Al confirmar, el carrito se queda con lo elegido y <strong>la cuenta sigue
+              abierta con el resto</strong>, para cobrárselo al otro con su propia forma de pago. Son{" "}
+              <em>dos ventas</em>, no una partida a la mitad: cada ticket lleva su método, y el corte y los
+              reportes siguen cuadrando.
+            </li>
+            <li>
+              <strong>Salir de una cuenta no la borra.</strong> Con una cuenta abierta, el botón de arriba dice{" "}
+              <strong>Salir</strong> y no «Vaciar»: se limpia la pantalla y <em>la cuenta se queda con lo que tiene
+              guardado</em>. Es la salida para cuando te equivocaste y ya no recuerdas cómo estaba — el sistema sí
+              se acuerda. «Vaciar», con el bote rojo, solo sale en una venta suelta, que es donde los artículos sí
+              se pierden.
+            </li>
+            <li>
+              <strong>Si te cambias de cuenta con algo sin guardar, te pregunta.</strong> «¿Guardar los cambios en
+              «Mesa 1»? Tiene 2 artículos guardados y en pantalla hay 3»: eliges <strong>Guardar y cambiar</strong>,{" "}
+              <strong>Cambiar sin guardar</strong> o <strong>Volver</strong>. Te dice los dos números a propósito,
+              porque lo normal es no acordarse. Si no cambiaste nada, no pregunta: cambiarse sigue siendo un solo{" "}
+              {v.toque}.
             </li>
             <li>
               Las cuentas son <strong>de la cafetería</strong>, no del aparato: puedes tomar el pedido en el celular y
