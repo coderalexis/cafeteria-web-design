@@ -53,6 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { CashSessionDialog, type OpenSession } from "./cash-session-dialog"
+import { DividirCuentaDialog } from "./dividir-cuenta-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { RecentOrdersDialog } from "./recent-orders-dialog"
 import { ModifierSheet } from "./modifier-sheet"
@@ -69,6 +70,7 @@ import {
   mergeParkedCarts,
   parkedSummary,
   parkedAccount,
+  repartirCuenta,
   waitingLabel,
   PARKED_MAX_AGE_MS,
   type ParkedOrder, applyCartDelta, cuentasParaSumar, detalleRecuperada, suggestAccountNames, type AccountVisit, type Recuperada } from "./parked"
@@ -1149,6 +1151,52 @@ export default function POSClient({
    * resto de las veces sobrevive a propósito—. Se hace después de que el
    * servidor confirmó la venta (o de que quedó en la cola), nunca antes.
    */
+  // Abierto y nombre van SEPARADOS, y el nombre no se limpia al cerrar: la
+  // cuenta se suelta antes de que termine la animación de salida, y leer el
+  // nombre de `openAccount` —o borrarlo al cerrar— dejaba «Separar «»» a la
+  // vista esos milisegundos.
+  const [dividirAbierto, setDividirAbierto] = useState(false)
+  const [nombreDividir, setNombreDividir] = useState("")
+  /**
+   * Separar la cuenta: se cobra una parte y el resto sigue abierto.
+   *
+   * «Somos dos, cada quien lo suyo» es lo que más pasa en una mesa, y NO es
+   * un pago mixto: son dos ventas, cada una con su método. Por eso se
+   * reparten artículos y no se parte el cobro — partirlo obligaría a
+   * redefinir qué significa «ventas en efectivo» en el corte y en todos los
+   * reportes.
+   *
+   * Lo que se queda vuelve a la cuenta ANTES de tocar el carrito: si el
+   * servidor rechaza el guardado, no se ha perdido ni un artículo.
+   */
+  const dividirCuenta = useCallback(
+    async (elegido: Record<string, number>) => {
+      if (!openAccount) return
+      const { cobrar, queda } = repartirCuenta(lines, elegido, () => crypto.randomUUID())
+      if (cobrar.length === 0 || queda.length === 0) return
+      const r = await parked.update(
+        openAccount.id,
+        openAccount.updatedAt,
+        serializeCart({ ...cartStateNow(), lines: queda }, Date.now()),
+      )
+      if (!r?.saved) {
+        toast.error(
+          `Alguien movió «${openAccount.name}» desde otro aparato. Ábrela otra vez y sepárala.`,
+          { duration: 8000 },
+        )
+        return
+      }
+      const nombre = openAccount.name
+      restoreLines(cobrar)
+      // El carrito deja de ser la cuenta: lo que se cobre ahora es una venta
+      // suelta, y la cuenta sigue viva con el resto. Si esto no se limpiara,
+      // al cobrar se borraría la cuenta entera con todo y lo que queda.
+      setOpenAccount(null)
+      toast.success(`Separaste «${nombre}»: cobra esto y el resto sigue abierto.`, { duration: 6000 })
+    },
+    [openAccount, lines, parked, cartStateNow, restoreLines],
+  )
+
   const cerrarCuentaCobrada = useCallback(() => {
     if (!openAccount) return
     parked.remove(openAccount.id)
@@ -1664,6 +1712,11 @@ export default function POSClient({
   const cartPanel = (
     <CartPanel
       onRepeatLast={repetirUltimaVenta}
+      onDividir={() => {
+        if (!openAccount) return
+        setNombreDividir(openAccount.name)
+        setDividirAbierto(true)
+      }}
       lines={lines}
       products={products}
       itemCount={itemCount}
@@ -2163,6 +2216,13 @@ export default function POSClient({
         loyaltyEnabled={loyaltyEnabled}
         onRecorrido={empezarRecorrido}
         onPracticar={togglePractica}
+      />
+      <DividirCuentaDialog
+        open={dividirAbierto}
+        onOpenChange={setDividirAbierto}
+        lines={lines}
+        accountName={nombreDividir}
+        onConfirm={(elegido) => void dividirCuenta(elegido)}
       />
       <CashSessionDialog
         open={showCashDialog}

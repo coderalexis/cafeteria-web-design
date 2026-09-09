@@ -470,3 +470,47 @@ export function avisoRecuperada(name: string, articulos: number): string {
   return `«${name}» recuperada · ${n} artículo${n === 1 ? "" : "s"}`
 }
 
+
+/** Lo que se cobra ahora y lo que sigue abierto en la cuenta. */
+export interface Reparto {
+  cobrar: CartLine[]
+  queda: CartLine[]
+}
+
+/**
+ * Reparte una cuenta entre lo que se cobra ahora y lo que se queda.
+ *
+ * Existe para el caso más común de una mesa: «somos dos, cada quien lo suyo».
+ * Eso NO es un pago mixto —un ticket con varias formas de pago—, son dos
+ * ventas, cada una con su método; por eso se resuelve repartiendo artículos y
+ * no partiendo el cobro, que obligaría a redefinir qué significa «ventas en
+ * efectivo» en el corte y en todos los reportes.
+ *
+ * `elegido` va por `lineId` y en PIEZAS, no en líneas: «dos de los tres
+ * lattes» es lo normal al separar una mesa. La parte que se queda se clona con
+ * id nuevo porque dos renglones con el mismo `lineId` se pisarían al editarse.
+ *
+ * Nada de precios aquí: al cobrar, el servidor los recalcula igual que
+ * siempre. Esto solo mueve renglones.
+ */
+export function repartirCuenta(
+  lines: CartLine[],
+  elegido: Record<string, number>,
+  nuevoId: () => string,
+): Reparto {
+  const cobrar: CartLine[] = []
+  const queda: CartLine[] = []
+  for (const l of lines) {
+    const pedido = elegido[l.lineId]
+    const n = Math.max(0, Math.min(l.quantity, Math.floor(Number.isFinite(pedido) ? (pedido as number) : 0)))
+    if (n === 0) {
+      queda.push(l)
+    } else if (n === l.quantity) {
+      cobrar.push(l)
+    } else {
+      cobrar.push({ ...l, quantity: n })
+      queda.push({ ...l, lineId: nuevoId(), quantity: l.quantity - n })
+    }
+  }
+  return { cobrar, queda }
+}

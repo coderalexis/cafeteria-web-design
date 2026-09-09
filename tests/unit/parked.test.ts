@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import type { CartLine, Product } from "@/app/pos/cart"
 import {
   applyCartDelta,
   PARKED_VIEJA_MS,
@@ -12,6 +13,7 @@ import {
   cuentasParaSumar,
   nombreConHora,
   waitingLabel,
+  repartirCuenta,
 } from "@/app/pos/parked"
 
 const MIN = 60_000
@@ -270,5 +272,76 @@ describe("detalleRecuperada — qué volvió, en una línea", () => {
 
   it("sin líneas no dice nada", () => {
     expect(detalleRecuperada(lineas())).toBe("")
+  })
+})
+
+// Separar una mesa: «somos dos, cada quien lo suyo». Es lo que más pasa, y
+// NO es un pago mixto: son dos ventas, cada una con su método.
+describe("repartirCuenta", () => {
+  const producto = (id: string): Product => ({ id, name: id, price: 50, category: "c", subcategory: "s" })
+  const linea = (lineId: string, quantity: number): CartLine => ({
+    lineId,
+    product: producto("p-" + lineId),
+    modifiers: [],
+    quantity,
+    notes: "",
+  })
+  /** Ids predecibles para poder afirmar sobre la parte que se queda. */
+  const contador = () => {
+    let n = 0
+    return () => `nuevo-${++n}`
+  }
+
+  it("sin nada elegido no se cobra nada y la cuenta queda igual", () => {
+    const lineas = [linea("a", 2), linea("b", 1)]
+    const r = repartirCuenta(lineas, {}, contador())
+    expect(r.cobrar).toEqual([])
+    expect(r.queda).toEqual(lineas)
+  })
+
+  it("una línea entera se va completa, sin clonar nada", () => {
+    const r = repartirCuenta([linea("a", 3), linea("b", 1)], { a: 3 }, contador())
+    expect(r.cobrar.map((l) => [l.lineId, l.quantity])).toEqual([["a", 3]])
+    expect(r.queda.map((l) => [l.lineId, l.quantity])).toEqual([["b", 1]])
+  })
+
+  it("«dos de los tres lattes» parte la línea y la parte que se queda lleva id nuevo", () => {
+    const r = repartirCuenta([linea("a", 3)], { a: 2 }, contador())
+    expect(r.cobrar.map((l) => [l.lineId, l.quantity])).toEqual([["a", 2]])
+    expect(r.queda.map((l) => [l.lineId, l.quantity])).toEqual([["nuevo-1", 3 - 2]])
+  })
+
+  it("no se pierde ni se inventa una sola pieza", () => {
+    const lineas = [linea("a", 3), linea("b", 2), linea("c", 1)]
+    const r = repartirCuenta(lineas, { a: 1, b: 2 }, contador())
+    const piezas = (ls: CartLine[]) => ls.reduce((s, l) => s + l.quantity, 0)
+    expect(piezas(r.cobrar) + piezas(r.queda)).toBe(piezas(lineas))
+    expect(piezas(r.cobrar)).toBe(3)
+  })
+
+  it("ningún renglón queda en cero", () => {
+    const r = repartirCuenta([linea("a", 2), linea("b", 2)], { a: 2, b: 1 }, contador())
+    for (const l of [...r.cobrar, ...r.queda]) expect(l.quantity).toBeGreaterThan(0)
+  })
+
+  it("se aguanta basura: negativos, de más, decimales y líneas que no existen", () => {
+    const r = repartirCuenta([linea("a", 2)], { a: -5, fantasma: 9 }, contador())
+    expect(r.cobrar).toEqual([])
+    expect(r.queda.map((l) => l.quantity)).toEqual([2])
+
+    const r2 = repartirCuenta([linea("a", 2)], { a: 99 }, contador())
+    expect(r2.cobrar.map((l) => l.quantity)).toEqual([2])
+    expect(r2.queda).toEqual([])
+
+    const r3 = repartirCuenta([linea("a", 3)], { a: 1.9 }, contador())
+    expect(r3.cobrar.map((l) => l.quantity)).toEqual([1])
+    expect(r3.queda.map((l) => l.quantity)).toEqual([2])
+  })
+
+  it("no toca los originales", () => {
+    const lineas = [linea("a", 3)]
+    const copia = JSON.parse(JSON.stringify(lineas))
+    repartirCuenta(lineas, { a: 1 }, contador())
+    expect(JSON.parse(JSON.stringify(lineas))).toEqual(copia)
   })
 })
