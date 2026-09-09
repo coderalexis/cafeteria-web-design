@@ -231,6 +231,14 @@ export function AyudaClient({ ticket, corte }: Props) {
   }
   const v = verbos(aparato)
   const tactil = esTactil(aparato)
+  /**
+   * Trozos que SOLO existen en ciertos aparatos.
+   *
+   * Se marca lo exclusivo, no lo que contrasta: «en el celular está abajo;
+   * en tablet, arriba del carrito» enseña la diferencia y se queda para
+   * todos. Lo que se esconde es lo que quien lee no puede hacer.
+   */
+  const esApto = (aparatos: Aparato[]) => aparatos.includes(aparato)
 
   const SECCIONES: SeccionDef[] = [
     {
@@ -344,7 +352,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             <strong>Tu primera venta, de la mano:</strong> menú <strong>⋮</strong> → <strong>Aprender</strong> →{" "}
-            <strong>Tu primera venta</strong> (en celular, también desde la tarjeta de la primera vez). Son cinco pasos
+            <strong>Tu primera venta</strong>{esApto(["celular"]) && " (también desde la tarjeta de la primera vez)"}. Son cinco pasos
             sobre el POS real, en práctica: {v.toca} un producto, mira tu línea, di cómo paga, cobra. Cada paso avanza
             cuando lo haces, y al final te dice en cuántos segundos vendiste. Se puede repetir las veces que quieras,
             por ejemplo cuando entra alguien nuevo a la caja; en <strong>Aprender</strong> también están la práctica y
@@ -352,8 +360,13 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             Para aprender el POS {v.tocandoSolo}, sin miedo a ensuciar las ventas reales: menú <strong>⋮</strong> →{" "}
-            <strong>Practicar sin registrar</strong> (en celular, también desde el botón <strong>Practicar</strong> de
-            la tarjeta de la primera vez). Solo entra con el carrito vacío y sin una cuenta abierta.
+            <strong>Practicar sin registrar</strong>
+            {esApto(["celular"]) && (
+              <>
+                {" "}(también desde el botón <strong>Practicar</strong> de la tarjeta de la primera vez)
+              </>
+            )}
+            . Solo entra con el carrito vacío y sin una cuenta abierta.
           </li>
           <li>
             Mientras dura, una <strong>franja violeta</strong> arriba dice «Modo práctica. Nada se registra». Puedes
@@ -741,6 +754,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             más veces les has abierto cuenta en esta franja de dos horas (Juan, que pasa después de entrenar entre 8 y
             10). Sale solo, de las cuentas de los últimos 60 días; no hay que registrar a nadie.
           </li>
+          {esApto(["celular"]) && (
           <li>
             <strong>En el celular, las cuentas viven junto al pulgar:</strong> una franja arriba de la barra de abajo,
             siempre a la vista, con cada cuenta y su monto. {v.Tocar} el nombre la abre en el carrito para agregarle; {v.tocar}{" "}
@@ -748,6 +762,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             {v.toque} de confirmación («¿$85? Sí») para que un roce no cobre nada. Si la cuenta cambió mientras la tenías
             abierta, lo tuyo se junta en la misma cuenta; ya no se crea una «Mesa 1 (2)».
           </li>
+          )}
           <li>
             Menú <strong>⋮</strong> (arriba a la derecha) → <strong>Tickets del día</strong>: lista las ventas del
             turno. Cada una tiene{" "}
@@ -899,11 +914,13 @@ export function AyudaClient({ ticket, corte }: Props) {
             aviso corto con «Ver ticket» en vez de la pantalla del recibo; y con el carrito vacío la barra ofrece{" "}
             <strong>Otra vez</strong>, que vuelve a poner la última venta en el carrito para cobrarla de un {v.toque}.
           </li>
+          {esApto(["celular"]) && (
           <li>
             <strong>La primera vez en un celular</strong> aparece una tarjeta con los dos pasos de una venta ({v.toca} el
             producto, {v.toca} Cobrar) y tres botones: <strong>Practicar sin registrar</strong>, <strong>Ver la guía</strong>{" "}
             y <strong>Entendido</strong>. Se va con un {v.toque} y no vuelve a salir en ese aparato.
           </li>
+          )}
           <li>
             <strong>Dónde vive el carrito, según la pantalla.</strong> En <strong>celular</strong> va en la{" "}
             <strong>barra inferior</strong>, partida en dos: la izquierda muestra los artículos (y anuncia lo recién
@@ -913,6 +930,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             barra inferior ni «Cobrar directo». Una tablet <strong>de pie</strong> se comporta como el celular. Es la
             misma venta; solo cambia dónde está el total.
           </li>
+          {esApto(["celular"]) && (
           <li>
             <strong>Ejemplo completo en celular</strong>: {v.toca} Espresso → {v.toca} Chico → el punto vuela al carrito y la
             barra dice qué entró → {v.toca} <strong>Cobrar</strong>. Dos artículos en efectivo exacto son{" "}
@@ -920,6 +938,7 @@ export function AyudaClient({ ticket, corte }: Props) {
             el monto y el cambio, y ya puedes seguir con el siguiente cliente (<strong>Ver ticket</strong> lo abre si
             hace falta). Si tu café imprime en automático o usa la nota QR, el ticket sí aparece, como en tablet.
           </li>
+          )}
           <li>
             Al abrir el carrito queda una <strong>rendija</strong> arriba: {v.tocala} para minimizarlo (también está la{" "}
             <strong>X</strong> ámbar). Y al bajar por los productos, el encabezado <strong>se encoge</strong> para dar
@@ -985,7 +1004,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             <strong>Compacto</strong> y <strong>Muy compacto</strong> encogen todo —letra, botones y espacios— para
             que quepan más productos y más
-            renglones del carrito. Útil en tablets acostadas, que son anchas pero bajitas.
+            renglones del carrito.{esApto(["tablet"]) && " Útil en tablets acostadas, que son anchas pero bajitas."}
           </li>
           <li>
             <strong>Grande</strong> y <strong>Muy grande</strong> son para quien no alcanza a leer bien de lejos o con
