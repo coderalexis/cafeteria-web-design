@@ -179,7 +179,7 @@ export function PosHeader(p: PosHeaderProps) {
                     setSearchQuery(e.target.value)
                     setSizePickerFor(null)
                   }}
-                  className="h-9 border-stone-200 bg-stone-50 pl-9 pr-10 text-sm"
+                  className="blanco-comodo h-9 border-stone-200 bg-stone-50 pl-9 pr-10 text-sm"
                 />
                 <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center">
                   {searchQuery ? (
@@ -351,7 +351,7 @@ export function PosHeader(p: PosHeaderProps) {
               onBlur={() => {
                 if (!searchQuery) setSearchPinned(false)
               }}
-              className="pl-9 pr-16 bg-stone-50 border-stone-200 h-10 md:h-9 text-sm"
+              className="blanco-comodo pl-9 pr-16 bg-stone-50 border-stone-200 h-10 md:h-9 text-sm"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
               {searchQuery ? (
@@ -432,7 +432,7 @@ export function PosHeader(p: PosHeaderProps) {
                   setSearchQuery("")
                   setSizePickerFor(null)
                 }}
-                className={`rounded-full shrink-0 text-sm border ${
+                className={`blanco-comodo rounded-full shrink-0 text-sm border ${
                   activeCategory === cat.id
                     ? colorClasses(cat.color)?.chipActive ?? DEFAULT_CHIP_ACTIVE
                     : colorClasses(cat.color)?.chip ?? DEFAULT_CHIP

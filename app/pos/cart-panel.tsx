@@ -208,7 +208,7 @@ export function CartPanel(p: CartPanelProps) {
   const [editingQtyFor, setEditingQtyFor] = useState<string | null>(null)
   return (
     <div className="flex flex-col h-full bg-white">
-      <header className="shrink-0 px-5 py-3 md:py-4 border-b border-stone-200 bg-amber-50/60">
+      <header className="compacto-si-bajo shrink-0 px-5 py-3 md:py-4 border-b border-stone-200 bg-amber-50/60">
         {/* Se envuelve a propósito: el tamaño de letra escala TODO en rem
             (la X de 2.5rem llega a 50px) y este renglón deja de caber en un
             celular. Mejor dos renglones que una X fuera de la pantalla. */}
@@ -285,7 +285,7 @@ export function CartPanel(p: CartPanelProps) {
               <>
                 <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
                   {itemCount}
-                  <span className="hidden md:inline">&nbsp;items</span>
+                  <span className="oculto-si-bajo hidden md:inline">&nbsp;items</span>
                 </Badge>
                 <Button
                   variant="ghost"
@@ -296,7 +296,7 @@ export function CartPanel(p: CartPanelProps) {
                   aria-label="Vaciar carrito"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Vaciar</span>
+                  <span className="oculto-si-bajo hidden md:inline">Vaciar</span>
                 </Button>
               </>
             )}
@@ -805,12 +805,17 @@ export function CartPanel(p: CartPanelProps) {
                   key={key}
                   type="button"
                   onClick={() => setPaymentMethod(key)}
-                  className={`sitio-atajo relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  className={`sitio-atajo relative flex min-w-0 flex-1 items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-xs font-semibold transition-all xl:text-sm ${
                     active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  {info.shortLabel}
+                  {/* En un panel de 19rem (toda tablet, y cualquier ventana
+                      por debajo de xl) los cuatro métodos NO caben con ícono:
+                      «Fiado» quedaba fuera del panel, medido 332 px de
+                      contenido en 257. El ícono vuelve cuando el panel crece
+                      a 25rem; el rótulo, además, ya no puede desbordar. */}
+                  <Icon className="hidden h-4 w-4 shrink-0 xl:block" />
+                  <span className="truncate">{info.shortLabel}</span>
                   <Kbd className="absolute top-1 left-1/2 -translate-x-1/2">{index + 1}</Kbd>
                 </button>
               )
