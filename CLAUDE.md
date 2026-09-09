@@ -107,6 +107,20 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
 
 - **Tailwind purga clases construidas en `lib/`**: las clases de color tienen
   que aparecer literales en un archivo que Tailwind escanee.
+- **Una clase propia de `globals.css` EMPATA con las utilidades de Tailwind**
+  (`.md:py-2`, `.mb-3`, `.md:inline`) y el orden de la hoja no está de
+  nuestro lado: la regla propia se ignora **en silencio**. Hay que calificarla
+  con el elemento (`button.sitio-atajo`, `span.oculto-si-bajo`). Ya vive ahí:
+  `sitio-atajo` (hueco para el atajo, solo `pointer:fine`), `blanco-comodo`
+  (44 px con `pointer:coarse`) y `compacto-si-bajo`/`oculto-si-bajo`/
+  `una-fila-si-bajo` (`max-height:700px`).
+- **Los cortes de Tailwind solo miran el ANCHO**, así que trataban una tablet
+  de 10.4" acostada (1000×600) como a un monitor: `md:` encogía los blancos
+  justo donde se toca con el dedo. Lo que depende de cómo se toca va por
+  `(pointer: coarse|fine)`, y lo que depende del alto por `max-height`.
+  Medidas de referencia: 10.4" = 1000×600 / 600×1000; iPad = 1180×820 /
+  810×1080. Ojo: `useIsMobile` es `ancho<768 || alto<500`, así que una tablet
+  **cambia de POS al rotar**.
 - `menu_categories.color` guarda NOMBRES (`amber`, `sky`…) de
   `lib/category-colors.ts`, no hex.
 - `log_audit` exige admin: las bitácoras del lado del cajero se insertan
