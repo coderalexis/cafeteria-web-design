@@ -130,3 +130,18 @@
   max-height: 85vh;
   max-height: 85dvh;
 }
+
+/* Hueco para la pista de atajo (Kbd) en un botón estrecho.
+   La pista va `absolute` en la esquina y el contenido va centrado a todo el
+   ancho, así que en «Grande» o «Efectivo» el número caía ENCIMA de la palabra
+   —hasta 18 px medidos en escritorio—. El hueco solo existe donde la pista se
+   dibuja (puntero fino): en tablet y celular el Kbd ni se pinta, y ahí el alto
+   es lo que más se cuida, porque es el aparato de verdad. */
+@media (hover: hover) and (pointer: fine) {
+  /* `button.` y no `.` a secas: compite contra `py-*` de Tailwind, que tiene
+     la misma especificidad, y quién gana dependería del orden en la hoja
+     —que aquí no está de nuestro lado—. Un elemento más lo decide sin dudas. */
+  button.sitio-atajo {
+    padding-top: 1.25rem;
+  }
+}

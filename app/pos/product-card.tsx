@@ -112,10 +112,10 @@ export const ProductCard = memo(function ProductCard({
                     onMarcarOrigen(e)
                     onElegirTamano(product, size)
                   }}
-                  className="relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
+                  className="sitio-atajo relative flex-1 py-2.5 md:py-2 px-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-center transition-colors"
                 >
                   {index < 9 && (
-                    <Kbd className="absolute top-1 right-1 border-white/40 bg-white/20 text-white opacity-90">
+                    <Kbd className="absolute top-1 left-1/2 -translate-x-1/2 border-white/40 bg-white/20 text-white opacity-90">
                       {index + 1}
                     </Kbd>
                   )}

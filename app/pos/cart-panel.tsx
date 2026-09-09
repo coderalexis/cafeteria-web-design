@@ -805,13 +805,13 @@ export function CartPanel(p: CartPanelProps) {
                   key={key}
                   type="button"
                   onClick={() => setPaymentMethod(key)}
-                  className={`relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  className={`sitio-atajo relative flex-1 flex items-center justify-center gap-2 py-3 md:py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
                     active ? activeClass : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
                   {info.shortLabel}
-                  <Kbd className="absolute top-1 right-1">{index + 1}</Kbd>
+                  <Kbd className="absolute top-1 left-1/2 -translate-x-1/2">{index + 1}</Kbd>
                 </button>
               )
             })}
