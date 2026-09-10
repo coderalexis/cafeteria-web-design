@@ -1184,6 +1184,8 @@ export default function POSClient({
     cambios: { piezasGuardadas: number; piezasAhora: number }
     nombre: string
   } | null>(null)
+  /** Nombre de la cuenta que se va a eliminar, o null. */
+  const [eliminarCuenta, setEliminarCuenta] = useState<string | null>(null)
   const [dividirAbierto, setDividirAbierto] = useState(false)
   const [nombreDividir, setNombreDividir] = useState("")
   /**
@@ -1741,6 +1743,7 @@ export default function POSClient({
   const cartPanel = (
     <CartPanel
       onRepeatLast={repetirUltimaVenta}
+      onEliminarCuenta={() => openAccount && setEliminarCuenta(openAccount.name)}
       onDividir={() => {
         if (!openAccount) return
         setNombreDividir(openAccount.name)
@@ -2250,6 +2253,38 @@ export default function POSClient({
           solo si de verdad cambió algo. Las tres salidas son explícitas
           —guardar, descartar, volver— porque aquí se decide qué le queda
           anotado a una mesa que todavía no paga. */}
+      {/* Eliminar la cuenta entera. Es lo único de la cabecera que no tiene
+          vuelta atrás, así que el aviso dice qué se pierde y el botón va en
+          rojo — el mismo trato que en la bandeja. */}
+      <AlertDialog open={eliminarCuenta !== null} onOpenChange={(abierto) => !abierto && setEliminarCuenta(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar «{eliminarCuenta}»?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se pierde lo que lleva y no se puede recuperar. Úsalo cuando el pedido se canceló; si solo quieres
+              atender otra mesa, usa <strong>Salir</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="blanco-comodo">Volver</AlertDialogCancel>
+            <AlertDialogAction
+              className="blanco-comodo bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (openAccount) {
+                  parked.remove(openAccount.id)
+                  toast.success(`Se eliminó «${openAccount.name}».`)
+                }
+                clearCart()
+                clearTip()
+                setOpenAccount(null)
+                setEliminarCuenta(null)
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={cambioDeCuenta !== null} onOpenChange={(abierto) => !abierto && setCambioDeCuenta(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

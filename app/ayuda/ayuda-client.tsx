@@ -577,12 +577,19 @@ export function AyudaClient({ ticket, corte }: Props) {
               <strong>Salir de una cuenta no la borra.</strong> Con una cuenta abierta, el botón de arriba dice{" "}
               <strong>Salir</strong> y no «Vaciar»: se limpia la pantalla y <em>la cuenta se queda con lo que tiene
               guardado</em>. Es la salida para cuando te equivocaste y ya no recuerdas cómo estaba — el sistema sí
-              se acuerda. «Vaciar», con el bote rojo, solo sale en una venta suelta, que es donde los artículos sí
-              se pierden.
+              se acuerda. «Vaciar» solo sale en una venta suelta, que es donde los artículos sí se pierden.
+            </li>
+            <li>
+              <strong>Si el pedido se canceló, borra la cuenta sin salir de ella.</strong> Con la cuenta abierta, el{" "}
+              <strong>bote</strong> de arriba del carrito la elimina entera: pregunta antes y no tiene vuelta atrás.
+              Funciona aunque le hayas quitado todos los artículos — y esto conviene saberlo:{" "}
+              <em>quitar cosas del carrito NO vacía la cuenta</em>. Lo que borraste de la pantalla sigue guardado
+              hasta que la cobres o la elimines, así que para cancelar de verdad hay que usar el bote.
               {esApto(["celular", "tablet"]) && (
                 <>
                   {" "}En pantalla chica es <strong>la flecha que sale de la puerta</strong>, a la derecha de las
-                  dos mitades; la <strong>X</strong> ámbar de al lado no sale de la cuenta, solo cierra el carrito.
+                  dos mitades. Ojo con los dos de al lado: el <strong>bote</strong> elimina la cuenta y la{" "}
+                  <strong>X</strong> ámbar solo cierra el carrito, sin salir de ella.
                 </>
               )}
             </li>

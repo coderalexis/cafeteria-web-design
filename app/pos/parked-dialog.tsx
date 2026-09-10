@@ -336,10 +336,10 @@ function CuentaRow({
           variant="ghost"
           size="icon"
           className="h-9 w-9 shrink-0 text-stone-300 hover:bg-red-50 hover:text-red-600"
-          title={`Descartar «${o.name}»`}
-          aria-label={`Descartar ${o.name}`}
+          title={`Eliminar «${o.name}»`}
+          aria-label={`Eliminar ${o.name}`}
           onClick={() => {
-            if (window.confirm(`¿Descartar la cuenta «${o.name}»? Se pierde lo que lleva y no se puede recuperar.`))
+            if (window.confirm(`¿Eliminar la cuenta «${o.name}»? Se pierde lo que lleva y no se puede recuperar.`))
               onRemove(o.id)
           }}
         >
