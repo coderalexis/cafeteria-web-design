@@ -69,6 +69,7 @@ export const INDICE_ADMIN: DestinoAdmin[] = [
   // ── Datos y ajustes (una entrada por tarjeta) ──
   { titulo: "Nombre, dirección y teléfono", donde: "Datos y ajustes → Datos generales", href: "/admin/negocio#datos", palabras: "nombre del negocio direccion telefono datos generales identificador slug cafe" },
   { titulo: "Zona horaria", donde: "Datos y ajustes → Zona horaria", href: "/admin/negocio#zona-horaria", palabras: "zona horaria hora dia de operacion reloj tijuana cancun" },
+  { titulo: "Logo de la cafetería (menú y ticket)", donde: "Datos y ajustes → Logo de la cafetería", href: "/admin/negocio#logo", palabras: "logo imagen marca subir cambiar quitar png jpg webp menu publico ticket termico blanco y negro monocromo transparente encabezado" },
   { titulo: "Textos del ticket (encabezado y pie)", donde: "Datos y ajustes → Ticket impreso", href: "/admin/negocio#ticket", palabras: "ticket encabezado pie del ticket recibo leyenda gracias por su compra vista previa" },
   { titulo: "Metas de venta (diaria y mensual)", donde: "Datos y ajustes → Metas de venta", href: "/admin/negocio#metas", palabras: "meta metas objetivo diaria mensual barra de avance" },
   { titulo: "Módulos del POS: cuentas abiertas, mesas, extras al tocar, descuento máximo", donde: "Datos y ajustes → Módulos del POS", href: "/admin/negocio#modulos", palabras: "modulos pos cuentas abiertas mesas etiquetas barra terraza para llevar botones extras al tocar un producto preguntar siempre solo obligatorios descuento maximo cajero techo por preparar ritmo segundos" },

@@ -24,6 +24,10 @@ export interface BusinessInfo {
   settings: unknown
   /** Fin de la prueba gratis (ISO) o null si la cafetería no está a prueba. */
   trialEndsAt: string | null
+  /** Logo a color, para el menú público y las pantallas. */
+  logoUrl: string | null
+  /** Logo monocromo para la impresora térmica (trazo negro sobre blanco). */
+  logoTicketUrl: string | null
 }
 
 export interface Membership {
@@ -91,6 +95,8 @@ function parseBusiness(v: unknown): BusinessInfo | null {
     receiptFooter: strOrNull(b.receipt_footer),
     settings: b.settings ?? {},
     trialEndsAt: strOrNull(b.trial_ends_at),
+    logoUrl: strOrNull(b.logo_url),
+    logoTicketUrl: strOrNull(b.logo_ticket_url),
   }
 }
 

@@ -323,7 +323,7 @@ function CloseSessionForm({
         ? "Caja cerrada. El efectivo cuadró."
         : `Caja cerrada. Diferencia: ${diff > 0 ? "+" : ""}${formatCurrency(diff)}`,
     )
-    if (print && !printLines(buildCorteLines(result.summary, receiptBusinessFrom(business)), "Corte de caja", receiptBusinessFrom(business).widthMm)) {
+    if (print && !printLines(buildCorteLines(result.summary, receiptBusinessFrom(business)), "Corte de caja", receiptBusinessFrom(business).widthMm, receiptBusinessFrom(business).logoTicket)) {
       toast.warning("El navegador bloqueó la ventana de impresión. Puedes reimprimir el corte desde Administrar → Cortes.")
     }
     onDone()

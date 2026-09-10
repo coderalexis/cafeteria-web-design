@@ -3,6 +3,7 @@ import type { BusinessInfo } from "@/lib/context-shape"
 import type { TicketRecord } from "@/lib/tickets"
 import { ticketItemLabel } from "@/lib/tickets"
 import { parseBusinessSettings, printableWidthMm } from "@/lib/settings"
+import { rutaDesdeUrl } from "@/lib/logo"
 
 /* ------------------------------------------------------------------ */
 /*  Impresión térmica vía popup + window.print. Lo usan el POS, el      */
@@ -55,6 +56,12 @@ export interface ReceiptBusiness {
   receiptFooter?: string | null
   /** Rollo de la impresora en mm (58 por omision). */
   widthMm?: 58 | 80
+  /**
+   * Logo monocromo para la termica. NO entra en las lineas de texto: se
+   * imprime como imagen encima del <pre>, porque el recibo es texto de 32
+   * columnas y un dibujo no cabe ahi. Por eso viaja aparte, hasta printLines.
+   */
+  logoTicket?: string | null
 }
 
 export function receiptBusinessFrom(b: BusinessInfo): ReceiptBusiness {
@@ -66,6 +73,7 @@ export function receiptBusinessFrom(b: BusinessInfo): ReceiptBusiness {
     phone: b.phone,
     receiptHeader: b.receiptHeader,
     receiptFooter: b.receiptFooter,
+    logoTicket: b.logoTicketUrl,
   }
 }
 
@@ -477,8 +485,25 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
 }
 
+/**
+ * La etiqueta <img> del logo, o cadena vacía.
+ *
+ * Solo se acepta una URL de NUESTRO bucket (`rutaDesdeUrl` la reconoce). El
+ * popup se arma con document.write, así que una URL cualquiera guardada a mano
+ * en la base sería una forma de meter marcado en la ventana de impresión.
+ */
+function logoTag(logoUrl: string | null | undefined): string {
+  if (!logoUrl || !rutaDesdeUrl(logoUrl)) return ""
+  return `<img class="logo" src="${escapeHtml(logoUrl).replace(/"/g, "&quot;")}" alt="">`
+}
+
 /** Abre el popup e imprime. Devuelve false si el navegador lo bloqueó. */
-export function printLines(lines: string[], title: string, paperMm: 58 | 80 = 58): boolean {
+export function printLines(
+  lines: string[],
+  title: string,
+  paperMm: 58 | 80 = 58,
+  logoUrl?: string | null,
+): boolean {
   const printWindow = window.open("", "_blank", "width=320,height=600")
   if (!printWindow) return false
 
@@ -496,14 +521,22 @@ export function printLines(lines: string[], title: string, paperMm: 58 | 80 = 58
             line-height: 1.4;
           }
           pre { margin: 0; white-space: pre-wrap; }
+          /* El logo ocupa el ancho util del rollo y nada mas: mas grande, la
+             termica lo encoge sola y se pierden las lineas finas. El TOPE DE
+             ALTO no es estetica: sin el, un logo cuadrado de 1000x1000 saldria
+             como un bloque de 58 mm de alto y se comeria seis centimetros de
+             rollo en cada ticket. */
+          img.logo { display: block; margin: 0 auto 6px; max-width: 100%; max-height: 96px; height: auto; }
           @media print {
             /* Lo que de verdad imprime: la hoja mide el ancho util del rollo,
                asi las 32 columnas caen en su tamano nativo y no escaladas. */
             body { width: ${printableWidthMm(paperMm)}mm; font-size: 11px; }
+            img.logo { max-height: 22mm; }
           }
         </style>
       </head>
       <body>
+        ${logoTag(logoUrl)}
         <pre>${escapeHtml(lines.join("\n"))}</pre>
         <script>
           window.onload = function() { window.print(); };
