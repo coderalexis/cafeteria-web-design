@@ -159,3 +159,7 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
   `next.config.mjs` se evalúa varias veces por build.
 - Con `pg_get_functiondef` los anclajes del `replace` son el texto exacto de la
   migración anterior: si no se encuentra, la migración debe fallar, no seguir.
+- **La suite SQL reproduce las migraciones sobre un Postgres pelón**, así que una
+  migración que toque un esquema que Supabase trae puesto (`auth`, `storage`…)
+  pone el CI en rojo hasta que `tests/sql/00_supabase_shim.sql` finja ese esquema.
+  Ya finge `auth` (users, uid/role/jwt) y `storage` (buckets, objects, foldername).
