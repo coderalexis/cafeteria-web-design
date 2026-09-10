@@ -86,6 +86,8 @@ export interface CartPanelProps {
   onRepeatLast: (e?: React.MouseEvent<HTMLElement>) => void
   /** Separar la cuenta abierta: cobrar una parte y dejar el resto. */
   onDividir: () => void
+  /** Eliminar del todo la cuenta abierta (se canceló el pedido). */
+  onEliminarCuenta: () => void
   setConfirmClear: (open: boolean) => void
   // Cuentas abiertas
   parkedEnabled: boolean
@@ -285,12 +287,19 @@ export function CartPanel(p: CartPanelProps) {
                 {cuentasVisibles.length}
               </button>
             )}
-            {lines.length > 0 && (
+            {/* Con una cuenta abierta las acciones existen AUNQUE el carrito
+                esté vacío. Si no, quitar los artículos de una cuenta que se
+                canceló dejaba sin salida: el botón desaparecía, la bandeja no
+                lista la cuenta que está abierta, y guardar con 0 artículos no
+                hace nada. Había que agregar algo con tal de poder salir. */}
+            {(lines.length > 0 || openAccount) && (
               <>
-                <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
-                  {itemCount}
-                  <span className="oculto-si-bajo hidden md:inline">&nbsp;items</span>
-                </Badge>
+                {lines.length > 0 && (
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+                    {itemCount}
+                    <span className="oculto-si-bajo hidden md:inline">&nbsp;items</span>
+                  </Badge>
+                )}
                 {/* Separar solo tiene sentido con una cuenta abierta y algo
                     que repartir: en una venta suelta no hay nada que dejar. */}
                 {openAccount && itemCount > 1 && (
@@ -331,6 +340,23 @@ export function CartPanel(p: CartPanelProps) {
                   {openAccount ? <LogOut className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
                   <span className="oculto-si-bajo hidden md:inline">{openAccount ? "Salir" : "Vaciar"}</span>
                 </Button>
+                {/* El bote quedó libre al renombrar el otro a «Salir», y vuelve
+                    con el significado que siempre tuvo: destruir. Aquí es la
+                    cuenta entera —«Alexis canceló»—, que antes obligaba a salir
+                    primero para poder descartarla desde la bandeja. */}
+                {openAccount && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="blanco-comodo h-8 px-2 gap-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    onClick={p.onEliminarCuenta}
+                    title={`Eliminar «${openAccount.name}»: se pierde lo que lleva`}
+                    aria-label={`Eliminar la cuenta ${openAccount.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span className="oculto-si-bajo hidden md:inline">Eliminar</span>
+                  </Button>
+                )}
               </>
             )}
             {isMobile && (
