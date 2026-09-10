@@ -241,7 +241,7 @@ export function CartPanel(p: CartPanelProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-1 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700"
+                className="blanco-comodo h-8 gap-1 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700"
                 onClick={() => {
                   // Con una cuenta abierta no hay nada que preguntar: ya tiene
                   // nombre. Volver a pedirlo en cada ronda era justamente lo
@@ -297,7 +297,7 @@ export function CartPanel(p: CartPanelProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700 gap-1"
+                    className="blanco-comodo h-8 px-2 text-stone-500 hover:bg-amber-50 hover:text-amber-700 gap-1"
                     onClick={p.onDividir}
                     title={`Cobrar una parte de «${openAccount.name}» y dejar el resto abierto`}
                     aria-label="Separar la cuenta"
@@ -315,7 +315,7 @@ export function CartPanel(p: CartPanelProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`h-8 px-2 gap-1 ${
+                  className={`blanco-comodo h-8 px-2 gap-1 ${
                     openAccount
                       ? "text-stone-500 hover:bg-stone-100 hover:text-stone-700"
                       : "text-stone-400 hover:bg-red-50 hover:text-red-600"

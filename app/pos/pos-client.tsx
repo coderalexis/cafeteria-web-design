@@ -2263,9 +2263,10 @@ export default function POSClient({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogCancel className="blanco-comodo">Volver</AlertDialogCancel>
             <Button
               variant="outline"
+              className="blanco-comodo"
               onClick={() => {
                 const p = cambioDeCuenta
                 setCambioDeCuenta(null)
@@ -2275,6 +2276,7 @@ export default function POSClient({
               Cambiar sin guardar
             </Button>
             <AlertDialogAction
+              className="blanco-comodo"
               onClick={() => {
                 const p = cambioDeCuenta
                 setCambioDeCuenta(null)
@@ -2434,13 +2436,13 @@ export default function POSClient({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogCancel className="blanco-comodo">Volver</AlertDialogCancel>
             {/* Rojo y «Vaciar» solo cuando de verdad se pierde algo. Con una
                 cuenta abierta no se pierde nada —la fila del servidor no se
                 toca—, y un botón rojo ahí es lo último que ve quien está
                 decidiendo si se atreve. */}
             <AlertDialogAction
-              className={openAccount ? undefined : "bg-red-600 hover:bg-red-700"}
+              className={openAccount ? "blanco-comodo" : "blanco-comodo bg-red-600 hover:bg-red-700"}
               onClick={() => {
                 clearCart()
                 clearTip()

@@ -151,6 +151,9 @@
   input.blanco-comodo,
   button.blanco-comodo {
     min-height: 44px;
+    /* También ancho: un botón de solo ícono medía 44x36 y se falla por el
+       lado corto. En los que ya son anchos —buscador, chips— no cambia nada. */
+    min-width: 44px;
   }
 }
 
