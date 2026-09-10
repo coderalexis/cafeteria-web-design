@@ -4,7 +4,17 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { landingPathFor, parseContext } from "@/lib/context-shape"
-import { isSyntheticEmail, normalizeSlug, normalizeUsername, SLUG_PATTERN, USERNAME_PATTERN, validatePassword } from "@/lib/accounts"
+import {
+  elegirCafe,
+  isSyntheticEmail,
+  normalizeSlug,
+  normalizeUsername,
+  SLUG_PATTERN,
+  USERNAME_PATTERN,
+  validatePassword,
+  type CandidatoCafe,
+} from "@/lib/accounts"
+import { LOGIN_FALTA_CAFE } from "@/lib/login-mensajes"
 import type { ActionResult } from "./types"
 
 // Mensaje único para usuario inexistente, café incorrecto y contraseña
@@ -23,6 +33,10 @@ export async function login(formData: FormData): Promise<ActionResult> {
   const identifier = String(formData.get("identifier") ?? formData.get("username") ?? "").trim()
   const password = String(formData.get("password") ?? "")
   const businessSlug = normalizeSlug(String(formData.get("business") ?? ""))
+  // El café puede venir de dos sitios y no valen lo mismo: si lo ESCRIBIÓ la
+  // persona (se lo pedimos) tiene que coincidir; si lo recordó el dispositivo
+  // es solo una pista. Ver `elegirCafe`.
+  const cafeEscrito = String(formData.get("cafeEscrito") ?? "") === "1"
 
   if (!identifier || !password) {
     return { error: "Usuario y contraseña son obligatorios." }
@@ -38,40 +52,43 @@ export async function login(formData: FormData): Promise<ActionResult> {
     email = identifier.toLowerCase()
   } else {
     const username = normalizeUsername(identifier)
-    if (!businessSlug) {
-      return { error: "Indica el café al que perteneces (o entra con tu correo)." }
-    }
-    if (!USERNAME_PATTERN.test(username) || !SLUG_PATTERN.test(businessSlug)) {
+    if (!USERNAME_PATTERN.test(username)) {
       return { error: LOGIN_ERROR }
     }
 
+    // Se busca en TODOS los cafés: el campo del café va oculto porque casi
+    // nadie tiene que escribirlo. El usuario es único POR CAFÉ, no en la
+    // plataforma, así que esto puede traer varios («cajero», «admin»).
     const admin = createAdminClient()
-    const { data: business } = await admin
-      .from("businesses")
-      .select("id")
-      .eq("slug", businessSlug)
-      .maybeSingle()
-    if (!business) {
-      return { error: LOGIN_ERROR }
-    }
-
-    const { data: member } = await admin
+    const { data: filas } = await admin
       .from("business_members")
-      .select("user_id")
-      .eq("business_id", business.id)
+      .select("business_id, user_id, businesses(slug)")
       .eq("username", username)
       .eq("is_active", true)
-      .maybeSingle()
-    if (!member) {
+
+    const candidatos: CandidatoCafe[] = (filas ?? []).flatMap((f) => {
+      const rel = f.businesses as { slug?: string } | { slug?: string }[] | null
+      const slug = Array.isArray(rel) ? rel[0]?.slug : rel?.slug
+      return slug ? [{ businessId: f.business_id, slug, userId: f.user_id }] : []
+    })
+
+    const elegido = elegirCafe(candidatos, { valor: businessSlug, escrito: cafeEscrito })
+    if (elegido.tipo === "ninguno") {
       return { error: LOGIN_ERROR }
     }
+    if (elegido.tipo === "varios") {
+      // Lo único que se revela es que ese usuario está repetido. No ayuda a
+      // entrar —la contraseña sigue haciendo falta— y es lo mismo que se
+      // averiguaría probando. A cambio, el campo desaparece para todos.
+      return { error: LOGIN_FALTA_CAFE }
+    }
 
-    const { data: authData } = await admin.auth.admin.getUserById(member.user_id)
+    const { data: authData } = await admin.auth.admin.getUserById(elegido.candidato.userId)
     if (!authData?.user?.email) {
       return { error: LOGIN_ERROR }
     }
     email = authData.user.email
-    businessId = business.id
+    businessId = elegido.candidato.businessId
   }
 
   const supabase = await createClient()

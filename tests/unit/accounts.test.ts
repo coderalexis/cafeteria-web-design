@@ -5,6 +5,8 @@ import {
   slugify,
   syntheticEmail,
   validatePassword,
+  elegirCafe,
+  type CandidatoCafe,
 } from "@/lib/accounts"
 import { computeDiscount, parseCash } from "@/app/pos/cart"
 
@@ -60,5 +62,56 @@ describe("carrito: descuento y efectivo", () => {
     expect(parseCash("100.50")).toBe(100.5)
     expect(parseCash("")).toBeNull()
     expect(parseCash("abc")).toBeNull()
+  })
+})
+
+// Entrar escribiendo SOLO el usuario. El campo del café se oculta, así que
+// esta decisión es la que evita dejar a alguien fuera sin poder corregirlo.
+describe("elegirCafe", () => {
+  const c = (slug: string): CandidatoCafe => ({ businessId: "b-" + slug, slug, userId: "u-" + slug })
+  const sinSlug = { valor: "", escrito: false }
+
+  it("un solo café: entra ahí sin preguntar nada", () => {
+    expect(elegirCafe([c("gym-coffe")], sinSlug)).toEqual({ tipo: "uno", candidato: c("gym-coffe") })
+  })
+
+  it("ningún café: no se distingue de una contraseña mala", () => {
+    expect(elegirCafe([], sinSlug)).toEqual({ tipo: "ninguno" })
+  })
+
+  it("varios cafés y nada que los distinga: hay que preguntar", () => {
+    expect(elegirCafe([c("uno"), c("dos")], sinSlug)).toEqual({ tipo: "varios" })
+  })
+
+  it("varios cafés con el slug escrito: entra al que escribió", () => {
+    const r = elegirCafe([c("uno"), c("dos")], { valor: "dos", escrito: true })
+    expect(r).toEqual({ tipo: "uno", candidato: c("dos") })
+  })
+
+  it("el slug ESCRITO que no coincide es un error, no se entra a otro", () => {
+    expect(elegirCafe([c("uno"), c("dos")], { valor: "tres", escrito: true })).toEqual({ tipo: "ninguno" })
+    expect(elegirCafe([c("uno")], { valor: "tres", escrito: true })).toEqual({ tipo: "ninguno" })
+  })
+
+  it("el slug RECORDADO que no coincide se ignora: nadie queda fuera por un dato viejo", () => {
+    // Cambió de café y el teléfono guardaba el anterior. Con el campo oculto
+    // no podría corregirlo, así que la pista se descarta.
+    expect(elegirCafe([c("nuevo")], { valor: "viejo", escrito: false })).toEqual({
+      tipo: "uno",
+      candidato: c("nuevo"),
+    })
+    expect(elegirCafe([c("uno"), c("dos")], { valor: "viejo", escrito: false })).toEqual({ tipo: "varios" })
+  })
+
+  it("el slug recordado que sí coincide ahorra la pregunta", () => {
+    const r = elegirCafe([c("uno"), c("dos")], { valor: "uno", escrito: false })
+    expect(r).toEqual({ tipo: "uno", candidato: c("uno") })
+  })
+
+  it("normaliza el slug: mayúsculas y espacios no deben fallar", () => {
+    expect(elegirCafe([c("gym-coffe")], { valor: "  GYM-COFFE ", escrito: true })).toEqual({
+      tipo: "uno",
+      candidato: c("gym-coffe"),
+    })
   })
 })
