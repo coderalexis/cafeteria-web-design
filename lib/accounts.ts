@@ -44,7 +44,7 @@ export function normalizeSlug(raw: string): string {
     .replace(/[\s_]+/g, "-")
 }
 
-/** Correo sintético de una cuenta de café (login por usuario + café). */
+/** Correo sintético de una cuenta de café (entra por usuario; nunca se le enseña). */
 export function syntheticEmail(username: string, businessSlug: string): string {
   return `${normalizeUsername(username)}@${normalizeSlug(businessSlug)}.${SYNTHETIC_EMAIL_DOMAIN}`
 }

@@ -34,7 +34,7 @@ export default function OlvideContrasenaPage() {
           </div>
           <h1 className="text-2xl font-bold text-stone-800">Recuperar contraseña</h1>
           <p className="text-sm text-stone-500 text-center">
-            Para cuentas que entran con correo. Si eres cajero (usuario + café), tu administrador la restablece desde
+            Para cuentas que entran con correo. Si eres cajero (entras con tu usuario), tu administrador la restablece desde
             Equipo.
           </p>
         </div>

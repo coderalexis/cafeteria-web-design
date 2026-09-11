@@ -324,7 +324,7 @@ export default function EquipoClient({ members }: Props) {
               <SheetHeader>
                 <SheetTitle>Agregar al equipo</SheetTitle>
                 <SheetDescription>
-                  Los cajeros entran con usuario + café; los administradores pueden entrar con su correo.
+                  Los cajeros entran solo con su usuario; los administradores pueden entrar con su correo.
                 </SheetDescription>
               </SheetHeader>
 
@@ -365,7 +365,7 @@ export default function EquipoClient({ members }: Props) {
                       minLength={3}
                     />
                     <p className="text-xs text-stone-400">
-                      Entrará con este usuario y el café «{ctx.business?.slug}». Minúsculas, números, punto y guiones.
+                      Entrará escribiendo solo este usuario. Minúsculas, números, punto y guiones.
                     </p>
                   </div>
                   <div className="space-y-1.5">

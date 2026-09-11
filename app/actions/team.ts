@@ -474,7 +474,7 @@ export async function changeMemberEmail(formData: FormData): Promise<ActionResul
   if (!currentEmail) return { error: "No se encontró la cuenta de esa persona." }
   if (isSyntheticEmail(currentEmail)) {
     return {
-      error: "Esa cuenta entra con usuario y café, no con correo. Para darle acceso por correo, agrégala de nuevo con su correo.",
+      error: "Esa cuenta entra con su usuario, no con correo. Para darle acceso por correo, agrégala de nuevo con su correo.",
     }
   }
 
