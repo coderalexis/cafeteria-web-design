@@ -272,7 +272,7 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             ¿Se te olvidó la contraseña? Si entras con correo, usa <strong>«¿Olvidaste tu contraseña?»</strong> en el
-            login y te llega un enlace. Si eres cajero (usuario + café), pídele a tu administrador que la restablezca
+            login y te llega un enlace. Si eres cajero (entras con tu usuario), pídele a tu administrador que la restablezca
             desde <strong>Equipo</strong>.
           </li>
         </ul>
@@ -1617,7 +1617,7 @@ export function AyudaClient({ ticket, corte }: Props) {
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Usuario de café</strong>: creas una cuenta con usuario y contraseña (entra con usuario + café),
+            <strong>Usuario de café</strong>: creas una cuenta con usuario y contraseña (entra escribiendo solo su usuario),
             ideal para cajeros — no necesita correo. <strong>Por correo</strong>: das acceso con su correo; si no tiene
             cuenta, se crea con una contraseña temporal que verás una sola vez.
           </li>

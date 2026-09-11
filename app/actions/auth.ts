@@ -194,7 +194,7 @@ export async function requestPasswordReset(formData: FormData): Promise<ActionRe
   if (isSyntheticEmail(email)) {
     return {
       error:
-        "Las cuentas de café (usuario + café) no usan correo. Pide a tu administrador que restablezca tu contraseña desde Equipo.",
+        "Las cuentas de café entran con su usuario, no con correo. Pide a tu administrador que restablezca tu contraseña desde Equipo.",
     }
   }
 
