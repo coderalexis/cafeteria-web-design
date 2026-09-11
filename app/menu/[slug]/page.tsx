@@ -6,6 +6,7 @@ import { createPublicClient } from "@/lib/supabase/public"
 import { colorClasses } from "@/lib/category-colors"
 import { priceRange, type PublicMenu } from "@/lib/public-menu"
 import { Coffee, MapPin, Phone } from "lucide-react"
+import { MenuNav } from "./menu-nav"
 
 /**
  * Menú público para el QR de las mesas. Sin sesión: todo sale del RPC
@@ -92,24 +93,23 @@ export default async function MenuPublicoPage({
           </div>
         </header>
 
-        {/* Índice de categorías: en el celular es más rápido que hacer scroll */}
+        {/* Índice de categorías. Se queda PEGADO arriba al bajar: en los menús
+            reales hay hasta 2 410 px (tres pantallas de celular) entre una
+            categoría y otra, y antes el índice solo existía al principio.
+            Va aquí suelto y no dentro de un <div>: `sticky` pega dentro de su
+            padre, y un envoltorio de paso lo dejaría pegado a su propio alto. */}
         {categories.length > 1 && (
-          <nav className="mt-8 flex flex-wrap justify-center gap-2">
-            {categories.map((cat) => {
+          <MenuNav
+            categorias={categories.map((cat) => {
               const color = colorClasses(cat.color)
-              return (
-                <a
-                  key={cat.slug}
-                  href={`#${cat.slug}`}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    color?.chip ?? "border-stone-300 text-stone-600 hover:bg-stone-100"
-                  }`}
-                >
-                  {cat.name}
-                </a>
-              )
+              return {
+                slug: cat.slug,
+                name: cat.name,
+                chip: color?.chip ?? "",
+                chipActive: color?.chipActive ?? "",
+              }
             })}
-          </nav>
+          />
         )}
 
         {/* Menú */}
@@ -123,7 +123,7 @@ export default async function MenuPublicoPage({
           {categories.map((cat) => {
             const color = colorClasses(cat.color)
             return (
-              <section key={cat.slug} id={cat.slug} className="scroll-mt-4">
+              <section key={cat.slug} id={cat.slug} className="scroll-mt-20">
                 <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-stone-500">
                   {color && <span className={`h-3 w-3 rounded-full ${color.dot}`} aria-hidden />}
                   {cat.name}

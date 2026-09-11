@@ -149,11 +149,36 @@
   /* 44 px es el mínimo para un dedo; el corte `md:` los encogía por creer
      que un aparato ancho se maneja con ratón. */
   input.blanco-comodo,
+  /* `a.` por los chips del menú público, que son enlaces de ancla. */
+  a.blanco-comodo,
   button.blanco-comodo {
     min-height: 44px;
     /* También ancho: un botón de solo ícono medía 44x36 y se falla por el
        lado corto. En los que ya son anchos —buscador, chips— no cambia nada. */
     min-width: 44px;
+  }
+}
+
+/* Una tira que rueda de lado SIN enseñar la barra: la barra le robaría
+   alto al chip y, en el menú público, se ve sobre la carta del cliente.
+   Que se pueda rodar se entiende porque el último chip queda cortado. */
+div.sin-barra {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+div.sin-barra::-webkit-scrollbar {
+  display: none;
+}
+
+/* Con el DEDO, una tira que rueda de lado es natural; con RATÓN nadie la
+   arrastra, así que ahí vuelve a envolver y a centrarse. Va por `pointer` y no
+   por ancho: lo que decide es cómo se toca. `div.` delante porque compite con
+   utilidades de Tailwind de la misma especificidad. */
+@media (hover: hover) and (pointer: fine) {
+  div.tira-si-dedo {
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
