@@ -137,6 +137,13 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
 - Herramientas de edición: `\uXXXX` y `\\` se convierten al escribir; para
   BOM o escapes en JS usar `String.fromCharCode`. Scripts largos se escriben
   con Write, no con heredocs (se truncan ~6 KB).
+- **En el pane del navegador no hay pintado**, y de ahí salen dos falsos
+  negativos: `requestAnimationFrame` no corre (el desplazamiento *suave* se
+  queda quieto: medir con `scrollBehavior = "auto"`) y **desplazarse por script
+  NO dispara el evento `scroll`** (mueve `scrollY` y nada más). Lo que reaccione
+  al desplazamiento se prueba lanzando el evento a mano
+  (`window.dispatchEvent(new Event("scroll"))`): el manejador lee `scrollY`, así
+  que se ejercita la lógica de verdad.
 - Humo headless en Windows: `--user-data-dir` con ruta CORTA, `Browser.close`
   por CDP antes de matar Chrome, puerto de depuración aleatorio, portales de
   Radix al final del DOM, IntersectionObserver no dispara con el panel oculto.
