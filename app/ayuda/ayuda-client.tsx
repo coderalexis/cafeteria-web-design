@@ -1474,7 +1474,10 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               <strong>Menú público con QR</strong>: activa «Publicar el menú» y el sistema te da el código QR para
               imprimir. Quien lo escanee ve tu carta en su celular, sin instalar nada; se actualiza sola al cambiar
-              precios, así que el QR impreso nunca se reemplaza. No muestra costos ni nada interno.
+              precios, así que el QR impreso nunca se reemplaza. No muestra costos ni nada interno. Arriba lleva{" "}
+              <strong>los nombres de tus categorías</strong>, que se quedan fijos mientras el cliente baja: puede
+              saltar de «Panadería» a «Barra fría» sin tener que subir hasta el principio, y siempre ve marcada la
+              sección en la que va. Por eso conviene que los nombres de tus categorías sean <em>cortos</em>.
             </li>
             <li>
               <strong>Tu logo</strong>: se sube en <strong>Datos y ajustes → Logo de la cafetería</strong> y sale en dos
