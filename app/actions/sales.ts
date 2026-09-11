@@ -14,6 +14,7 @@ import {
   type TicketRow,
 } from "@/lib/tickets"
 import type { ActionResult } from "./types"
+import { cambiosDe, type CambioExistencia } from "@/lib/existencias"
 
 function revalidateSales() {
   revalidatePath("/admin", "layout")
@@ -100,6 +101,8 @@ interface CreateTicketData {
   loyalty: { stamps: number; target: number; redeemed: boolean; name: string; phone: string } | null
   /** Venta fiada: a quién y cuánto debe ya (para el aviso y el ticket). */
   credit: { customerId: string; name: string; balance: number } | null
+  /** Existencia nueva de lo que se cuenta por pieza (P45); el POS la aplica sin recargar. */
+  stock: CambioExistencia[]
 }
 
 export async function createTicket(
@@ -166,6 +169,7 @@ export async function createTicket(
     changeDue: ticket.change_due ?? null,
     loyalty: ticket.loyalty ?? null,
     credit: ticket.credit ? { customerId: ticket.credit.customer_id, name: ticket.credit.name, balance: Number(ticket.credit.balance) } : null,
+    stock: cambiosDe(data),
   }
 }
 
@@ -244,6 +248,7 @@ export async function correctTicket(
     changeDue: ticket.change_due ?? null,
     loyalty: ticket.loyalty ?? null,
     credit: ticket.credit ? { customerId: ticket.credit.customer_id, name: ticket.credit.name, balance: Number(ticket.credit.balance) } : null,
+    stock: cambiosDe(data),
     originalFolio: ticket.original_folio,
   }
 }
@@ -260,7 +265,7 @@ const cancelSchema = z.object({
 
 export async function cancelTicket(
   input: z.infer<typeof cancelSchema>,
-): Promise<ActionResult<{ folio: number }>> {
+): Promise<ActionResult<{ folio: number; stock: CambioExistencia[] }>> {
   const parsed = cancelSchema.safeParse(input)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
@@ -277,7 +282,7 @@ export async function cancelTicket(
   }
 
   revalidateSales()
-  return { success: true, folio: (data as { folio: number }).folio }
+  return { success: true, folio: (data as { folio: number }).folio, stock: cambiosDe(data) }
 }
 
 /* ------------------------------------------------------------------ */

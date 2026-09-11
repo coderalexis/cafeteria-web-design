@@ -1,6 +1,7 @@
 # Diseño: inventario por pieza
 
-> Documento de diseño y plan de acción. **Nada de esto está implementado.**
+> Documento de diseño y plan de acción. La **Fase 1 está IMPLEMENTADA**
+> (migración 57 + Existencias + POS); las fases 2 y 3 siguen sin hacerse.
 > Escrito con los datos reales de Gym Coffe delante y antes de tocar código,
 > para que las decisiones difíciles se tomen en frío — como se hizo con
 > `docs/cola-sin-internet.md`.
@@ -29,6 +30,10 @@ tal cual— son cuatro o cinco artículos:
 | Agua mineral | 0 | $0 |
 | Refresco | 0 | $0 |
 | Copa de yogurt | 8 | $0 (se arma en el momento: dudoso) |
+
+(Es el ejemplo de UN café, no una lista del sistema: **cada cafetería marca lo
+suyo**. El módulo no sabe de pan ni de botellas; solo de artículos que
+alguien decidió contar, y nada viene marcado de fábrica.)
 
 Tres cosas que salen de esa tabla y que mandan sobre el diseño:
 
@@ -182,17 +187,18 @@ agua»** — que es el dato que interesa, no el nuevo total. Solo dueño o admin
 
 ## Pantallas
 
-- **Productos** (ya existe): en la variante, un interruptor **«Se cuenta por
-  pieza»**; al encenderlo pide existencia inicial y mínimo (opcional). Ese
-  interruptor es el único punto de entrada al módulo.
-- **Existencias** (`/admin/existencias`, grupo «Tu menú» junto a Productos):
-  la lista de lo que se cuenta con su número, en rojo lo que está en o bajo el
-  mínimo y lo negativo; botones **Entrada** y **Merma** en cada renglón y
-  **Contar** arriba; al tocar un renglón, su historial como estado de cuenta.
+- **Existencias** (`/admin/existencias`, grupo «Tu menú» junto a Productos)
+  es el **único punto de entrada** del módulo: «Contar un artículo» elige del
+  menú, pide cuántas hay hoy y, opcional, a partir de cuántas avisar. La lista
+  enseña cada artículo con su número —ámbar en o bajo el mínimo, rojo agotado
+  o negativo—, botones **Entrada** y **Merma** en cada renglón y, en ⋯,
+  **Contar lo que hay**, **Historial**, el mínimo y **Dejar de contar**. (Se
+  descartó un interruptor dentro de Productos: ese editor ya carga bastante, y
+  una lista vacía que dice «elige qué contar» se descubre igual.)
 - **POS**: en la tarjeta del producto, una esquina con **«quedan 3»** cuando
   está en o bajo el mínimo y **«agotado»** en 0 o menos. **Nunca bloquea**: la
-  tarjeta sigue vendiendo. En el menú ⋮ del POS, «Registrar merma» para la
-  cajera.
+  tarjeta sigue vendiendo. En el menú ⋮ del POS, **Existencias**: la lista
+  de lo que se cuenta con Entrada y Merma, para la cajera (sin costo).
 - **Resumen** (`/admin`): tarjeta **«Se está acabando»** solo cuando haya algo
   que decir; si no hay nada, no existe.
 - **Correo semanal**: una línea con lo que quedó bajo mínimo y las mermas de la
@@ -208,16 +214,15 @@ agua»** — que es el dato que interesa, no el nuevo total. Solo dueño o admin
 |---|---|---|---|
 | Ver existencias en el POS | Sí | Sí | Sí |
 | Registrar merma | Sí, con motivo | Sí | Sí |
-| Registrar entrada | **Decidir** (ver abajo) | Sí | Sí |
+| Registrar entrada | Sí, sin costo | Sí, con costo | Sí, con costo |
 | Contar | No | Sí | Sí |
 | Marcar qué se cuenta, mínimos | No | Sí | Sí |
 | Ver mermas valuadas | No | Sí | Sí |
 
-Decisión pendiente para el usuario: si la cajera puede registrar **entradas**.
-A favor: en un café chico es ella quien recibe el pan a las 7 de la mañana.
-En contra: la entrada con costo toca el margen. Propuesta: **sí puede, pero sin
-costo**; el costo solo lo pone admin o dueño. Y como ya aplica en todo el
-sistema, estas reglas van en el RPC, no en la pantalla, y en `role-legend.tsx`.
+Decidido con el usuario (2026-09-11): la cajera **sí registra entradas, sin
+costo** —en un café chico es ella quien recibe el pan a las 7—; el costo, que
+toca el margen, solo lo pone admin o dueño. Como en todo el sistema, estas
+reglas viven en el RPC, no en la pantalla, y están en `role-legend.tsx`.
 
 ## Fases, en PR entregables
 
@@ -226,12 +231,13 @@ el café de prueba, su viñeta en `/ayuda` y su entrada en `lib/admin-search.ts`
 
 ### Fase 0 — Decidir qué se cuenta (sin código)
 
-Con Diana: confirmar la lista de arriba y aclarar los dudosos (la copa de
-yogurt se arma en el momento, ¿se cuenta el yogurt o no se cuenta nada?). Y
-las dos decisiones abiertas: entradas por cajera, y si se quiere «consumo del
-personal» como motivo desde el día uno. Sin esto el resto se diseña a ciegas.
+**Hecho (2026-09-11).** Tres decisiones: (1) no hay lista del sistema, cada
+café marca lo suyo; (2) la cajera registra entradas sin costo y mermas con
+motivo, contar y decidir qué se cuenta es de admin; (3) motivos de merma desde
+el día uno: se cayó o se rompió · caducó · cortesía · consumo del personal ·
+otro (con texto).
 
-### Fase 1 — El núcleo · **M**
+### Fase 1 — El núcleo · **M** · ✅ IMPLEMENTADA (migración 57, `p45_inventario`)
 
 Migración `57_p45_inventario.sql`: las dos tablas, RLS de solo lectura, RPC
 `stock_track(variant, on/off, qty_inicial, min)`, `stock_move(kind, variant,

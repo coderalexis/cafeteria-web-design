@@ -45,6 +45,7 @@ import {
   Wallet,
   X,
   HandCoins,
+  Boxes,
 } from "lucide-react"
 import { POS_SHORTCUTS } from "@/app/pos/shortcuts"
 import { TRIAL_DAYS } from "@/lib/signup"
@@ -1451,6 +1452,82 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             Cada promoción se puede apagar sin borrarla, y en la lista ves cuántas ventas cobró en los últimos 30 días y
             cuánto descontó.
+          </li>
+        </ul>
+      ),
+    },
+    {
+      id: "cajero-existencias",
+      grupo: "cajero",
+      icon: Boxes,
+      titulo: "Existencias: «quedan 3» y registrar mermas",
+      palabras:
+        "existencias inventario quedan agotado merma entrada llego mercancia se cayo caduco cortesia consumo del personal contar piezas pan botellas",
+      acciones: [{ etiqueta: "POS", href: "/pos" }],
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            Si tu café cuenta algo por pieza —pan, botellas, pasteles—, la tarjeta de ese producto enseña{" "}
+            <strong>«quedan 3»</strong> o <strong>«Agotado»</strong>. Es un aviso, <strong>no una barrera</strong>:
+            si tienes la pieza en la mano, cóbrala igual. El sistema se corrige cuando alguien cuenta.
+          </li>
+          <li>
+            <strong>Llegó mercancía o se perdió algo</strong>: ⋮ → <strong>Existencias</strong>. La flecha hacia
+            abajo registra una entrada («llegaron 12») y el triángulo una merma («se cayeron 2»). La merma pide el
+            motivo: se cayó, caducó, cortesía, consumo del personal u otro. El costo de lo que llega lo pone un
+            administrador.
+          </li>
+          <li>
+            Lo que está en una <strong>cuenta abierta</strong> no baja hasta que se cobra, y{" "}
+            <strong>cancelar</strong> una venta devuelve sus piezas solas.
+          </li>
+        </ul>
+      ),
+    },
+    {
+      id: "admin-existencias",
+      grupo: "admin",
+      icon: Boxes,
+      titulo: "Existencias: lo que se cuenta por pieza",
+      palabras:
+        "existencias inventario piezas contar por pieza pan botellas pasteles muffin entrada merma conteo minimo avisar se esta acabando agotado negativo costo por pieza historial a donde se fueron dejar de contar",
+      acciones: [{ etiqueta: "Existencias", href: "/admin/existencias", admin: true }],
+      nodo: (
+        <ul className="space-y-2 text-sm text-stone-600">
+          <li>
+            <strong>Qué se cuenta</strong>: lo que se compra hecho y se vende tal cual —la orejita, la botella, el
+            muffin—. Las bebidas que se preparan <em>no</em> se cuentan: eso exigiría llevar gramos por taza, y no lo
+            hace nadie. Tú decides qué entra; un café que no marca nada no ve nada nuevo.
+          </li>
+          <li>
+            <strong>Empezar</strong>: <strong>Existencias → Contar un artículo</strong>, {v.toca} uno de tu menú y
+            di cuántas hay hoy y, si quieres, a partir de cuántas avisar. Desde ese momento{" "}
+            <strong>baja sola con cada venta</strong> y vuelve si la venta se cancela o se corrige.
+          </li>
+          <li>
+            <strong>Entrada</strong>: cuando llega mercancía. Si pones <strong>cuánto te costó cada pieza</strong>,
+            ese pasa a ser el costo del producto y su margen deja de ser un invento, sin abrir Productos. Ojo:
+            una entrada con costo <strong>no se captura también en Gastos</strong>; ya entra a tu utilidad como
+            costo de lo vendido, y anotarla dos veces la descontaría dos veces.
+          </li>
+          <li>
+            <strong>Merma</strong>: se cayó, caducó, cortesía, consumo del personal. Tu cajera también puede
+            registrarla desde el POS, porque las mermas pasan en la barra.
+          </li>
+          <li>
+            <strong>Contar lo que hay</strong> (en ⋯): escribes lo que hay de verdad y el sistema anota la
+            diferencia — «faltaban 3», «sobraban 1»—. Es el arqueo de las piezas, y basta con hacerlo de vez en
+            cuando: <strong>una venta nunca se bloquea por existencias</strong>. Si el sistema dice cero y hay un
+            muffin en la vitrina, se vende; la existencia queda en negativo y el conteo la corrige.
+          </li>
+          <li>
+            <strong>Historial</strong> (en ⋯): cada renglón dice qué pasó y cuántas quedaron —«llegaron 12 → 12»,
+            «vendida 1 · ticket #105 → 11»—. Es la respuesta a «compré 30 y tengo 3, ¿a dónde se fueron?».
+          </li>
+          <li>
+            <strong>Avisos</strong>: en o bajo el mínimo, el artículo sale en ámbar aquí y «quedan 3» en la tarjeta
+            del POS; agotado o negativo, en rojo. <strong>Dejar de contar</strong> lo saca de la lista y conserva
+            su historial.
           </li>
         </ul>
       ),

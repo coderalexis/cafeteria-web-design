@@ -41,6 +41,18 @@ const FILAS: { que: string; cajero: string; admin: string; owner: string }[] = [
     owner: "Sí",
   },
   {
+    que: "Existencias por pieza: registrar entradas y mermas",
+    cajero: "Sí, desde el POS (la entrada sin costo)",
+    admin: "Sí, con el costo por pieza",
+    owner: "Sí, con el costo por pieza",
+  },
+  {
+    que: "Existencias por pieza: decidir qué se cuenta, mínimos y conteos",
+    cajero: "No",
+    admin: "Sí",
+    owner: "Sí",
+  },
+  {
     que: "Vender fuera de menú (nombre y precio decididos en caja, con el módulo encendido)",
     cajero: "Sí, hasta $9,999 por artículo",
     admin: "Sí",

@@ -533,9 +533,9 @@ export function Landing() {
             {[
               {
                 icon: Boxes,
-                titulo: "Inventario",
+                titulo: "Existencias: avisos y lista de compras",
                 texto:
-                  "Existencias de lo que se cuenta por pieza —pan, pasteles, botellas—, con descuento automático al vender, alertas de que se está acabando y registro de mermas.",
+                  "Contar por pieza lo que se compra hecho —pan, botellas, pasteles— ya está: baja solo al vender, con entradas, mermas y conteo. Lo que sigue: aviso de «se está acabando» en el resumen y en el correo del lunes, «agotado» en el menú público, y la lista de compras.",
               },
             ].map(({ icon: Icon, titulo, texto }) => (
               <div key={titulo} className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-6">

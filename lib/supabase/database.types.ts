@@ -1230,6 +1230,119 @@ export type Database = {
           },
         ]
       }
+      stock_items: {
+        Row: {
+          business_id: string
+          min_qty: number
+          qty: number
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          business_id?: string
+          min_qty?: number
+          qty?: number
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          business_id?: string
+          min_qty?: number
+          qty?: number
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: true
+            referencedRelation: "menu_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          actor_id: string | null
+          business_id: string
+          created_at: string
+          id: string
+          kind: string
+          qty: number
+          qty_after: number
+          reason: string | null
+          seq: number
+          ticket_id: string | null
+          unit_cost: number | null
+          variant_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          kind: string
+          qty: number
+          qty_after: number
+          reason?: string | null
+          seq?: never
+          ticket_id?: string | null
+          unit_cost?: number | null
+          variant_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          qty?: number
+          qty_after?: number
+          reason?: string | null
+          seq?: never
+          ticket_id?: string | null
+          unit_cost?: number | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "menu_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_item_modifiers: {
         Row: {
           business_id: string
@@ -1685,6 +1798,35 @@ export type Database = {
       set_ticket_prepared: {
         Args: { p_prepared?: boolean; p_ticket_id: string }
         Returns: string
+      }
+      stock_audit: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_biz: string
+          p_details: Json
+          p_entity: string
+        }
+        Returns: undefined
+      }
+      stock_move: {
+        Args: {
+          p_kind: string
+          p_qty: number
+          p_reason?: string
+          p_unit_cost?: number
+          p_variant: string
+        }
+        Returns: Json
+      }
+      stock_track: {
+        Args: {
+          p_min?: number
+          p_on: boolean
+          p_qty?: number
+          p_variant: string
+        }
+        Returns: Json
       }
       ticket_lines: {
         Args: { p_biz: string; p_items: Json }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import type { Existencia } from "@/lib/existencias"
 import type { AccountVisit } from "./parked"
 import { creditAccountsFrom } from "@/lib/credit"
 import { getContext } from "@/lib/context"
@@ -78,7 +79,7 @@ export default async function POSPage() {
       .select(
         `id, name, description, sort_order, category_id, prompt_modifiers, pinned_order,
          menu_categories(id, name, slug),
-         menu_variants(id, name, size_label, price, sort_order, is_active),
+         menu_variants(id, name, size_label, price, sort_order, is_active, stock_items(qty, min_qty)),
          product_modifier_groups(
            modifier_groups(id, name, min_select, max_select, is_required, sort_order, is_active,
              modifiers(id, name, price_delta, sort_order, is_active, is_default))
@@ -282,12 +283,23 @@ export default async function POSPage() {
     .filter((id): id is string => !!id && !fijados.includes(id))
   const favoriteVariantIds = [...fijados, ...automaticos].slice(0, Math.max(8, fijados.length))
 
+  // Existencias de lo que se cuenta por pieza (P45), por variante. Vacío en
+  // un café que no cuenta nada, y entonces el POS no enseña nada nuevo.
+  const existencias: Record<string, Existencia> = {}
+  for (const p of vendibles) {
+    for (const v of p.menu_variants ?? []) {
+      const s = Array.isArray(v.stock_items) ? v.stock_items[0] : v.stock_items
+      if (s) existencias[v.id] = { qty: s.qty, minQty: s.min_qty }
+    }
+  }
+
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
   return (
     <POSClient
       categories={categories}
       products={products}
+      existencias={existencias}
       isAdmin={isAdmin}
       businessId={businessId}
       cashierId={ctx.userId}
