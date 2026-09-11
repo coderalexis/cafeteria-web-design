@@ -34,6 +34,8 @@ export interface PublicMenu {
     tagline: string | null
     /** Letra chica al pie de todo el menú (migración 25). */
     menu_note: string | null
+    /** Logo a color (migración 56); null si la cafetería no subió ninguno. */
+    logo_url: string | null
   }
   categories: PublicMenuCategory[]
 }

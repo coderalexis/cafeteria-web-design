@@ -86,7 +86,7 @@ export function ReceiptView({
   const receiptBiz = receiptBusinessFrom(business)
 
   const handlePrint = () => {
-    if (!printLines(buildTicketLines(saleToReceipt(sale), receiptBiz), `Ticket ${sale.folio}`, receiptBiz.widthMm)) {
+    if (!printLines(buildTicketLines(saleToReceipt(sale), receiptBiz), `Ticket ${sale.folio}`, receiptBiz.widthMm, receiptBiz.logoTicket)) {
       toast.error("El navegador bloqueó la ventana de impresión. Puedes reimprimir desde «Tickets».")
     }
   }
@@ -111,7 +111,8 @@ export function ReceiptView({
         : autoPrint === "comanda"
         ? buildKitchenLines(r, receiptBiz)
         : [...buildTicketLines(r, receiptBiz), "", "", "- - - - - ✂ - - - - -", "", ...buildKitchenLines(r, receiptBiz)]
-    if (printLines(lineas, `Venta ${sale.folio}`, receiptBiz.widthMm)) {
+    const conLogo = autoPrint !== "comanda" ? receiptBiz.logoTicket : null
+    if (printLines(lineas, `Venta ${sale.folio}`, receiptBiz.widthMm, conLogo)) {
       setPrintedAuto(true)
     } else {
       toast.error("El navegador bloqueó la impresión automática; usa los botones.")

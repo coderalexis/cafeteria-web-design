@@ -214,6 +214,8 @@ export type Database = {
           id: string
           is_template: boolean
           locale: string
+          logo_ticket_url: string | null
+          logo_url: string | null
           name: string
           phone: string | null
           plan: string
@@ -236,6 +238,8 @@ export type Database = {
           id?: string
           is_template?: boolean
           locale?: string
+          logo_ticket_url?: string | null
+          logo_url?: string | null
           name: string
           phone?: string | null
           plan?: string
@@ -258,6 +262,8 @@ export type Database = {
           id?: string
           is_template?: boolean
           locale?: string
+          logo_ticket_url?: string | null
+          logo_url?: string | null
           name?: string
           phone?: string | null
           plan?: string

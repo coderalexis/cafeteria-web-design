@@ -66,4 +66,6 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "miembro.correo": "Correo de miembro cambiado",
   "miembro.pin": "PIN de caja cambiado",
   "negocio.ajustes": "Ajustes del negocio",
+  "negocio.logo": "Logo actualizado",
+  "negocio.logo.quitado": "Logo quitado",
 }

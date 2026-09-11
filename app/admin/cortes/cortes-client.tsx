@@ -69,7 +69,7 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
       toast.error(result.error)
       return
     }
-    if (!printLines(buildCorteLines(result.summary, receiptBusinessFrom(business)), "Corte de caja", receiptBusinessFrom(business).widthMm)) {
+    if (!printLines(buildCorteLines(result.summary, receiptBusinessFrom(business)), "Corte de caja", receiptBusinessFrom(business).widthMm, receiptBusinessFrom(business).logoTicket)) {
       toast.error("El navegador bloqueó la ventana de impresión.")
     }
   }

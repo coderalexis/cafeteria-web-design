@@ -35,6 +35,7 @@ import { formatDate, formatDateTime } from "@/lib/format"
 import { buildTicketLines } from "@/lib/receipt"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { MenuQrCard } from "./qr-card"
+import { LogoCard } from "./logo-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -158,6 +159,11 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
           </a>
         </div>
       )}
+
+      {/* El logo va aparte del formulario de ajustes: se guarda solo al
+          elegir el archivo, sin esperar al botón «Guardar ajustes». Meterlo
+          dentro sería además un <form> dentro de otro. */}
+      <LogoCard logoMenu={business.logoUrl} logoTicket={business.logoTicketUrl} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <form action={handleSubmit} className="space-y-6">

@@ -9,6 +9,8 @@ import { homePathFor, parseContext } from "@/lib/context-shape"
 import { isValidTimeZone } from "@/lib/dates"
 import { LOCK_MINUTES_OPTIONS, parseBusinessSettings, parseGoal, serializeBusinessSettings, MENU_NOTE_MAX, TABLE_COUNT_MAX, parseAccountLabels, KITCHEN_POLL_MIN, KITCHEN_POLL_MAX, KITCHEN_POLL_HIDDEN_MIN, KITCHEN_POLL_HIDDEN_MAX } from "@/lib/settings"
 import { normalizeClosingTime } from "@/lib/cash-session"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { extensionDe, revisarLogo, rutaDesdeUrl, rutaLogo, type RanuraLogo } from "@/lib/logo"
 import type { ActionResult } from "./types"
 
 /**
@@ -267,5 +269,120 @@ export async function hideStartupChecklist(): Promise<ActionResult> {
   if (error) return { error: error.message }
 
   revalidatePath("/admin", "layout")
+  return { success: true }
+}
+
+/* ------------------------------------------------------------------ */
+/*  El logo de la cafetería (P42).                                      */
+/*                                                                      */
+/*  Sube con SERVICE ROLE a propósito, aunque el bucket sea público de   */
+/*  lectura: así el negocio lo pone el servidor desde `member_ctx()` y   */
+/*  no hay que confiar en que la carpeta de la ruta sea la suya. Por lo  */
+/*  mismo, `logo_url`/`logo_ticket_url` no están en el grant por columna */
+/*  de `authenticated`: si lo estuvieran, un cliente podría apuntar su   */
+/*  logo a cualquier URL de internet y el ticket la imprimiría.          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * El parche de la fila. Se escribe con la clave literal y no con una columna
+ * calculada: con `{ [columna]: url }` TypeScript pierde de vista cuál de las
+ * dos es y el update deja de estar tipado.
+ */
+function parcheLogo(ranura: RanuraLogo, url: string | null) {
+  return ranura === "menu" ? { logo_url: url } : { logo_ticket_url: url }
+}
+
+const NOMBRE_RANURA: Record<RanuraLogo, string> = {
+  menu: "logo del menú",
+  ticket: "logo del ticket",
+}
+
+function ranuraDe(v: FormDataEntryValue | null): RanuraLogo | null {
+  return v === "menu" || v === "ticket" ? v : null
+}
+
+/**
+ * Borra el archivo anterior. De buen esfuerzo: si falla, el logo nuevo ya
+ * quedó guardado y lo único que sobra es un archivo huérfano de 1 MB como
+ * mucho. Dejar la subida en rojo por eso sería peor para quien lo sube.
+ */
+async function borrarAnterior(
+  admin: ReturnType<typeof createAdminClient>,
+  urlAnterior: string | null | undefined,
+): Promise<void> {
+  const ruta = rutaDesdeUrl(urlAnterior)
+  if (!ruta) return
+  const { error } = await admin.storage.from("logos").remove([ruta])
+  if (error) console.error("[logo] no se pudo borrar el anterior:", error.message)
+}
+
+export async function subirLogo(formData: FormData): Promise<ActionResult<{ url: string }>> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx?.business) return { error: authError ?? "Sesión inválida." }
+
+  const ranura = ranuraDe(formData.get("ranura"))
+  if (!ranura) return { error: "No se sabe qué logo es." }
+
+  const archivo = formData.get("archivo")
+  if (!(archivo instanceof File)) return { error: "No se recibió ninguna imagen." }
+
+  const problema = revisarLogo(archivo)
+  if (problema) return { error: problema.mensaje }
+
+  const extension = extensionDe(archivo.type)
+  if (!extension) return { error: "El logo tiene que ser PNG, JPG o WebP." }
+
+  const admin = createAdminClient()
+  const ruta = rutaLogo(ctx.business.id, ranura, extension, Date.now())
+
+  const { error: subida } = await admin.storage
+    .from("logos")
+    .upload(ruta, archivo, { contentType: archivo.type, upsert: false })
+  if (subida) {
+    return { error: `No se pudo subir el logo: ${subida.message}` }
+  }
+
+  const { data: publica } = admin.storage.from("logos").getPublicUrl(ruta)
+  const url = publica.publicUrl
+
+  const anterior = ranura === "menu" ? ctx.business.logoUrl : ctx.business.logoTicketUrl
+  const { error: guardado } = await admin
+    .from("businesses")
+    .update(parcheLogo(ranura, url))
+    .eq("id", ctx.business.id)
+
+  if (guardado) {
+    // La fila no cambió: el archivo recién subido sobra.
+    await admin.storage.from("logos").remove([ruta])
+    return { error: guardado.message }
+  }
+
+  await borrarAnterior(admin, anterior)
+  await logAudit("negocio.logo", ctx.business.name, { ranura: NOMBRE_RANURA[ranura] })
+
+  revalidatePath("/", "layout")
+  revalidatePath(`/menu/${ctx.business.slug}`)
+  return { success: true, url }
+}
+
+export async function quitarLogo(ranura: RanuraLogo): Promise<ActionResult> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx?.business) return { error: authError ?? "Sesión inválida." }
+  if (ranura !== "menu" && ranura !== "ticket") return { error: "No se sabe qué logo es." }
+
+  const admin = createAdminClient()
+  const anterior = ranura === "menu" ? ctx.business.logoUrl : ctx.business.logoTicketUrl
+
+  const { error } = await admin
+    .from("businesses")
+    .update(parcheLogo(ranura, null))
+    .eq("id", ctx.business.id)
+  if (error) return { error: error.message }
+
+  await borrarAnterior(admin, anterior)
+  await logAudit("negocio.logo.quitado", ctx.business.name, { ranura: NOMBRE_RANURA[ranura] })
+
+  revalidatePath("/", "layout")
+  revalidatePath(`/menu/${ctx.business.slug}`)
   return { success: true }
 }

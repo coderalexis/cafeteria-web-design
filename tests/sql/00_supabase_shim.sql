@@ -80,3 +80,50 @@ grant all on all functions in schema public to anon, authenticated, service_role
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+-- ── Storage ────────────────────────────────────────────────────────
+-- La migración 54 crea el bucket de los logos y hace que `delete_business`
+-- se lleve sus archivos. Nada de eso es lógica de Supabase que estemos
+-- imitando: son dos tablas y una función de utilidad que allá vienen puestas
+-- y aquí no, igual que el esquema `auth` de arriba.
+create schema if not exists storage;
+
+create table storage.buckets (
+  id text primary key,
+  name text not null,
+  owner uuid,
+  public boolean not null default false,
+  avif_autodetection boolean not null default false,
+  file_size_limit bigint,
+  allowed_mime_types text[],
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name text,
+  owner uuid,
+  metadata jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Igual que la de Supabase: parte la ruta por «/» y devuelve TODO menos el
+-- último trozo, que es el nombre del archivo. Así `(foldername(name))[1]` es
+-- la carpeta de primer nivel — para nosotros, el id del negocio.
+create or replace function storage.foldername(name text) returns text[]
+language plpgsql immutable
+as $$
+declare
+  v_partes text[];
+begin
+  v_partes := string_to_array(name, '/');
+  return v_partes[1:array_length(v_partes, 1) - 1];
+end
+$$;
+
+grant usage on schema storage to anon, authenticated, service_role;
+grant all on all tables in schema storage to service_role;
+grant execute on function storage.foldername(text) to anon, authenticated, service_role;

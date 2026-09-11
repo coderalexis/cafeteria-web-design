@@ -1461,8 +1461,8 @@ export function AyudaClient({ ticket, corte }: Props) {
       icon: Store,
       titulo: "Datos y ajustes: negocio, metas y menú con QR",
       palabras:
-        "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto fiados modulo fiar",
-      acciones: [{ etiqueta: "Datos y ajustes", href: "/admin/negocio", admin: true }, { etiqueta: "Metas", href: "/admin/negocio#metas", admin: true }, { etiqueta: "Menú público (QR)", href: "/admin/negocio#menu-publico", admin: true }, { etiqueta: "Impresión", href: "/admin/negocio#impresion", admin: true }, { etiqueta: "Módulos del POS", href: "/admin/negocio#modulos", admin: true }, { etiqueta: "Seguridad de caja", href: "/admin/negocio#seguridad", admin: true }],
+        "nombre zona horaria ticket encabezado pie metas qr menu publico resumen semanal correo lunes seguridad bloqueo impresion automatica imprimir modulos pedidos espera hora de cierre caja olvidada para llevar cargo comision tarjeta mercado pago neto fiados modulo fiar logo imagen marca png transparente monocromo",
+      acciones: [{ etiqueta: "Datos y ajustes", href: "/admin/negocio", admin: true }, { etiqueta: "Metas", href: "/admin/negocio#metas", admin: true }, { etiqueta: "Menú público (QR)", href: "/admin/negocio#menu-publico", admin: true }, { etiqueta: "Logo", href: "/admin/negocio#logo", admin: true }, { etiqueta: "Impresión", href: "/admin/negocio#impresion", admin: true }, { etiqueta: "Módulos del POS", href: "/admin/negocio#modulos", admin: true }, { etiqueta: "Seguridad de caja", href: "/admin/negocio#seguridad", admin: true }],
       nodo: (
         <>
           <ul className="space-y-2 text-sm text-stone-600">
@@ -1475,6 +1475,16 @@ export function AyudaClient({ ticket, corte }: Props) {
               <strong>Menú público con QR</strong>: activa «Publicar el menú» y el sistema te da el código QR para
               imprimir. Quien lo escanee ve tu carta en su celular, sin instalar nada; se actualiza sola al cambiar
               precios, así que el QR impreso nunca se reemplaza. No muestra costos ni nada interno.
+            </li>
+            <li>
+              <strong>Tu logo</strong>: se sube en <strong>Datos y ajustes → Logo de la cafetería</strong> y sale en dos
+              lugares: arriba de tu menú público y arriba del ticket impreso. Son <strong>dos archivos</strong> y no uno,
+              a propósito: la pantalla es a color y la impresora térmica solo sabe pintar puntos negros, así que un logo
+              de color sale de ella como una mancha gris. Para el menú, lo mejor es un PNG con{" "}
+              <strong>fondo transparente</strong> (si el archivo trae fondo negro, en el menú se verá un rectángulo
+              negro); para el ticket, el mismo logo en <strong>negro sobre blanco</strong>, de unos 384 puntos de
+              ancho. Si solo tienes uno, súbelo donde se vea mejor y deja el otro vacío: donde no haya logo no sale
+              nada raro, queda como está hoy.
             </li>
             <li>
               <strong>La letra chica de tu carta</strong>: lo que aplica a todo el menú («nuestros jarabes son libres

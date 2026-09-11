@@ -71,9 +71,20 @@ export default async function MenuPublicoPage({
       <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
         {/* Encabezado */}
         <header className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100">
-            <Coffee className="h-7 w-7 text-amber-700" />
-          </div>
+          {/* Con logo propio se ve el logo y nada mas: el cuadro ambar es el
+              relleno de quien todavia no sube uno, no un marco de la marca. */}
+          {business.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={business.logo_url}
+              alt={business.name}
+              className="mx-auto h-20 w-auto max-w-[70%] object-contain"
+            />
+          ) : (
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100">
+              <Coffee className="h-7 w-7 text-amber-700" />
+            </div>
+          )}
           <h1 className="mt-4 text-3xl font-bold text-stone-800">{business.name}</h1>
           {business.tagline && <p className="mt-1 text-sm text-stone-500">{business.tagline}</p>}
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-stone-500">
