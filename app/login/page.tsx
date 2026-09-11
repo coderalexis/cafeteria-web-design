@@ -7,6 +7,7 @@ import { login } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Coffee, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react"
+import { LOGIN_FALTA_CAFE } from "@/lib/login-mensajes"
 
 const BUSINESS_STORAGE_KEY = "pos-business-slug"
 
@@ -41,17 +42,25 @@ export default function LoginPage() {
   }, [])
 
   const usesEmail = identifier.includes("@")
+  // El campo del café nace OCULTO y solo aparece si el servidor dice que ese
+  // usuario está en más de uno. Con correo nunca hace falta, y con usuario
+  // casi nunca: es único por café, pero rara vez repetido entre cafés.
+  const [pedirCafe, setPedirCafe] = useState(false)
+  const mostrarCafe = pedirCafe && !usesEmail
 
   function handleSubmit(formData: FormData) {
     setError(null)
     const slug = normalizeSlugInput(String(formData.get("business") ?? ""))
     formData.set("business", slug)
+    formData.set("cafeEscrito", mostrarCafe ? "1" : "")
     if (slug) window.localStorage.setItem(BUSINESS_STORAGE_KEY, slug)
     startTransition(async () => {
       const result = await login(formData)
       // Si llegamos aquí, el login falló (el éxito redirige)
       if (result?.error) {
         setError(result.error)
+        // Ese usuario está en varios cafés: ahora sí hay que preguntarlo.
+        if (result.error === LOGIN_FALTA_CAFE) setPedirCafe(true)
       }
     })
   }
@@ -102,16 +111,16 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className={usesEmail ? "hidden" : "space-y-2"} aria-hidden={usesEmail}>
+          <div className={mostrarCafe ? "space-y-2" : "hidden"} aria-hidden={!mostrarCafe}>
             <label htmlFor="business" className="text-sm font-medium text-stone-700">
-              Café
+              ¿Cuál de tus cafés?
             </label>
             <Input
               id="business"
               name="business"
               type="text"
               placeholder="nombre-corto-del-cafe"
-              required={!usesEmail}
+              required={mostrarCafe}
               autoComplete="organization"
               autoCapitalize="none"
               spellCheck={false}
@@ -121,7 +130,8 @@ export default function LoginPage() {
               onChange={(e) => setBusiness(normalizeSlugInput(e.target.value))}
             />
             <p className="text-xs text-stone-400">
-              El identificador de tu cafetería (te lo da el administrador). Se recuerda en este dispositivo.
+              El nombre corto que te dio tu administrador (p. ej. <em>gym-coffe</em>). Se recuerda en este
+              dispositivo.
             </p>
           </div>
 

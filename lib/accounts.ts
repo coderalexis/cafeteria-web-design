@@ -96,3 +96,51 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40)
 }
+
+/* ── Con qué café entra alguien que solo escribió su usuario ───────── */
+
+/**
+ * Un café donde ese usuario existe y está activo.
+ *
+ * El usuario es único POR CAFÉ (`unique(business_id, username)`), no en toda
+ * la plataforma: «cajero» o «admin» van a repetirse en cuanto haya dos cafés
+ * que los usen. Por eso esto puede traer varios.
+ */
+export interface CandidatoCafe {
+  businessId: string
+  slug: string
+  userId: string
+}
+
+export type CafeElegido =
+  | { tipo: "uno"; candidato: CandidatoCafe }
+  | { tipo: "varios" }
+  | { tipo: "ninguno" }
+
+/**
+ * A qué café entra, si es que se puede saber.
+ *
+ * El slug llega de dos maneras y NO significan lo mismo:
+ *
+ * - **Escrito** por la persona (se lo pedimos porque su usuario está
+ *   repetido): tiene que coincidir. Si no, es un error — entrar a otro café
+ *   distinto del que tecleó sería peor que no entrar.
+ * - **Recordado** del dispositivo o de un `?c=slug`: es una PISTA. Si coincide
+ *   se usa, y si no se ignora y se resuelve por el usuario. Un slug viejo
+ *   guardado en el teléfono —porque cambió de café— no puede dejar a nadie
+ *   fuera, y menos ahora que el campo va oculto y no lo vería para corregirlo.
+ */
+export function elegirCafe(
+  candidatos: CandidatoCafe[],
+  slug: { valor: string; escrito: boolean },
+): CafeElegido {
+  if (candidatos.length === 0) return { tipo: "ninguno" }
+  const pedido = normalizeSlug(slug.valor)
+  if (pedido) {
+    const exacto = candidatos.find((c) => c.slug === pedido)
+    if (exacto) return { tipo: "uno", candidato: exacto }
+    if (slug.escrito) return { tipo: "ninguno" }
+  }
+  if (candidatos.length === 1) return { tipo: "uno", candidato: candidatos[0] }
+  return { tipo: "varios" }
+}

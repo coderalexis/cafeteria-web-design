@@ -246,17 +246,21 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "cajero",
       icon: Users,
       titulo: "Entrar al sistema",
-      palabras: "login sesion contrasena olvide usuario cafe correo selector cuenta",
+      palabras: "login sesion contrasena olvide usuario cafe correo selector cuenta entrar solo con el usuario sin escribir el cafe no me pide la cafeteria usuario repetido en varios cafes nombre corto",
       acciones: [{ etiqueta: "Mi cuenta", href: "/cuenta" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Cajeros</strong>: escribe tu <strong>usuario</strong>, el <strong>café</strong> (el identificador
-            corto de tu cafetería, p. ej. <em>el-cafecito</em>) y tu contraseña. El café se recuerda en ese dispositivo.
+            <strong>Cajeros</strong>: tu <strong>usuario</strong> y tu contraseña. Nada más — no hace falta escribir
+            el café, el sistema sabe a cuál perteneces.
           </li>
           <li>
-            <strong>Dueños y administradores</strong> pueden entrar con su <strong>correo</strong> y contraseña; el
-            campo Café se oculta solo.
+            <strong>Dueños y administradores</strong>: su <strong>correo</strong> y su contraseña.
+          </li>
+          <li>
+            <strong>La única vez que se pregunta el café</strong> es si tu usuario existe en más de una cafetería
+            —«cajero» o «admin» se repiten fácil—. Ahí aparece un campo pidiendo cuál es el tuyo: es el{" "}
+            <em>nombre corto</em> que te dio tu administrador, y se recuerda en ese dispositivo.
           </li>
           <li>
             El <strong>ojito</strong> del campo de contraseña la muestra para revisar que la escribiste bien antes de
