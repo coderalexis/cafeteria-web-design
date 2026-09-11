@@ -76,7 +76,7 @@ export function MovimientoDialog({
       }
       const quedan = (q: number) => `Queda${q === 1 ? "" : "n"} ${q}`
       if (kind === "conteo") {
-        const diff = r.qtyAfter - item.qty
+        const diff = r.delta
         toast.success(
           diff === 0
             ? `${item.nombre}: cuadra, ${r.qtyAfter}.`

@@ -2,8 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
-import type { KindMovimiento } from "@/lib/existencias"
-import { ExistenciasClient, type Candidato, type ItemExistencia, type Movimiento } from "./existencias-client"
+import { ExistenciasClient, type Candidato, type ItemExistencia } from "./existencias-client"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +22,9 @@ export default async function ExistenciasPage() {
   if (!isManager(ctx.role)) redirect("/pos")
 
   const supabase = await createClient()
-  const [{ data: filas }, { data: menu }, { data: movs }] = await Promise.all([
+  // El historial NO se trae aquí: se pide por artículo al abrirlo
+  // (`historialDe`), que es cuando de verdad hace falta.
+  const [{ data: filas }, { data: menu }] = await Promise.all([
     supabase
       .from("stock_items")
       .select(
@@ -39,14 +40,6 @@ export default async function ExistenciasPage() {
       )
       .eq("is_active", true)
       .order("sort_order"),
-    // El diario reciente de todo el café, para el historial por artículo. Con
-    // el volumen de una cafetería (decenas de movimientos por semana) alcanza
-    // de sobra; si un día no, el historial se pide por artículo.
-    supabase
-      .from("stock_movements")
-      .select("id, seq, variant_id, kind, qty, qty_after, unit_cost, reason, created_at, tickets(folio), profiles(full_name)")
-      .order("seq", { ascending: false })
-      .limit(400),
   ])
 
   const items: ItemExistencia[] = (filas ?? [])
@@ -83,25 +76,5 @@ export default async function ExistenciasPage() {
     )
     .sort((a, b) => a.categoriaOrden - b.categoriaOrden || a.nombre.localeCompare(b.nombre, "es"))
 
-  const movimientos: Movimiento[] = (movs ?? []).map((m) => ({
-    id: m.id,
-    variantId: m.variant_id,
-    kind: m.kind as KindMovimiento,
-    qty: m.qty,
-    qtyAfter: m.qty_after,
-    unitCost: m.unit_cost == null ? null : Number(m.unit_cost),
-    reason: m.reason,
-    folio: m.tickets?.folio ?? null,
-    actor: m.profiles?.full_name ?? null,
-    at: m.created_at,
-  }))
-
-  return (
-    <ExistenciasClient
-      items={items}
-      candidatos={candidatos}
-      movimientos={movimientos}
-      timezone={ctx.business.timezone}
-    />
-  )
+  return <ExistenciasClient items={items} candidatos={candidatos} timezone={ctx.business.timezone} />
 }

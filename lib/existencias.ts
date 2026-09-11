@@ -94,6 +94,14 @@ export interface MovimientoDiario {
   folio: number | null
 }
 
+/** Un renglón del historial tal como lo devuelve `historialDe` y lo pinta la pantalla. */
+export interface Movimiento extends MovimientoDiario {
+  id: string
+  variantId: string
+  actor: string | null
+  at: string
+}
+
 /**
  * Un renglón del diario en palabras. Es lo que convierte «-2, 11» en algo que
  * una dueña lee: «Vendidas 2 · ticket #105 → 11».

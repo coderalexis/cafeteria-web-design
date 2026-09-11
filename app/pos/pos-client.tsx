@@ -114,7 +114,7 @@ import {
   type SizeOption, type PersistedCart, CART_STORAGE_VERSION, customProduct, linesToItems } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
-import { aplicarCambios, esquinaProducto, type CambioExistencia, type Existencia } from "@/lib/existencias"
+import { aplicarCambios, esquinaExistencia, esquinaProducto, type CambioExistencia, type Existencia } from "@/lib/existencias"
 import { ExistenciasPosDialog } from "./existencias-dialog"
 
 interface POSClientProps {
@@ -299,7 +299,18 @@ export default function POSClient({
   const textSize = usePosTextSize()
   // Cola de ventas sin internet (docs/cola-sin-internet.md). Vive aquí y no
   // dentro de un componente hijo porque cobrar la usa y el aviso la muestra.
-  const cola = useOfflineQueue(businessId)
+  // Existencias de lo que se cuenta por pieza (P45): nacen del servidor y se
+  // ponen al día con lo que cada cobro, cancelación o merma DEVUELVE, sin
+  // volver a pedir la carta. Con `router.refresh()` llegan de nuevo por props.
+  // Van antes de la cola porque las ventas que suben desde ella también descuentan.
+  const [existencias, setExistencias] = useState(existenciasIniciales)
+  useEffect(() => setExistencias(existenciasIniciales), [existenciasIniciales])
+  const [showExistencias, setShowExistencias] = useState(false)
+  const aplicarExistencias = useCallback(
+    (cambios: CambioExistencia[]) => setExistencias((m) => aplicarCambios(m, cambios)),
+    [],
+  )
+  const cola = useOfflineQueue(businessId, aplicarExistencias)
   const [showQueueReview, setShowQueueReview] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   // Se avisa UNA vez por cierre, no en cada recarga, y solo mientras no haya
@@ -646,16 +657,6 @@ export default function POSClient({
   // servidor cancela la original y cobra esta con la hora original.
   const [corrigiendo, setCorrigiendo] = useState<{ id: string; folio: number; total: number } | null>(null)
 
-  // Existencias de lo que se cuenta por pieza (P45): nacen del servidor y se
-  // ponen al día con lo que cada cobro, cancelación o merma DEVUELVE, sin
-  // volver a pedir la carta. Con `router.refresh()` llegan de nuevo por props.
-  const [existencias, setExistencias] = useState(existenciasIniciales)
-  useEffect(() => setExistencias(existenciasIniciales), [existenciasIniciales])
-  const [showExistencias, setShowExistencias] = useState(false)
-  const aplicarExistencias = useCallback(
-    (cambios: CambioExistencia[]) => setExistencias((m) => aplicarCambios(m, cambios)),
-    [],
-  )
   /** «Quedan 3» / «Agotado» de una tarjeta; null si no se cuenta o hay de sobra. */
   const esquinaDe = useCallback(
     (p: Product): string | null => {
@@ -1981,11 +1982,8 @@ export default function POSClient({
                   data-favoritos
                 >
                   {favorites.map(({ product, size }) => {
-                    const esquina = size
-                      ? existencias[size.variantId]
-                        ? esquinaProducto([existencias[size.variantId]])
-                        : null
-                      : esquinaDe(product)
+                    const e = size ? existencias[size.variantId] : undefined
+                    const esquina = size ? (e ? esquinaExistencia(e.qty, e.minQty) : null) : esquinaDe(product)
                     return (
                     <m.button
                       key={size?.variantId ?? product.id}

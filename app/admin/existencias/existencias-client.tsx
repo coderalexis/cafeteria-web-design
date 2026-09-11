@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -15,14 +15,14 @@ import {
   Search,
   TriangleAlert,
 } from "lucide-react"
-import { dejarDeContar, marcarPorPieza } from "@/app/actions/existencias"
+import { dejarDeContar, historialDe, marcarPorPieza } from "@/app/actions/existencias"
 import { MovimientoDialog } from "@/components/movimiento-existencia-dialog"
 import {
   describirMovimiento,
   estadoExistencia,
   type EstadoExistencia,
   type KindManual,
-  type KindMovimiento,
+  type Movimiento,
 } from "@/lib/existencias"
 import { formatCurrency, formatDateTime } from "@/lib/format"
 import { Button } from "@/components/ui/button"
@@ -75,19 +75,6 @@ export interface Candidato {
   categoriaOrden: number
 }
 
-export interface Movimiento {
-  id: string
-  variantId: string
-  kind: KindMovimiento
-  qty: number
-  qtyAfter: number
-  unitCost: number | null
-  reason: string | null
-  folio: number | null
-  actor: string | null
-  at: string
-}
-
 const ESTADO: Record<EstadoExistencia, { clase: string; texto: string | null }> = {
   ok: { clase: "text-stone-800", texto: null },
   bajo: { clase: "text-amber-700", texto: "Se está acabando" },
@@ -103,12 +90,10 @@ const ESTADO: Record<EstadoExistencia, { clase: string; texto: string | null }> 
 export function ExistenciasClient({
   items,
   candidatos,
-  movimientos,
   timezone,
 }: {
   items: ItemExistencia[]
   candidatos: Candidato[]
-  movimientos: Movimiento[]
   timezone: string
 }) {
   const router = useRouter()
@@ -120,15 +105,6 @@ export function ExistenciasClient({
   const [isPending, startTransition] = useTransition()
 
   const avisos = items.filter((i) => estadoExistencia(i.qty, i.minQty) !== "ok")
-  const porVariante = useMemo(() => {
-    const m = new Map<string, Movimiento[]>()
-    for (const x of movimientos) {
-      const lista = m.get(x.variantId) ?? []
-      lista.push(x)
-      m.set(x.variantId, lista)
-    }
-    return m
-  }, [movimientos])
 
   function dejar(item: ItemExistencia) {
     startTransition(async () => {
@@ -263,7 +239,6 @@ export function ExistenciasClient({
       {historial && (
         <HistorialDialog
           item={historial}
-          movimientos={porVariante.get(historial.variantId) ?? []}
           timezone={timezone}
           onClose={() => setHistorial(null)}
         />
@@ -457,20 +432,33 @@ function AgregarDialog({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Historial: el diario como estado de cuenta.                         */
+/*  Historial: el diario como estado de cuenta. Se pide al abrirlo, solo  */
+/*  el de este artículo: así nunca se corta por lo que se movió el resto. */
 /* ------------------------------------------------------------------ */
 
 function HistorialDialog({
   item,
-  movimientos,
   timezone,
   onClose,
 }: {
   item: ItemExistencia
-  movimientos: Movimiento[]
   timezone: string
   onClose: () => void
 }) {
+  const [historial, setHistorial] = useState<{ movimientos: Movimiento[]; completo: boolean } | null>(null)
+  const [fallo, setFallo] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    historialDe(item.variantId).then((r) => {
+      if (!vivo) return
+      if (!r.success) setFallo(r.error || "No se pudo leer el historial.")
+      else setHistorial({ movimientos: r.movimientos, completo: r.completo })
+    })
+    return () => {
+      vivo = false
+    }
+  }, [item.variantId])
+  const movimientos = historial?.movimientos ?? []
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="overflow-y-hidden flex flex-col">
@@ -479,7 +467,13 @@ function HistorialDialog({
           <DialogDescription>Cada renglón dice qué pasó y cuántas quedaron. Lo más reciente arriba.</DialogDescription>
         </DialogHeader>
         <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-stone-100">
-          {movimientos.length === 0 && (
+          {!historial && !fallo && (
+            <li className="py-8 flex justify-center text-stone-400">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </li>
+          )}
+          {fallo && <li className="py-8 text-center text-sm text-red-700">{fallo}</li>}
+          {historial && movimientos.length === 0 && (
             <li className="py-8 text-center text-sm text-stone-400">Sin movimientos todavía.</li>
           )}
           {movimientos.map((m) => (
@@ -500,6 +494,9 @@ function HistorialDialog({
             </li>
           ))}
         </ul>
+        {historial && !historial.completo && (
+          <p className="text-xs text-stone-400">Se muestran los últimos {movimientos.length} movimientos.</p>
+        )}
       </DialogContent>
     </Dialog>
   )
