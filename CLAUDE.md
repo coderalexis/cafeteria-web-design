@@ -158,6 +158,14 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
   —lo normal dentro de un diálogo— no se resuelve, el visor crece hasta su
   contenido y no queda NADA que desplazar. Así se quedó una dueña sin poder
   bajar por sus tickets ni cerrar la caja desde el iPhone.
+  **Corolario:** si un diálogo lleva `overflow-y-hidden`, TODOS sus pasos
+  necesitan su propia zona desplazable, no solo el que la motivó. Uno de dos
+  pasos (buscar / llenar el formulario) donde solo el buscador desplaza recorta
+  el formulario **en silencio** y deja el botón de guardar fuera de la
+  pantalla. Se ve con el teléfono ACOSTADO (812×375) o en la tablet de 10.4"
+  (1000×600), nunca con el celular de pie. El patrón bueno: cuerpo con
+  `flex-1 min-h-0 overflow-y-auto` y el `DialogFooter` FUERA de él, para que
+  los botones no se vayan con el desplazamiento.
 - **Deploy con pestañas abiertas**: una server action que revalida devuelve
   el árbol de la página del build nuevo y la pestaña vieja truena con
   «reading 'call'»; y si Vercel no reutilizó la caché de build, la sal de las

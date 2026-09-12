@@ -1230,6 +1230,176 @@ export type Database = {
           },
         ]
       }
+      stock_items: {
+        Row: {
+          business_id: string
+          id: string
+          min_qty: number
+          qty: number
+          supply_id: string | null
+          tracked: boolean
+          tracked_at: string
+          tracked_seq: number
+          updated_at: string
+          variant_id: string | null
+        }
+        Insert: {
+          business_id?: string
+          id?: string
+          min_qty?: number
+          qty?: number
+          supply_id?: string | null
+          tracked?: boolean
+          tracked_at?: string
+          tracked_seq?: number
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          id?: string
+          min_qty?: number
+          qty?: number
+          supply_id?: string | null
+          tracked?: boolean
+          tracked_at?: string
+          tracked_seq?: number
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_supply_id_fkey"
+            columns: ["supply_id"]
+            isOneToOne: false
+            referencedRelation: "supplies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "menu_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          actor_id: string | null
+          business_id: string
+          created_at: string
+          id: string
+          item_id: string
+          kind: string
+          qty: number
+          qty_after: number
+          reason: string | null
+          seq: number
+          ticket_id: string | null
+          unit_cost: number | null
+        }
+        Insert: {
+          actor_id?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          item_id: string
+          kind: string
+          qty: number
+          qty_after: number
+          reason?: string | null
+          seq?: never
+          ticket_id?: string | null
+          unit_cost?: number | null
+        }
+        Update: {
+          actor_id?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          kind?: string
+          qty?: number
+          qty_after?: number
+          reason?: string | null
+          seq?: never
+          ticket_id?: string | null
+          unit_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplies: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          unit: string
+        }
+        Insert: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          unit?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplies_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_item_modifiers: {
         Row: {
           business_id: string
@@ -1685,6 +1855,47 @@ export type Database = {
       set_ticket_prepared: {
         Args: { p_prepared?: boolean; p_ticket_id: string }
         Returns: string
+      }
+      stock_audit: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_biz: string
+          p_details: Json
+          p_entity: string
+        }
+        Returns: undefined
+      }
+      stock_item_name: { Args: { p_item: string }; Returns: string }
+      stock_move: {
+        Args: {
+          p_item: string
+          p_kind: string
+          p_qty: number
+          p_reason?: string
+          p_unit_cost?: number
+        }
+        Returns: Json
+      }
+      stock_track: {
+        Args: {
+          p_min?: number
+          p_on: boolean
+          p_qty?: number
+          p_variant: string
+        }
+        Returns: Json
+      }
+      supply_save: {
+        Args: {
+          p_min?: number
+          p_name: string
+          p_on?: boolean
+          p_qty?: number
+          p_supply?: string
+          p_unit?: string
+        }
+        Returns: Json
       }
       ticket_lines: {
         Args: { p_biz: string; p_items: Json }

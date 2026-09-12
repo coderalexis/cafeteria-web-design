@@ -30,6 +30,7 @@ import { formatCurrency, formatTime, PAYMENT_METHODS, type PaymentMethodKey } fr
 import { buildKitchenLines, buildTicketLines, printLines, receiptBusinessFrom, receiptFromTicket } from "@/lib/receipt"
 import { useBusiness } from "@/components/business-provider"
 import { ticketItemLabel, type TicketRecord } from "@/lib/tickets"
+import type { CambioExistencia } from "@/lib/existencias"
 import { ReceiptQrDialog, useReceiptQr } from "@/components/receipt-qr-dialog"
 
 interface Props {
@@ -40,9 +41,11 @@ interface Props {
   publicReceipt: boolean
   /** Corregir: la venta se carga al carrito para cobrarla de nuevo (P37). */
   onCorrect?: (ticket: TicketRecord) => void
+  /** Cancelar devuelve piezas a lo que se cuenta (P45): el POS las aplica sin recargar. */
+  onStock?: (cambios: CambioExistencia[]) => void
 }
 
-export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt, onCorrect }: Props) {
+export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt, onCorrect, onStock }: Props) {
   const router = useRouter()
   const receiptBiz = receiptBusinessFrom(useBusiness())
   const qr = useReceiptQr()
@@ -90,6 +93,7 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
       return
     }
     toast.success(`Ticket #${result.folio} cancelado`)
+    onStock?.(result.stock)
     setToCancel(null)
     setReason("")
     await load()

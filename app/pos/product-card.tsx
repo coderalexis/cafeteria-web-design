@@ -32,6 +32,7 @@ export const ProductCard = memo(function ProductCard({
   onElegir,
   onElegirTamano,
   marcado,
+  esquina,
 }: {
   product: Product
   accent: string | undefined
@@ -43,6 +44,8 @@ export const ProductCard = memo(function ProductCard({
   onElegirTamano: (p: Product, size?: SizeOption) => void
   /** El primero de la rejilla: el recorrido de la primera venta lo ilumina. */
   marcado?: boolean
+  /** «Quedan 3» / «Agotado» (P45): texto estable, así el memo sigue sirviendo. Nunca bloquea. */
+  esquina?: string | null
 }) {
   return (
     <div className="relative" data-recorrido={marcado ? "producto" : undefined}>
@@ -84,11 +87,22 @@ export const ProductCard = memo(function ProductCard({
           {product.description && product.description !== subcategory && (
             <p className="text-xs text-stone-400 mt-0.5 truncate">{product.description}</p>
           )}
-          <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between">
+          <p className="text-amber-700 font-bold text-base mt-1 flex items-center justify-between gap-1">
             {getDisplayPrice(product)}
-            {product.modifierGroups && (
-              <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
-            )}
+            <span className="flex items-center gap-1">
+              {esquina && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                    esquina === "Agotado" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {esquina}
+                </span>
+              )}
+              {product.modifierGroups && (
+                <SlidersHorizontal className="h-3.5 w-3.5 text-stone-300" aria-label="Con opciones" />
+              )}
+            </span>
           </p>
         </div>
       </m.button>

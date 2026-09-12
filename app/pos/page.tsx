@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { esUnidad, type ItemExistencia, type Unidad } from "@/lib/existencias"
 import type { AccountVisit } from "./parked"
 import { creditAccountsFrom } from "@/lib/credit"
 import { getContext } from "@/lib/context"
@@ -282,12 +283,37 @@ export default async function POSPage() {
     .filter((id): id is string => !!id && !fijados.includes(id))
   const favoriteVariantIds = [...fijados, ...automaticos].slice(0, Math.max(8, fijados.length))
 
+  // Lo que el café cuenta (P45): insumos y artículos del menú, en una lista.
+  // Vacía en un café que no cuenta nada, y entonces el POS no enseña nada
+  // nuevo. Se pide aparte del menú porque los insumos no están en la carta.
+  const { data: contado } = await supabase
+    .from("stock_items")
+    .select(`id, variant_id, supply_id, qty, min_qty,
+       supplies(name, unit),
+       menu_variants(name, menu_products(name))`)
+    .eq("tracked", true)
+  const existencias: ItemExistencia[] = (contado ?? []).map((f) => {
+    const v = f.menu_variants
+    const nombreMenu = v ? `${v.menu_products?.name ?? ""}${v.name && v.name !== "Único" ? ` · ${v.name}` : ""}` : ""
+    const unidad = f.supplies && esUnidad(f.supplies.unit) ? (f.supplies.unit as Unidad) : "pieza"
+    return {
+      itemId: f.id,
+      variantId: f.variant_id,
+      supplyId: f.supply_id,
+      nombre: f.supply_id ? (f.supplies?.name ?? "") : nombreMenu,
+      unidad,
+      qty: Number(f.qty),
+      minQty: Number(f.min_qty),
+    }
+  })
+
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
   return (
     <POSClient
       categories={categories}
       products={products}
+      existencias={existencias}
       isAdmin={isAdmin}
       businessId={businessId}
       cashierId={ctx.userId}

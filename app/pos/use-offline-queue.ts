@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createTicket } from "@/app/actions/sales"
+import type { CambioExistencia } from "@/lib/existencias"
 import {
   canEnqueue,
   clearDiffs,
@@ -25,14 +26,20 @@ import {
  * Un solo trabajador, no uno por venta: subir en paralelo desordenaría los
  * folios y multiplicaría los reintentos justo cuando la red está mal. El
  * candado `subiendoRef` garantiza que solo haya un ciclo vivo.
+ *
+ * `onStock`: lo que cada venta subida descontó de las existencias (P45), para
+ * que la esquina «quedan 3» del POS no se quede vieja después de una racha
+ * sin internet. Va por ref: cambiar el callback no reinicia el trabajador.
  */
-export function useOfflineQueue(businessId: string) {
+export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioExistencia[]) => void) {
   const [state, setState] = useState<QueueState>(() => readQueue(null))
   const [subiendo, setSubiendo] = useState<{ hecho: number; total: number } | null>(null)
   const [hidratada, setHidratada] = useState(false)
   const subiendoRef = useRef(false)
   const estadoRef = useRef(state)
   estadoRef.current = state
+  const onStockRef = useRef(onStock)
+  onStockRef.current = onStock
 
   const key = queueKey(businessId)
 
@@ -103,6 +110,7 @@ export function useOfflineQueue(businessId: string) {
         })
         if (r.success) {
           guardar(markUploaded(estadoRef.current, venta.clientRef, r.folio, r.total))
+          onStockRef.current?.(r.stock)
         } else if (isNetworkError(r.error)) {
           // Volvió a caerse: se deja pendiente y se corta el ciclo — insistir
           // con las demás sin red solo gasta batería.

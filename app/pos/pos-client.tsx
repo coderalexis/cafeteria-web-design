@@ -114,6 +114,8 @@ import {
   type SizeOption, type PersistedCart, CART_STORAGE_VERSION, customProduct, linesToItems } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
+import { aplicarCambios, esquinaExistencia, esquinaProducto, porVariante, type CambioExistencia, type ItemExistencia } from "@/lib/existencias"
+import { ExistenciasPosDialog } from "./existencias-dialog"
 
 interface POSClientProps {
   categories: Category[]
@@ -168,6 +170,8 @@ interface POSClientProps {
   /** Fuera de menú (P39): vender algo que no está en la carta con precio de caja. */
   customItemsEnabled: boolean
   recientesFueraDeMenu: CustomRecent[]
+  /** Lo que el café cuenta (P45): insumos y artículos del menú; vacío si no cuenta nada. */
+  existencias: ItemExistencia[]
 }
 
 /**
@@ -221,6 +225,7 @@ export default function POSClient({
   fiados,
   customItemsEnabled,
   recientesFueraDeMenu,
+  existencias: existenciasIniciales,
 }: POSClientProps) {
   const router = useRouter()
   const appCtx = useAppContext()
@@ -294,7 +299,20 @@ export default function POSClient({
   const textSize = usePosTextSize()
   // Cola de ventas sin internet (docs/cola-sin-internet.md). Vive aquí y no
   // dentro de un componente hijo porque cobrar la usa y el aviso la muestra.
-  const cola = useOfflineQueue(businessId)
+  // Lo que el café cuenta (P45): nace del servidor y se pone al día con lo que
+  // cada cobro, cancelación o merma DEVUELVE, sin volver a pedir la carta. Con
+  // `router.refresh()` llega de nuevo por props. Va antes de la cola porque las
+  // ventas que suben desde ella también descuentan.
+  const [existencias, setExistencias] = useState(existenciasIniciales)
+  useEffect(() => setExistencias(existenciasIniciales), [existenciasIniciales])
+  const [showExistencias, setShowExistencias] = useState(false)
+  const aplicarExistencias = useCallback(
+    (cambios: CambioExistencia[]) => setExistencias((lista) => aplicarCambios(lista, cambios)),
+    [],
+  )
+  /** Solo lo del menú, que es lo que se pinta en las tarjetas. */
+  const porVarianteMapa = useMemo(() => porVariante(existencias), [existencias])
+  const cola = useOfflineQueue(businessId, aplicarExistencias)
   const [showQueueReview, setShowQueueReview] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   // Se avisa UNA vez por cierre, no en cada recarga, y solo mientras no haya
@@ -640,6 +658,16 @@ export default function POSClient({
   // La venta vuelve al carrito tal como se cobró; al cobrar de nuevo, el
   // servidor cancela la original y cobra esta con la hora original.
   const [corrigiendo, setCorrigiendo] = useState<{ id: string; folio: number; total: number } | null>(null)
+
+  /** «Quedan 3» / «Agotado» de una tarjeta; null si no se cuenta o hay de sobra. */
+  const esquinaDe = useCallback(
+    (p: Product): string | null => {
+      const ids = p.sizes ? p.sizes.map((s) => s.variantId) : p.variantId ? [p.variantId] : []
+      const lista = ids.flatMap((id) => (porVarianteMapa[id] ? [porVarianteMapa[id]] : []))
+      return lista.length ? esquinaProducto(lista) : null
+    },
+    [porVarianteMapa],
+  )
   const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
   const { lastAdded, markFlyOrigin, marcarOrigenEn, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
 
@@ -1332,6 +1360,7 @@ export default function POSClient({
         : await createTicket(entrada)
 
       if (result.success) {
+        aplicarExistencias(result.stock)
         const completada: CompletedSale = {
           ticketId: result.ticketId,
           folio: result.folio,
@@ -1473,7 +1502,7 @@ export default function POSClient({
     } finally {
       if (!optimista) setIsProcessing(false)
     }
-  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount, corrigiendo, creditCustomer, router, setPaymentMethod])
+  }, [canCharge, saleRef, businessId, paymentMethod, ticketNotes, esParaLlevar, cashReceived, tipAmount, discount, total, lines, lastSaleKey, clearTip, resetAfterSale, loyaltyCustomer, loyaltyRedeem, cola, cerrarCuentaCobrada, isMobile, autoPrint, practica, due, changeDue, openAccount, restoreLines, setTicketNotes, setDiscount, corrigiendo, creditCustomer, router, setPaymentMethod, aplicarExistencias])
 
   /**
    * Producto/tamaño elegido: si algún extra es obligatorio (o el negocio pide
@@ -1667,6 +1696,7 @@ export default function POSClient({
           toast.error(result.error || "Error al registrar la venta")
           return
         }
+        aplicarExistencias(result.stock)
         parked.remove(o.id)
         if (openAccount?.id === o.id) {
           // También estaba en el carrito: ya se cobró, no hay ronda que guardar.
@@ -1726,7 +1756,7 @@ export default function POSClient({
         setConfirmarCobro(null)
       }
     },
-    [cobrandoCuenta, openSession, products, businessId, parked, openAccount, clearCart, cola],
+    [cobrandoCuenta, openSession, products, businessId, parked, openAccount, clearCart, cola, aplicarExistencias],
   )
   const tocarCobro = useCallback(
     (o: ParkedOrder) => {
@@ -1887,6 +1917,7 @@ export default function POSClient({
           practica={practica}
           onTogglePractica={togglePractica}
           onAprender={() => setShowAprender(true)}
+          onExistencias={existencias.length > 0 ? () => setShowExistencias(true) : undefined}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
@@ -1952,7 +1983,10 @@ export default function POSClient({
                   className={`una-fila-si-bajo ${isMobile ? "grid grid-cols-2 gap-2 min-[500px]:flex min-[500px]:flex-wrap" : "flex flex-wrap gap-2"}`}
                   data-favoritos
                 >
-                  {favorites.map(({ product, size }) => (
+                  {favorites.map(({ product, size }) => {
+                    const e = size ? porVarianteMapa[size.variantId] : undefined
+                    const esquina = size ? (e ? esquinaExistencia(e.qty, e.minQty) : null) : esquinaDe(product)
+                    return (
                     <m.button
                       key={size?.variantId ?? product.id}
                       whileTap={{ scale: 0.95 }}
@@ -1969,8 +2003,18 @@ export default function POSClient({
                       <span className="block text-xs font-bold text-amber-700">
                         {size ? formatCurrency(size.price) : getDisplayPrice(product)}
                       </span>
+                      {esquina && (
+                        <span
+                          className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                            esquina === "Agotado" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {esquina}
+                        </span>
+                      )}
                     </m.button>
-                  ))}
+                    )
+                  })}
                   {/* Lo que no está en la carta, al alcance del pulgar: un
                       tile más al final de los de siempre. */}
                   {customItemsEnabled && (
@@ -2016,6 +2060,7 @@ export default function POSClient({
                       onMarcarOrigen={markFlyOrigin}
                       onElegir={handleProductClick}
                       onElegirTamano={chooseProduct}
+                      esquina={esquinaDe(product)}
                     />
                   ))}
                 </div>
@@ -2370,12 +2415,20 @@ export default function POSClient({
       )}
       <TicketHistoryDialog
         onCorrect={iniciarCorreccion}
+        onStock={aplicarExistencias}
         open={showTickets}
         onOpenChange={setShowTickets}
         isAdmin={isAdmin}
         publicReceipt={publicReceipt}
       />
       <RecentOrdersDialog open={showRecent} onOpenChange={setShowRecent} />
+      <ExistenciasPosDialog
+        open={showExistencias}
+        onOpenChange={setShowExistencias}
+        existencias={existencias}
+        isAdmin={isAdmin}
+        onCambios={aplicarExistencias}
+      />
       <ProductInfoDialog product={infoProduct} onClose={() => setInfoProduct(null)} />
       <LoyaltyDialog
         open={showLoyalty}
