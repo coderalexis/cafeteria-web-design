@@ -8,12 +8,13 @@ import type { ActionResult } from "./types"
 import type { CambioExistencia, KindMovimiento, Movimiento } from "@/lib/existencias"
 
 /* ------------------------------------------------------------------ */
-/*  Inventario por pieza (P45).                                         */
+/*  Inventario (P45).                                                   */
 /*                                                                      */
-/*  Toda la regla vive en los RPC (migración 57): quién puede marcar,   */
-/*  quién puede poner el costo, que la merma lleve motivo, que contar   */
-/*  sea de admin. Aquí solo se validan formas y se traduce lo que el    */
-/*  servidor devuelve a lo que la pantalla y el POS necesitan.          */
+/*  Toda la regla vive en los RPC (migraciones 57 y 58): quién puede    */
+/*  decidir qué se cuenta, quién puede poner el costo, que la merma     */
+/*  lleve motivo, que contar sea de admin, que lo del menú se cuente    */
+/*  entero. Aquí solo se validan formas y se traduce lo que el servidor */
+/*  devuelve a lo que la pantalla y el POS necesitan.                   */
 /* ------------------------------------------------------------------ */
 
 function revalidar() {
@@ -30,13 +31,15 @@ const HISTORIAL_MAX = 300
  * «por si acaso» era pagar cientos de renglones en cada visita y, peor,
  * cortarlo en silencio para el artículo que más se mueve.
  */
-export async function historialDe(variantId: string): Promise<ActionResult<{ movimientos: Movimiento[]; completo: boolean }>> {
-  if (!z.string().uuid().safeParse(variantId).success) return { error: "Artículo inválido." }
+export async function historialDe(
+  itemId: string,
+): Promise<ActionResult<{ movimientos: Movimiento[]; completo: boolean }>> {
+  if (!z.string().uuid().safeParse(itemId).success) return { error: "Artículo inválido." }
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("stock_movements")
-    .select("id, variant_id, kind, qty, qty_after, unit_cost, reason, created_at, tickets(folio), profiles(full_name)")
-    .eq("variant_id", variantId)
+    .select("id, kind, qty, qty_after, unit_cost, reason, created_at, tickets(folio), profiles(full_name)")
+    .eq("item_id", itemId)
     .order("seq", { ascending: false })
     .limit(HISTORIAL_MAX + 1)
   if (error) return { error: dbErrorMessage(error) }
@@ -46,10 +49,9 @@ export async function historialDe(variantId: string): Promise<ActionResult<{ mov
     completo: filas.length <= HISTORIAL_MAX,
     movimientos: filas.slice(0, HISTORIAL_MAX).map((m) => ({
       id: m.id,
-      variantId: m.variant_id,
       kind: m.kind as KindMovimiento,
-      qty: m.qty,
-      qtyAfter: m.qty_after,
+      qty: Number(m.qty),
+      qtyAfter: Number(m.qty_after),
       unitCost: m.unit_cost == null ? null : Number(m.unit_cost),
       reason: m.reason,
       folio: m.tickets?.folio ?? null,
@@ -59,20 +61,21 @@ export async function historialDe(variantId: string): Promise<ActionResult<{ mov
   }
 }
 
-const piezas = z.number().int().min(0, "No puede ser negativo.").max(100000, "Son demasiadas piezas.")
+const cantidad = z.number().min(0, "No puede ser negativo.").max(100000, "Es demasiado.")
+const enteras = z.number().int("Se cuenta en piezas enteras.").min(0, "No puede ser negativo.").max(100000, "Es demasiado.")
 
-const marcarSchema = z.object({
+const menuSchema = z.object({
   variantId: z.string().uuid(),
   /** null = no tocar la existencia (solo empezar a contar, o ajustar el mínimo). */
-  qty: piezas.nullable(),
-  minQty: piezas.nullable(),
+  qty: enteras.nullable(),
+  minQty: enteras.nullable(),
 })
 
-/** Empieza a contar una variante (o ajusta su mínimo / su existencia). Admin o dueño. */
-export async function marcarPorPieza(
-  input: z.infer<typeof marcarSchema>,
-): Promise<ActionResult<{ qty: number; minQty: number }>> {
-  const parsed = marcarSchema.safeParse(input)
+/** Empieza a contar algo del MENÚ (o ajusta su mínimo / su existencia). Admin o dueño. */
+export async function contarDelMenu(
+  input: z.infer<typeof menuSchema>,
+): Promise<ActionResult<{ itemId: string; qty: number; minQty: number }>> {
+  const parsed = menuSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("stock_track", {
@@ -82,33 +85,84 @@ export async function marcarPorPieza(
     p_min: parsed.data.minQty ?? undefined,
   })
   if (error) return { error: dbErrorMessage(error) }
-  const r = (data ?? {}) as { qty?: number; min_qty?: number }
+  const r = (data ?? {}) as { item_id?: string; qty?: number; min_qty?: number }
   revalidar()
-  return { success: true, qty: Number(r.qty ?? 0), minQty: Number(r.min_qty ?? 0) }
+  return { success: true, itemId: String(r.item_id ?? ""), qty: Number(r.qty ?? 0), minQty: Number(r.min_qty ?? 0) }
 }
 
-/** Deja de contar una variante. El diario se queda. */
-export async function dejarDeContar(variantId: string): Promise<ActionResult> {
-  if (!z.string().uuid().safeParse(variantId).success) return { error: "Artículo inválido." }
+const insumoSchema = z.object({
+  /** Sin id = nace; con id = se renombra, cambia de unidad o de mínimo. */
+  supplyId: z.string().uuid().nullable().optional(),
+  nombre: z.string().trim().min(1, "Escribe el nombre del insumo.").max(80, "El nombre es demasiado largo."),
+  unidad: z.enum(["pieza", "paquete", "caja", "bolsa", "kilo", "litro"]),
+  qty: cantidad.nullable().optional(),
+  minQty: cantidad.nullable().optional(),
+})
+
+/** Crea o corrige un insumo: lo que se compra para preparar y no está en el menú. */
+export async function guardarInsumo(
+  input: z.infer<typeof insumoSchema>,
+): Promise<ActionResult<{ itemId: string; supplyId: string; qty: number }>> {
+  const parsed = insumoSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." }
+  const v = parsed.data
   const supabase = await createClient()
-  const { error } = await supabase.rpc("stock_track", { p_variant: variantId, p_on: false })
+  const { data, error } = await supabase.rpc("supply_save", {
+    p_name: v.nombre,
+    p_unit: v.unidad,
+    p_supply: v.supplyId ?? undefined,
+    p_qty: v.qty ?? undefined,
+    p_min: v.minQty ?? undefined,
+  })
   if (error) return { error: dbErrorMessage(error) }
+  const r = (data ?? {}) as { item_id?: string; supply_id?: string; qty?: number }
+  revalidar()
+  return {
+    success: true,
+    itemId: String(r.item_id ?? ""),
+    supplyId: String(r.supply_id ?? ""),
+    qty: Number(r.qty ?? 0),
+  }
+}
+
+/** Deja de contar, sea del menú o un insumo. El diario se queda. */
+export async function dejarDeContar(input: {
+  variantId?: string | null
+  supplyId?: string | null
+  nombre?: string
+}): Promise<ActionResult> {
+  const supabase = await createClient()
+  if (input.variantId) {
+    if (!z.string().uuid().safeParse(input.variantId).success) return { error: "Artículo inválido." }
+    const { error } = await supabase.rpc("stock_track", { p_variant: input.variantId, p_on: false })
+    if (error) return { error: dbErrorMessage(error) }
+  } else if (input.supplyId) {
+    if (!z.string().uuid().safeParse(input.supplyId).success) return { error: "Artículo inválido." }
+    const { error } = await supabase.rpc("supply_save", {
+      p_name: input.nombre ?? "",
+      p_supply: input.supplyId,
+      p_on: false,
+    })
+    if (error) return { error: dbErrorMessage(error) }
+  } else {
+    return { error: "Artículo inválido." }
+  }
   revalidar()
   return { success: true }
 }
 
 const moverSchema = z.object({
-  variantId: z.string().uuid(),
+  itemId: z.string().uuid(),
   kind: z.enum(["entrada", "merma", "conteo"]),
-  qty: piezas,
+  qty: cantidad,
   reason: z.string().trim().max(200, "El motivo es demasiado largo.").optional(),
   unitCost: z.number().min(0, "El costo no es válido.").max(99999, "El costo no es válido.").optional(),
 })
 
 /**
- * Registra lo que pasó con las piezas. Cualquiera del equipo (el RPC decide
- * qué puede cada rol). Devuelve la existencia nueva en la misma forma que
- * `create_ticket`, para que el POS la aplique con la misma función.
+ * Registra lo que pasó con las existencias. Cualquiera del equipo (el RPC
+ * decide qué puede cada rol). Devuelve la existencia nueva en la misma forma
+ * que `create_ticket`, para que el POS la aplique con la misma función.
  */
 export async function registrarMovimiento(
   input: z.infer<typeof moverSchema>,
@@ -118,7 +172,7 @@ export async function registrarMovimiento(
   const v = parsed.data
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("stock_move", {
-    p_variant: v.variantId,
+    p_item: v.itemId,
     p_kind: v.kind,
     p_qty: v.qty,
     p_reason: v.reason || undefined,
@@ -130,7 +184,7 @@ export async function registrarMovimiento(
   revalidar()
   return {
     success: true,
-    cambios: [{ variant_id: v.variantId, qty: qtyAfter }],
+    cambios: [{ item_id: v.itemId, qty: qtyAfter }],
     qtyAfter,
     // Lo que cambió según el SERVIDOR: en un conteo, la diferencia real, no la
     // que la pantalla calcularía con un número que pudo quedar viejo.

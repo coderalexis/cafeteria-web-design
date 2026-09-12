@@ -2,7 +2,8 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getContext } from "@/lib/context"
 import { homePathFor, isManager } from "@/lib/context-shape"
-import { ExistenciasClient, type Candidato, type ItemExistencia } from "./existencias-client"
+import { esUnidad, type Unidad } from "@/lib/existencias"
+import { ExistenciasClient, type Candidato, type Fila } from "./existencias-client"
 
 export const dynamic = "force-dynamic"
 
@@ -12,9 +13,10 @@ function nombreDe(producto: string, variante: string): string {
 }
 
 /**
- * Inventario por pieza (P45). Todo se lee por RLS: las dos tablas son de solo
- * lectura para el cliente y se escriben por RPC desde `app/actions/existencias.ts`.
- * Diseño en docs/inventario.md.
+ * Existencias (P45): lo que cada café cuenta, de las dos clases — insumos que
+ * se compran para preparar y artículos del menú que se revenden. Todo se lee
+ * por RLS: las tablas son de solo lectura para el cliente y se escriben por
+ * RPC desde `app/actions/existencias.ts`. Diseño en docs/inventario.md.
  */
 export default async function ExistenciasPage() {
   const ctx = await getContext()
@@ -28,40 +30,47 @@ export default async function ExistenciasPage() {
     supabase
       .from("stock_items")
       .select(
-        `variant_id, qty, min_qty, updated_at,
-         menu_variants(id, name, size_label, price, cost, is_active,
+        `id, variant_id, supply_id, qty, min_qty,
+         supplies(id, name, unit),
+         menu_variants(id, name, price, cost, is_active,
            menu_products(id, name, is_active, menu_categories(name, sort_order)))`,
-      ),
+      )
+      .eq("tracked", true),
     supabase
       .from("menu_products")
       .select(
         `id, name, sort_order, menu_categories(name, sort_order),
-         menu_variants(id, name, size_label, is_active, sort_order)`,
+         menu_variants(id, name, is_active, sort_order)`,
       )
       .eq("is_active", true)
       .order("sort_order"),
   ])
 
-  const items: ItemExistencia[] = (filas ?? [])
-    .map((f) => {
+  const items: Fila[] = (filas ?? [])
+    .map((f): Fila => {
+      const s = f.supplies
       const v = f.menu_variants
       const p = v?.menu_products
+      const esInsumo = !!f.supply_id
       return {
+        itemId: f.id,
         variantId: f.variant_id,
-        nombre: nombreDe(p?.name ?? "(producto borrado)", v?.name ?? "Único"),
-        categoria: p?.menu_categories?.name ?? "",
-        categoriaOrden: p?.menu_categories?.sort_order ?? 0,
-        qty: f.qty,
-        minQty: f.min_qty,
+        supplyId: f.supply_id,
+        esInsumo,
+        nombre: esInsumo ? (s?.name ?? "(insumo borrado)") : nombreDe(p?.name ?? "(producto borrado)", v?.name ?? "Único"),
+        unidad: esInsumo && s && esUnidad(s.unit) ? (s.unit as Unidad) : "pieza",
+        categoria: esInsumo ? "" : (p?.menu_categories?.name ?? ""),
+        categoriaOrden: esInsumo ? 0 : (p?.menu_categories?.sort_order ?? 0),
+        qty: Number(f.qty),
+        minQty: Number(f.min_qty),
         cost: Number(v?.cost ?? 0),
-        price: Number(v?.price ?? 0),
-        activo: (v?.is_active ?? false) && (p?.is_active ?? false),
-        updatedAt: f.updated_at,
+        // Un insumo nunca sale del menú; una variante sí puede desactivarse.
+        activo: esInsumo || ((v?.is_active ?? false) && (p?.is_active ?? false)),
       }
     })
     .sort((a, b) => a.categoriaOrden - b.categoriaOrden || a.nombre.localeCompare(b.nombre, "es"))
 
-  const contados = new Set(items.map((i) => i.variantId))
+  const contados = new Set(items.map((i) => i.variantId).filter(Boolean))
   const candidatos: Candidato[] = (menu ?? [])
     .flatMap((p) =>
       [...(p.menu_variants ?? [])]

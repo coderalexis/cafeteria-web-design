@@ -114,7 +114,7 @@ import {
   type SizeOption, type PersistedCart, CART_STORAGE_VERSION, customProduct, linesToItems } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
-import { aplicarCambios, esquinaExistencia, esquinaProducto, type CambioExistencia, type Existencia } from "@/lib/existencias"
+import { aplicarCambios, esquinaExistencia, esquinaProducto, porVariante, type CambioExistencia, type ItemExistencia } from "@/lib/existencias"
 import { ExistenciasPosDialog } from "./existencias-dialog"
 
 interface POSClientProps {
@@ -170,8 +170,8 @@ interface POSClientProps {
   /** Fuera de menú (P39): vender algo que no está en la carta con precio de caja. */
   customItemsEnabled: boolean
   recientesFueraDeMenu: CustomRecent[]
-  /** Existencias de lo que se cuenta por pieza (P45), por variante; vacío si el café no cuenta nada. */
-  existencias: Record<string, Existencia>
+  /** Lo que el café cuenta (P45): insumos y artículos del menú; vacío si no cuenta nada. */
+  existencias: ItemExistencia[]
 }
 
 /**
@@ -299,17 +299,19 @@ export default function POSClient({
   const textSize = usePosTextSize()
   // Cola de ventas sin internet (docs/cola-sin-internet.md). Vive aquí y no
   // dentro de un componente hijo porque cobrar la usa y el aviso la muestra.
-  // Existencias de lo que se cuenta por pieza (P45): nacen del servidor y se
-  // ponen al día con lo que cada cobro, cancelación o merma DEVUELVE, sin
-  // volver a pedir la carta. Con `router.refresh()` llegan de nuevo por props.
-  // Van antes de la cola porque las ventas que suben desde ella también descuentan.
+  // Lo que el café cuenta (P45): nace del servidor y se pone al día con lo que
+  // cada cobro, cancelación o merma DEVUELVE, sin volver a pedir la carta. Con
+  // `router.refresh()` llega de nuevo por props. Va antes de la cola porque las
+  // ventas que suben desde ella también descuentan.
   const [existencias, setExistencias] = useState(existenciasIniciales)
   useEffect(() => setExistencias(existenciasIniciales), [existenciasIniciales])
   const [showExistencias, setShowExistencias] = useState(false)
   const aplicarExistencias = useCallback(
-    (cambios: CambioExistencia[]) => setExistencias((m) => aplicarCambios(m, cambios)),
+    (cambios: CambioExistencia[]) => setExistencias((lista) => aplicarCambios(lista, cambios)),
     [],
   )
+  /** Solo lo del menú, que es lo que se pinta en las tarjetas. */
+  const porVarianteMapa = useMemo(() => porVariante(existencias), [existencias])
   const cola = useOfflineQueue(businessId, aplicarExistencias)
   const [showQueueReview, setShowQueueReview] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
@@ -661,10 +663,10 @@ export default function POSClient({
   const esquinaDe = useCallback(
     (p: Product): string | null => {
       const ids = p.sizes ? p.sizes.map((s) => s.variantId) : p.variantId ? [p.variantId] : []
-      const lista = ids.flatMap((id) => (existencias[id] ? [existencias[id]] : []))
+      const lista = ids.flatMap((id) => (porVarianteMapa[id] ? [porVarianteMapa[id]] : []))
       return lista.length ? esquinaProducto(lista) : null
     },
-    [existencias],
+    [porVarianteMapa],
   )
   const feedback = useCartFeedback({ lines, isMobile, cartOpen, recuperada })
   const { lastAdded, markFlyOrigin, marcarOrigenEn, cartPulse, barDip, barTargetRef, bagTargetRef } = feedback
@@ -1915,7 +1917,7 @@ export default function POSClient({
           practica={practica}
           onTogglePractica={togglePractica}
           onAprender={() => setShowAprender(true)}
-          onExistencias={Object.keys(existencias).length > 0 ? () => setShowExistencias(true) : undefined}
+          onExistencias={existencias.length > 0 ? () => setShowExistencias(true) : undefined}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
@@ -1982,7 +1984,7 @@ export default function POSClient({
                   data-favoritos
                 >
                   {favorites.map(({ product, size }) => {
-                    const e = size ? existencias[size.variantId] : undefined
+                    const e = size ? porVarianteMapa[size.variantId] : undefined
                     const esquina = size ? (e ? esquinaExistencia(e.qty, e.minQty) : null) : esquinaDe(product)
                     return (
                     <m.button
@@ -2423,7 +2425,6 @@ export default function POSClient({
       <ExistenciasPosDialog
         open={showExistencias}
         onOpenChange={setShowExistencias}
-        products={products}
         existencias={existencias}
         isAdmin={isAdmin}
         onCambios={aplicarExistencias}

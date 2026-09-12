@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import type { Existencia } from "@/lib/existencias"
+import { esUnidad, type ItemExistencia, type Unidad } from "@/lib/existencias"
 import type { AccountVisit } from "./parked"
 import { creditAccountsFrom } from "@/lib/credit"
 import { getContext } from "@/lib/context"
@@ -79,7 +79,7 @@ export default async function POSPage() {
       .select(
         `id, name, description, sort_order, category_id, prompt_modifiers, pinned_order,
          menu_categories(id, name, slug),
-         menu_variants(id, name, size_label, price, sort_order, is_active, stock_items(qty, min_qty)),
+         menu_variants(id, name, size_label, price, sort_order, is_active),
          product_modifier_groups(
            modifier_groups(id, name, min_select, max_select, is_required, sort_order, is_active,
              modifiers(id, name, price_delta, sort_order, is_active, is_default))
@@ -283,15 +283,29 @@ export default async function POSPage() {
     .filter((id): id is string => !!id && !fijados.includes(id))
   const favoriteVariantIds = [...fijados, ...automaticos].slice(0, Math.max(8, fijados.length))
 
-  // Existencias de lo que se cuenta por pieza (P45), por variante. Vacío en
-  // un café que no cuenta nada, y entonces el POS no enseña nada nuevo.
-  const existencias: Record<string, Existencia> = {}
-  for (const p of vendibles) {
-    for (const v of p.menu_variants ?? []) {
-      const s = Array.isArray(v.stock_items) ? v.stock_items[0] : v.stock_items
-      if (s) existencias[v.id] = { qty: s.qty, minQty: s.min_qty }
+  // Lo que el café cuenta (P45): insumos y artículos del menú, en una lista.
+  // Vacía en un café que no cuenta nada, y entonces el POS no enseña nada
+  // nuevo. Se pide aparte del menú porque los insumos no están en la carta.
+  const { data: contado } = await supabase
+    .from("stock_items")
+    .select(`id, variant_id, supply_id, qty, min_qty,
+       supplies(name, unit),
+       menu_variants(name, menu_products(name))`)
+    .eq("tracked", true)
+  const existencias: ItemExistencia[] = (contado ?? []).map((f) => {
+    const v = f.menu_variants
+    const nombreMenu = v ? `${v.menu_products?.name ?? ""}${v.name && v.name !== "Único" ? ` · ${v.name}` : ""}` : ""
+    const unidad = f.supplies && esUnidad(f.supplies.unit) ? (f.supplies.unit as Unidad) : "pieza"
+    return {
+      itemId: f.id,
+      variantId: f.variant_id,
+      supplyId: f.supply_id,
+      nombre: f.supply_id ? (f.supplies?.name ?? "") : nombreMenu,
+      unidad,
+      qty: Number(f.qty),
+      minQty: Number(f.min_qty),
     }
-  }
+  })
 
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 

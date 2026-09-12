@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { registrarMovimiento } from "@/app/actions/existencias"
-import { MOTIVOS_MERMA, validarMovimiento, type CambioExistencia, type KindManual } from "@/lib/existencias"
+import {
+  MOTIVOS_MERMA,
+  UNIDADES,
+  conUnidad,
+  validarMovimiento,
+  type CambioExistencia,
+  type KindManual,
+  type Unidad,
+} from "@/lib/existencias"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -23,8 +31,17 @@ const TITULO: Record<KindManual, string> = {
   conteo: "Contar lo que hay",
 }
 
+export interface ItemMovimiento {
+  itemId: string
+  nombre: string
+  qty: number
+  unidad: Unidad
+  /** Lo del menú se cuenta entero; un insumo admite decimales (2.5 kilos). */
+  esDelMenu: boolean
+}
+
 /**
- * Entrada, merma o conteo de un artículo que se cuenta por pieza (P45).
+ * Entrada, merma o conteo de algo que se cuenta (P45).
  *
  * Vive fuera de /admin porque lo usan dos pantallas: Existencias (dueña,
  * admin) y el POS (la cajera registra lo que llega y lo que se pierde desde
@@ -38,7 +55,7 @@ export function MovimientoDialog({
   onClose,
   onDone,
 }: {
-  item: { variantId: string; nombre: string; qty: number }
+  item: ItemMovimiento
   kind: KindManual
   /** La cajera puede meter entradas y mermas, pero no costo ni conteo. */
   esAdmin?: boolean
@@ -54,17 +71,20 @@ export function MovimientoDialog({
   const [nota, setNota] = useState("")
   const [isPending, startTransition] = useTransition()
 
+  const entero = item.esDelMenu
+  const unidadLabel = UNIDADES.find((u) => u.id === item.unidad)?.varios ?? "piezas"
+  const cuantas = entero ? "¿Cuántas" : "¿Cuánto"
   const reason =
     kind === "merma" ? (motivo === "Otro" ? otro.trim() : motivo) : kind === "conteo" ? nota.trim() : ""
 
   function guardar() {
     const n = qty.trim() === "" ? NaN : Number(qty)
     const unitCost = costo.trim() === "" ? undefined : Number(costo)
-    const problema = validarMovimiento({ kind, qty: n, reason, unitCost: unitCost ?? null, esAdmin })
+    const problema = validarMovimiento({ kind, qty: n, reason, unitCost: unitCost ?? null, esAdmin, entero })
     if (problema) return toast.error(problema)
     startTransition(async () => {
       const r = await registrarMovimiento({
-        variantId: item.variantId,
+        itemId: item.itemId,
         kind,
         qty: n,
         reason: reason || undefined,
@@ -74,18 +94,18 @@ export function MovimientoDialog({
         toast.error(r.error)
         return
       }
-      const quedan = (q: number) => `Queda${q === 1 ? "" : "n"} ${q}`
+      const quedan = conUnidad(r.qtyAfter, item.unidad)
       if (kind === "conteo") {
         const diff = r.delta
         toast.success(
           diff === 0
-            ? `${item.nombre}: cuadra, ${r.qtyAfter}.`
+            ? `${item.nombre}: cuadra, ${quedan}.`
             : diff < 0
-              ? `${item.nombre}: faltaban ${-diff}. ${quedan(r.qtyAfter)}.`
-              : `${item.nombre}: sobraban ${diff}. ${quedan(r.qtyAfter)}.`,
+              ? `${item.nombre}: faltaban ${conUnidad(-diff, item.unidad)}. Quedan ${quedan}.`
+              : `${item.nombre}: sobraban ${conUnidad(diff, item.unidad)}. Quedan ${quedan}.`,
         )
       } else {
-        toast.success(`${item.nombre}: ${quedan(r.qtyAfter).toLowerCase()}.`)
+        toast.success(`${item.nombre}: quedan ${quedan}.`)
       }
       onDone?.(r.cambios)
       onClose()
@@ -102,30 +122,33 @@ export function MovimientoDialog({
           </DialogTitle>
           <DialogDescription>
             {kind === "conteo"
-              ? `El sistema cree que hay ${item.qty}. Escribe lo que hay de verdad y él anota la diferencia.`
-              : `Ahora hay ${item.qty}.`}
+              ? `El sistema cree que hay ${conUnidad(item.qty, item.unidad)}. Escribe lo que hay de verdad y él anota la diferencia.`
+              : `Ahora hay ${conUnidad(item.qty, item.unidad)}.`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="mov-qty" className="text-sm font-medium text-stone-700">
               {kind === "entrada"
-                ? "¿Cuántas llegaron?"
+                ? `${cuantas} ${entero ? "llegaron" : "llegó"}?`
                 : kind === "merma"
-                  ? "¿Cuántas se perdieron?"
-                  : "¿Cuántas hay de verdad?"}
+                  ? `${cuantas} se ${entero ? "perdieron" : "perdió"}?`
+                  : `${cuantas} hay de verdad?`}
             </label>
-            <Input
-              id="mov-qty"
-              autoFocus
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              className="blanco-comodo text-lg"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="mov-qty"
+                autoFocus
+                type="number"
+                inputMode={entero ? "numeric" : "decimal"}
+                min={0}
+                step={entero ? 1 : "any"}
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                className="blanco-comodo text-lg"
+              />
+              <span className="shrink-0 text-sm text-stone-500">{unidadLabel}</span>
+            </div>
           </div>
 
           {kind === "merma" && (
@@ -163,7 +186,7 @@ export function MovimientoDialog({
           {kind === "entrada" && esAdmin && (
             <div className="space-y-1.5">
               <label htmlFor="mov-costo" className="text-sm font-medium text-stone-700">
-                ¿Cuánto te costó cada pieza? (opcional)
+                ¿Cuánto te costó cada {UNIDADES.find((u) => u.id === item.unidad)?.uno ?? "pieza"}? (opcional)
               </label>
               <Input
                 id="mov-costo"
@@ -176,9 +199,22 @@ export function MovimientoDialog({
                 placeholder="$"
                 className="blanco-comodo"
               />
+              {/* La regla se invierte según qué sea: lo del menú entra a la
+                  utilidad al venderse; un insumo nunca se vende solo, así que
+                  si no se captura en Gastos, no entra por ningún lado. */}
               <p className="text-xs text-stone-400">
-                Con esto el margen de este artículo deja de ser un invento. Ojo:{" "}
-                <strong>no lo captures también en Gastos</strong>; ya entra a tu utilidad como costo de lo vendido.
+                {item.esDelMenu ? (
+                  <>
+                    Con esto el margen de este artículo deja de ser un invento. Ojo:{" "}
+                    <strong>no lo captures también en Gastos</strong>; ya entra a tu utilidad como costo de lo
+                    vendido.
+                  </>
+                ) : (
+                  <>
+                    Sirve para saber cuánto se te va en insumos. Un insumo no se vende solo, así que{" "}
+                    <strong>esta compra sí va en Gastos</strong> para que aparezca en tu utilidad.
+                  </>
+                )}
               </p>
             </div>
           )}
