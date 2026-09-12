@@ -452,7 +452,7 @@ function AgregarDialog({
         </DialogHeader>
 
         {clase === null && (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex-1 min-h-0 overflow-y-auto content-start grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => setClase("insumo")}
@@ -513,7 +513,8 @@ function AgregarDialog({
         )}
 
         {(clase === "insumo" || (clase === "menu" && elegido)) && (
-          <div className="space-y-4">
+          <>
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 -mx-1 px-1">
             {clase === "insumo" && (
               <>
                 <div className="space-y-1.5">
@@ -589,6 +590,7 @@ function AgregarDialog({
                   : "Con 2, aparece en ámbar aquí para que sepas que toca comprar."}
               </p>
             </div>
+            </div>
             <DialogFooter className="gap-2">
               <Button
                 type="button"
@@ -608,7 +610,7 @@ function AgregarDialog({
                 Empezar a contar
               </Button>
             </DialogFooter>
-          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
