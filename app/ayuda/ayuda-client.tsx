@@ -1460,22 +1460,27 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "cajero-existencias",
       grupo: "cajero",
       icon: Boxes,
-      titulo: "Existencias: «quedan 3» y registrar mermas",
+      titulo: "Existencias: «quedan 3», entradas y mermas",
       palabras:
-        "existencias inventario quedan agotado merma entrada llego mercancia se cayo caduco cortesia consumo del personal contar piezas pan botellas",
+        "existencias inventario quedan agotado merma entrada llego mercancia se cayo caduco cortesia consumo del personal contar piezas pan botellas insumos vasos servilletas cafe en grano leche azucar desechables",
       acciones: [{ etiqueta: "POS", href: "/pos" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            Si tu café cuenta algo por pieza —pan, botellas, pasteles—, la tarjeta de ese producto enseña{" "}
+            Si tu café cuenta algo de la carta —pan, botellas, pasteles—, la tarjeta de ese producto enseña{" "}
             <strong>«quedan 3»</strong> o <strong>«Agotado»</strong>. Es un aviso, <strong>no una barrera</strong>:
             si tienes la pieza en la mano, cóbrala igual. El sistema se corrige cuando alguien cuenta.
           </li>
           <li>
-            <strong>Llegó mercancía o se perdió algo</strong>: ⋮ → <strong>Existencias</strong>. La flecha hacia
-            abajo registra una entrada («llegaron 12») y el triángulo una merma («se cayeron 2»). La merma pide el
-            motivo: se cayó, caducó, cortesía, consumo del personal u otro. El costo de lo que llega lo pone un
-            administrador.
+            <strong>Llegó mercancía o se perdió algo</strong>: ⋮ → <strong>Existencias</strong>. Ahí está todo lo
+            que el café cuenta: los <strong>insumos</strong> (café en grano, vasos, servilletas) y lo de la carta.
+            La flecha hacia abajo registra una entrada («llegaron 12») y el triángulo una merma («se cayeron 2»).
+            La merma pide el motivo: se cayó, caducó, cortesía, consumo del personal u otro. El costo de lo que
+            llega lo pone un administrador.
+          </li>
+          <li>
+            Los <strong>insumos no bajan solos</strong>: nadie sabe cuánto café lleva cada taza. Ahí el registro
+            tuyo es el que cuenta, así que si llegaron vasos, anótalos.
           </li>
           <li>
             Lo que está en una <strong>cuenta abierta</strong> no baja hasta que se cobra, y{" "}
@@ -1488,27 +1493,34 @@ export function AyudaClient({ ticket, corte }: Props) {
       id: "admin-existencias",
       grupo: "admin",
       icon: Boxes,
-      titulo: "Existencias: lo que se cuenta por pieza",
+      titulo: "Existencias: insumos y lo que revendes",
       palabras:
-        "existencias inventario piezas contar por pieza pan botellas pasteles muffin entrada merma conteo minimo avisar se esta acabando agotado negativo costo por pieza historial a donde se fueron dejar de contar",
+        "existencias inventario insumos cafe en grano leche vasos tapas servilletas azucar jarabes desechables kilos litros paquetes cajas bolsas piezas contar pan botellas pasteles muffin entrada merma conteo minimo avisar se esta acabando agotado negativo costo historial a donde se fueron dejar de contar",
       acciones: [{ etiqueta: "Existencias", href: "/admin/existencias", admin: true }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
-            <strong>Qué se cuenta</strong>: lo que se compra hecho y se vende tal cual —la orejita, la botella, el
-            muffin—. Las bebidas que se preparan <em>no</em> se cuentan: eso exigiría llevar gramos por taza, y no lo
-            hace nadie. Tú decides qué entra; un café que no marca nada no ve nada nuevo.
+            <strong>Se cuentan dos clases de cosas</strong>, y la diferencia es una sola: si baja sola con la
+            venta. Los <strong>insumos</strong> —café en grano, leche, vasos, tapas, servilletas, azúcar— no están
+            en tu menú y <em>no</em> bajan solos: nadie puede adivinar cuántos gramos lleva cada taza, así que los
+            cuentas tú de vez en cuando. Lo <strong>de tu menú</strong> —panqués, galletas, botellas: lo que
+            compras hecho y vendes igualito— sí baja con cada venta, y vuelve si se cancela o se corrige. Tú
+            decides qué entra; un café que no agrega nada no ve nada nuevo.
           </li>
           <li>
-            <strong>Empezar</strong>: <strong>Existencias → Contar un artículo</strong>, {v.toca} uno de tu menú y
-            di cuántas hay hoy y, si quieres, a partir de cuántas avisar. Desde ese momento{" "}
-            <strong>baja sola con cada venta</strong> y vuelve si la venta se cancela o se corrige.
+            <strong>Empezar</strong>: <strong>Existencias → Agregar</strong>. De un insumo escribes qué es y{" "}
+            <strong>cómo lo cuentas</strong> —piezas, paquetes, cajas, bolsas, kilos o litros—; de algo del menú{" "}
+            {v.toca} uno de tu carta. En los dos casos dices cuánto hay hoy y, si quieres, a partir de cuánto
+            avisar. Las unidades no se convierten entre sí: se cuenta en lo que tú cuentas.
           </li>
           <li>
-            <strong>Entrada</strong>: cuando llega mercancía. Si pones <strong>cuánto te costó cada pieza</strong>,
-            ese pasa a ser el costo del producto y su margen deja de ser un invento, sin abrir Productos. Ojo:
-            una entrada con costo <strong>no se captura también en Gastos</strong>; ya entra a tu utilidad como
-            costo de lo vendido, y anotarla dos veces la descontaría dos veces.
+            <strong>Entrada</strong>: cuando llega mercancía. Si pones <strong>cuánto te costó cada una</strong>, la
+            regla cambia según qué sea. En algo <strong>de tu menú</strong> ese pasa a ser el costo del producto y
+            su margen deja de ser un invento, sin abrir Productos; y esa compra{" "}
+            <strong>no se captura también en Gastos</strong>, porque ya entra a tu utilidad como costo de lo
+            vendido. Un <strong>insumo</strong> nunca se vende solo, así que su compra{" "}
+            <strong>sí va en Gastos</strong> o no aparece en tu utilidad por ningún lado; aquí el costo te sirve
+            para saber cuánto se te va en insumos.
           </li>
           <li>
             <strong>Merma</strong>: se cayó, caducó, cortesía, consumo del personal. Tu cajera también puede
@@ -1516,18 +1528,20 @@ export function AyudaClient({ ticket, corte }: Props) {
           </li>
           <li>
             <strong>Contar lo que hay</strong> (en ⋯): escribes lo que hay de verdad y el sistema anota la
-            diferencia — «faltaban 3», «sobraban 1»—. Es el arqueo de las piezas, y basta con hacerlo de vez en
-            cuando: <strong>una venta nunca se bloquea por existencias</strong>. Si el sistema dice cero y hay un
-            muffin en la vitrina, se vende; la existencia queda en negativo y el conteo la corrige.
+            diferencia — «faltaban 3», «sobraban 1»—. Es el arqueo, y basta con hacerlo de vez en cuando: con los
+            insumos, una vez por semana ya es mucho.{" "}
+            <strong>Una venta nunca se bloquea por existencias</strong>: si el sistema dice cero y hay un muffin en
+            la vitrina, se vende; la existencia queda en negativo y el conteo la corrige.
           </li>
           <li>
-            <strong>Historial</strong> (en ⋯): cada renglón dice qué pasó y cuántas quedaron —«llegaron 12 → 12»,
-            «vendida 1 · ticket #105 → 11»—. Es la respuesta a «compré 30 y tengo 3, ¿a dónde se fueron?».
+            <strong>Historial</strong> (en ⋯): cada renglón dice qué pasó y cuánto quedó —«llegaron 12 piezas →
+            12», «vendida 1 pieza · ticket #105 → 11»—. Es la respuesta a «compré 30 y tengo 3, ¿a dónde se
+            fueron?».
           </li>
           <li>
-            <strong>Avisos</strong>: en o bajo el mínimo, el artículo sale en ámbar aquí y «quedan 3» en la tarjeta
-            del POS; agotado o negativo, en rojo. <strong>Dejar de contar</strong> lo saca de la lista y conserva
-            su historial.
+            <strong>Avisos</strong>: en o bajo el mínimo sale en ámbar aquí, y si es de tu menú además «quedan 3»
+            en la tarjeta del POS; agotado o negativo, en rojo. <strong>Dejar de contar</strong> lo saca de la
+            lista y conserva su historial; si algún día vuelves a contarlo, la cuenta empieza limpia.
           </li>
         </ul>
       ),

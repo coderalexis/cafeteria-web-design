@@ -1866,10 +1866,7 @@ export type Database = {
         }
         Returns: undefined
       }
-      stock_item_name: {
-        Args: { p_item: string }
-        Returns: string
-      }
+      stock_item_name: { Args: { p_item: string }; Returns: string }
       stock_move: {
         Args: {
           p_item: string

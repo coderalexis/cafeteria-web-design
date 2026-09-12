@@ -41,13 +41,13 @@ const FILAS: { que: string; cajero: string; admin: string; owner: string }[] = [
     owner: "Sí",
   },
   {
-    que: "Existencias por pieza: registrar entradas y mermas",
+    que: "Existencias: registrar entradas y mermas",
     cajero: "Sí, desde el POS (la entrada sin costo)",
-    admin: "Sí, con el costo por pieza",
-    owner: "Sí, con el costo por pieza",
+    admin: "Sí, con el costo",
+    owner: "Sí, con el costo",
   },
   {
-    que: "Existencias por pieza: decidir qué se cuenta, mínimos y conteos",
+    que: "Existencias: decidir qué se cuenta (insumos incluidos), mínimos y conteos",
     cajero: "No",
     admin: "Sí",
     owner: "Sí",

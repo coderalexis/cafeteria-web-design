@@ -1,10 +1,50 @@
-# Diseño: inventario por pieza
+# Diseño: existencias (insumos y reventa)
 
 > Documento de diseño y plan de acción. La **Fase 1 está IMPLEMENTADA**
-> (migración 57 + Existencias + POS); las fases 2 y 3 siguen sin hacerse.
-> Escrito con los datos reales de Gym Coffe delante y antes de tocar código,
-> para que las decisiones difíciles se tomen en frío — como se hizo con
-> `docs/cola-sin-internet.md`.
+> (migraciones 57 y 58 + Existencias + POS); las fases 2 y 3 siguen sin
+> hacerse. Escrito con los datos reales de Gym Coffe delante y antes de tocar
+> código, para que las decisiones difíciles se tomen en frío — como se hizo
+> con `docs/cola-sin-internet.md`.
+
+## Corrección de rumbo (2026-09-11): también se cuentan los INSUMOS
+
+La primera versión contaba **solo lo que está en el menú y se vende tal cual**.
+Al enseñarla, el usuario puso el dedo en la llaga: eso sirve para el panqué de
+Gym Coffe y para nada más. En Cafecito Jaral nadie se surte de «capuchinos»;
+se compran café en grano, leche, vasos, tapas, servilletas y azúcar, y con eso
+se preparan las bebidas. **Lo que de verdad se acaba un sábado a media tarde no
+está en la carta.**
+
+El error no fue la decisión de «sin recetas» —esa sigue en pie: nadie captura
+gramos por bebida— sino el salto de ahí a «entonces solo se cuenta lo del
+menú». **Un insumo no necesita receta para contarse.** Necesita que alguien
+anote lo que llegó, lo que se tiró, y cuente una vez por semana. El valor está
+en no quedarse sin vasos y en saber cuánto se va en insumos al mes, no en la
+precisión de un gramo.
+
+Así que hay **una sola lista con dos clases de cosas**, y la diferencia es una:
+
+| | De tu menú | Insumo |
+|---|---|---|
+| Qué es | lo que compras hecho y vendes igualito | lo que compras para preparar |
+| Ejemplos | panqués, galletas, botellas | café en grano, leche, vasos, servilletas |
+| ¿Baja con la venta? | **sí**, sola | **no**: nadie sabe cuánto lleva cada taza |
+| Cómo se cuenta | piezas enteras | en su unidad: piezas, paquetes, cajas, bolsas, kilos, litros |
+| El costo de una entrada | pasa a `menu_variants.cost` → costo de lo vendido, y por eso **no** va en Gastos | se queda en el diario; la compra **sí** va en Gastos o no entra a la utilidad |
+| Esquina «quedan 3» en el POS | sí | no (no tiene tarjeta) |
+
+Comparten todo lo demás: entrada, merma con motivo, conteo, mínimo, historial
+y —cuando llegue la Fase 3— la lista de compras.
+
+**Por qué se pudo rehacer el esquema sin dolor:** las dos tablas de la 57
+estaban **vacías en los cinco cafés** (comprobado el 2026-09-11). La migración
+estaba aplicada pero su pantalla nunca llegó a producción. La 58 las tira y las
+rehace; esperar a que Gym Coffe contara su primer panqué lo habría vuelto una
+migración de datos.
+
+**Lo que se volvió a descartar:** descontar el vaso por bebida. Es 1 a 1 y
+suena fácil, pero es una receta chica que abre la puerta a las grandes. Conteo
+semanal y mínimo resuelven el noventa por ciento.
 
 ## Qué prometimos ya
 
@@ -55,11 +95,13 @@ Tres cosas que salen de esa tabla y que mandan sobre el diseño:
 
 ## Las decisiones de fondo
 
-**Por pieza, sin recetas.** Se cuenta lo que se compra y se vende como la
-misma cosa: la orejita, la botella, el muffin. Lo que se prepara (café, leche,
-jarabes, el pan del sándwich) NO se cuenta: exigiría capturar gramos por
-bebida y mantenerlo al día, y eso no lo hace ni una cadena. Si un día lo piden,
-el diario de movimientos de este diseño es la base sobre la que se construye.
+**Sin recetas, pero contando los insumos.** Nada se descuenta por fórmula:
+capturar gramos por bebida y mantenerlos al día no lo hace ni una cadena. Pero
+los insumos sí se cuentan, a mano: se anota lo que llega, lo que se tira y lo
+que hay al contar. Lo que se compra hecho y se vende igual (la orejita, la
+botella, el muffin) además baja solo con la venta, porque ahí sí hay un uno a
+uno que nadie tiene que mantener. Si un día alguien pide recetas de verdad, el
+diario de movimientos de este diseño es la base sobre la que se construye.
 
 **Nunca se bloquea una venta por existencias.** Si el sistema dice que quedan
 cero muffins y la cajera tiene uno en la mano, el que está mal es el sistema.
@@ -73,15 +115,30 @@ ventas y cancelaciones la mueven solas. Las personas registran tres cosas:
 que hay de verdad). Nada más. Toda escritura pasa por RPC; **ningún cliente
 escribe existencias directo**, igual que con el dinero.
 
-**Opcional por producto y apagado por omisión.** Un café que no marque nada no
-ve una sola pantalla, botón ni número nuevo. El módulo no existe hasta que el
-primer producto dice «se cuenta por pieza».
+**Opcional y apagado por omisión.** Un café que no agregue nada no ve una sola
+pantalla, botón ni número nuevo. El módulo no existe hasta que alguien agrega
+su primer insumo o su primer artículo del menú.
 
 **Todo movimiento deja rastro.** La pregunta que un dueño hace de verdad es
 «compré 30 y tengo 3, ¿a dónde se fueron 27?». La respuesta tiene que estar en
 un diario, no en un número.
 
 ## Modelo de datos
+
+> **Al día (migración 58).** El bloque de abajo describe la forma original de
+> la 57, que se conserva aquí porque explica el *porqué* de cada decisión. Lo
+> que cambió: `stock_items` tiene su propio `id` y apunta **o** a una variante
+> del menú **o** a un insumo (`supplies`), nunca a los dos; `qty` y `min_qty`
+> son numéricos (kilos y litros llevan decimales; lo del menú se sigue
+> exigiendo entero); `stock_movements` apunta al `item_id` y no a la variante;
+> y dejar de contar ya **no borra** la fila: la apaga (`tracked`) y sella desde
+> qué renglón del diario cuenta la cuenta viva (`tracked_seq`).
+>
+> **`tracked_seq` va por secuencia y no por hora**, y esto lo cazó el ensayo:
+> dentro de una misma transacción `now()` es idéntico para todo, así que con
+> una marca de tiempo, vender y volver a contar en el mismo movimiento se
+> pisaban y una venta vieja revivía al cancelarse. Es la misma lección que
+> obligó a poner `seq` en el diario.
 
 Dos tablas nuevas, ninguna columna en `menu_variants`:
 
@@ -237,7 +294,7 @@ motivo, contar y decidir qué se cuenta es de admin; (3) motivos de merma desde
 el día uno: se cayó o se rompió · caducó · cortesía · consumo del personal ·
 otro (con texto).
 
-### Fase 1 — El núcleo · **M** · ✅ IMPLEMENTADA (migración 57, `p45_inventario`)
+### Fase 1 — El núcleo · **M** · ✅ IMPLEMENTADA (migraciones 57 `p45_inventario` y 58 `p45_insumos`)
 
 Migración `57_p45_inventario.sql`: las dos tablas, RLS de solo lectura, RPC
 `stock_track(variant, on/off, qty_inicial, min)`, `stock_move(kind, variant,
@@ -269,9 +326,13 @@ Análisis, por motivo.
 
 ### Después, y solo si lo piden
 
-- **Recetas** (insumos por bebida: café, leche, jarabes). El diario ya está;
-  faltaría la tabla de recetas y descontar por fórmula. Se descartó dos veces
-  por la misma razón: nadie mantiene los gramos.
+- **Recetas** (descontar el insumo por bebida: gramos de café, mililitros de
+  leche). El diario ya está; faltaría la tabla de recetas y descontar por
+  fórmula. Se descartó tres veces por la misma razón: nadie mantiene los
+  gramos. Ojo: contar los insumos —que ya se hace— no es esto.
+- **El vaso por venta** (una «receta chica»: cada bebida chica gasta un vaso
+  chico). Descartado el 2026-09-11 junto con la corrección de rumbo: mantener
+  ese mapeo es trabajo, y el conteo semanal ya resuelve el problema real.
 - **Consumo por extras** («leche deslactosada» descontando cartones). Es una
   receta chica; misma respuesta.
 - **Proveedores, órdenes de compra, códigos de barras, varios almacenes.** Son
