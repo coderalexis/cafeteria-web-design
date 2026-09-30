@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { serializeCart, type CartState } from "./cart"
 // (serializeCart se usa en `park`; `update` ya recibe el carrito serializado)
 import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
-import { PARKED_MAX, type ParkedOrder } from "./parked"
+import { PARKED_MAX, mismoCarrito, reconciliarLista, type ParkedOrder } from "./parked"
 import { BUILD_ID, esErrorDeVersion, hayVersionNueva } from "@/lib/version"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
@@ -13,6 +13,8 @@ const REFRESCO_MS = 10_000
 // En un teléfono, cada consulta cuesta batería y datos, y el POS del celular
 // casi siempre es el único aparato de la cafetería: con 30 s alcanza.
 const REFRESCO_MOVIL_MS = 30_000
+/** Un sondeo que lleve más de esto sin contestar deja de bloquear al siguiente. */
+const SONDEO_MAX_MS = 15_000
 
 /**
  * Cuentas abiertas de la CAFETERÍA, no del aparato.
@@ -37,6 +39,7 @@ export function useParkedOrders(businessId: string) {
   const [listo, setListo] = useState(false)
   const ref = useRef<ParkedOrder[]>([])
   const cargando = useRef(false)
+  const cargandoDesde = useRef(0)
   /**
    * Cuántos sondeos seguidos han visto un build más nuevo en el servidor
    * (0 = ninguno). Es un contador y no un booleano para que quien lo mira
@@ -50,26 +53,31 @@ export function useParkedOrders(businessId: string) {
   }, [])
 
   const refrescar = useCallback(async () => {
-    if (cargando.current) return
+    // Un sondeo que no contesta (señal a medias) no puede bloquear a los que
+    // siguen para siempre: pasado un rato se deja pasar al siguiente, y si el
+    // viejo llega tarde, reconciliarLista lo pone en su lugar.
+    if (cargando.current && Date.now() - cargandoDesde.current < SONDEO_MAX_MS) return
     cargando.current = true
+    cargandoDesde.current = Date.now()
     try {
       const r = await listParked()
       if (r.success) {
         if (hayVersionNueva(BUILD_ID, r.build)) setVersionNueva((n) => n + 1)
-        // Más reciente primero: es el que más probablemente se retoma.
-        aplicar(
-          r.orders
-            .map((o) => ({
-              id: o.id,
-              name: o.name,
-              savedAt: o.savedAt,
-              cart: o.cart as ParkedOrder["cart"],
-              updatedAt: o.updatedAt,
-              owedSince: o.owedSince,
-              owedContact: o.owedContact,
-            }))
-            .reverse(),
-        )
+        // Más reciente primero: es el que más probablemente se retoma. Y
+        // reconciliado con lo que este aparato ya sabe: una respuesta que llega
+        // tarde no puede regresar el sello de una cuenta recién guardada.
+        const servidor = r.orders
+          .map((o) => ({
+            id: o.id,
+            name: o.name,
+            savedAt: o.savedAt,
+            cart: o.cart as ParkedOrder["cart"],
+            updatedAt: o.updatedAt,
+            owedSince: o.owedSince,
+            owedContact: o.owedContact,
+          }))
+          .reverse()
+        aplicar(reconciliarLista(ref.current, servidor))
         setListo(true)
       }
     } catch (e) {
@@ -214,10 +222,26 @@ export function useParkedOrders(businessId: string) {
       /** Al chocar: lo que sí está en el servidor (null si la cuenta ya no existe). */
       current: { cart: ParkedOrder["cart"]; updatedAt: string } | null
     } | null> => {
-      const r = await updateParked({ id, cart, expectedUpdatedAt })
+      let r = await updateParked({ id, cart, expectedUpdatedAt })
       if (!r?.success) {
         toast.error(r?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
         return null
+      }
+      // Choque FALSO: el servidor tiene exactamente lo que este aparato ya
+      // sabía de la cuenta y solo el sello iba viejo (un sondeo lento llegó
+      // después de un guardado). No lo movió nadie: se reintenta una vez con
+      // el sello del servidor. Si el carrito de allá es otro, sí es un choque
+      // y se trata como siempre.
+      if (!r.saved && r.current) {
+        const mia = ref.current.find((o) => o.id === id)
+        if (mia && mismoCarrito(mia.cart, r.current.cart)) {
+          const otra = await updateParked({ id, cart, expectedUpdatedAt: r.current.updatedAt })
+          if (!otra?.success) {
+            toast.error(otra?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
+            return null
+          }
+          r = otra
+        }
       }
       if (r.saved) {
         aplicar(

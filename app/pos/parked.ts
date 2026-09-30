@@ -221,6 +221,77 @@ export function isVieja(savedAt: number, now: number): boolean {
 }
 
 /**
+ * Qué lista queda después de un sondeo al servidor.
+ *
+ * El servidor manda sobre QUÉ cuentas existen (lo que se cobró o se descartó
+ * en otro aparato desaparece aquí también), pero NO puede hacer retroceder el
+ * sello de una cuenta que este aparato ya guardó. Lo que pasó en Gym Coffe el
+ * 2026-09-14 (reconstruido de los registros del servidor): con la señal
+ * lenta, la respuesta de un sondeo llegó DESPUÉS de que un guardado ya había
+ * sido confirmado, y la lista quedó con el sello anterior. Desde ahí cada
+ * guardado de «Mesa 2» chocaba contra el guardado anterior de ese mismo
+ * teléfono —26 veces en dos minutos—, el POS avisaba «se movió en otro
+ * aparato», fabricó ocho copias «Mesa 2 (2)» y la dueña tuvo que borrarlas
+ * una por una.
+ *
+ * Reglas: una cuenta que aquí tiene un sello MÁS NUEVO que el del sondeo se
+ * queda con su carrito y su sello (el sondeo es viejo, no la cuenta); y una
+ * cuenta provisional (recién guardada, sin respuesta todavía) se conserva al
+ * frente, porque el servidor aún no la conoce.
+ */
+export function reconciliarLista(local: ParkedOrder[], servidor: ParkedOrder[]): ParkedOrder[] {
+  const mias = new Map(local.map((o) => [o.id, o]))
+  const delServidor = servidor.map((s) => {
+    const mia = mias.get(s.id)
+    if (!mia) return s
+    const sMio = Date.parse(mia.updatedAt)
+    const sServ = Date.parse(s.updatedAt)
+    if (Number.isFinite(sMio) && (!Number.isFinite(sServ) || sMio > sServ)) {
+      return { ...s, cart: mia.cart, updatedAt: mia.updatedAt }
+    }
+    return s
+  })
+  const provisionales = local.filter((o) => o.id.startsWith("local-"))
+  return [...provisionales, ...delServidor]
+}
+
+function ordenado(x: unknown): unknown {
+  if (Array.isArray(x)) return x.map(ordenado)
+  if (x && typeof x === "object") {
+    const o = x as Record<string, unknown>
+    return Object.fromEntries(
+      Object.keys(o)
+        .sort()
+        .map((k) => [k, ordenado(o[k])]),
+    )
+  }
+  return x
+}
+
+/**
+ * ¿Es el mismo carrito? Se compara por contenido y sin importar el orden de
+ * las llaves: Postgres (jsonb) las reordena al guardar, así que comparar el
+ * texto tal cual diría «distinto» a dos carritos iguales.
+ *
+ * Sirve para distinguir un choque de verdad (otro aparato cambió la cuenta)
+ * de un choque falso: el servidor tiene EXACTAMENTE lo que este aparato ya
+ * guardó y solo el sello quedó viejo. En el falso se reintenta con el sello
+ * del servidor; en el de verdad se guarda aparte, como siempre.
+ */
+export function mismoCarrito(a: PersistedCart | unknown, b: PersistedCart | unknown): boolean {
+  const limpio = (c: unknown) => {
+    // savedAt cambia en cada serialización y no dice nada del contenido.
+    if (c && typeof c === "object" && !Array.isArray(c)) {
+      const { savedAt: _s, ...resto } = c as Record<string, unknown>
+      void _s
+      return ordenado(resto)
+    }
+    return ordenado(c)
+  }
+  return JSON.stringify(limpio(a)) === JSON.stringify(limpio(b))
+}
+
+/**
  * Nombre para la copia que se guarda cuando otro aparato ya movió la cuenta.
  *
  * Ante un choque no se pisa ni se tira nada: lo que este aparato agregó se

@@ -172,6 +172,15 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
   acciones rota y TODAS dan 404 («Failed to find Server Action»). `lib/version.ts`
   cubre ambos; el sello del build tiene que ser determinista (commit), porque
   `next.config.mjs` se evalúa varias veces por build.
+- **Un sondeo que sobreescribe estado puede deshacer una escritura ya
+  confirmada** cuando la red va lenta: la respuesta del sondeo (vieja) llega
+  DESPUÉS de la respuesta del guardado (nueva) y la pisa. En las cuentas
+  abiertas eso dejaba el sello de versión viejo y cada guardado «chocaba»
+  contra el guardado anterior del mismo teléfono (Gym Coffe, 2026-09-14: 26
+  choques y 8 copias «Mesa 2 (2)» en dos minutos). Regla: lo que llega de un
+  sondeo se RECONCILIA por versión (`reconciliarLista`), nunca se aplica a
+  ciegas; y un choque cuyo contenido en el servidor es idéntico al local es un
+  choque FALSO que se reintenta con el sello del servidor (`mismoCarrito`).
 - **Una server action dentro de `startTransition(async …)` que rechaza (sin
   señal, deploy a medias) tumba la pantalla ENTERA al error boundary**: React 19
   trata ese rechazo como error de render. En el POS eso es quedarse sin caja a
