@@ -163,8 +163,11 @@ export function describirMovimiento(m: MovimientoDiario, unidad: Unidad = "pieza
     case "merma":
       return `Merma de ${cantidad}${m.reason ? `: ${m.reason}` : ""}`
     case "conteo": {
-      // El primer renglón de todo artículo: no «sobraban 10», había 10.
-      if (m.reason === "Existencia inicial") return `Existencia inicial: ${cantidad}`
+      // El primer renglón de la cuenta: no «sobraban 10», había 10. Va con lo
+      // que QUEDÓ y no con el cambio: al volver a contar algo que se había
+      // dejado de contar, el cambio es la diferencia contra el saldo viejo
+      // (-7) y lo contado son las 4 que hay.
+      if (m.reason === "Existencia inicial") return `Existencia inicial: ${conUnidad(m.qtyAfter, unidad)}`
       const signo = m.qty > 0 ? "sobraban" : "faltaban"
       const nota = m.reason && m.reason !== "Conteo" ? ` · ${m.reason}` : ""
       return `Conteo: ${signo} ${cantidad}${nota}`
