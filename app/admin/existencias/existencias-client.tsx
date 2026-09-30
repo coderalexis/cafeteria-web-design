@@ -398,12 +398,15 @@ function AgregarDialog({
 
   function guardar() {
     const nQty = qty.trim() === "" ? 0 : Number(qty)
-    const nMin = min.trim() === "" ? 0 : Number(min)
+    // Vacío = «no lo toques»: en algo nuevo queda sin aviso, y en algo del
+    // menú que se vuelve a contar conserva el mínimo que ya tenía. Con un 0
+    // explícito, el mínimo anterior se borraba en silencio al volver a contar.
+    const nMin = min.trim() === "" ? null : Number(min)
     if (!Number.isFinite(nQty) || nQty < 0) return toast.error("Escribe cuánto hay.")
-    if (!Number.isFinite(nMin) || nMin < 0) return toast.error("El mínimo no es válido.")
+    if (nMin !== null && (!Number.isFinite(nMin) || nMin < 0)) return toast.error("El mínimo no es válido.")
     if (clase === "menu") {
       if (!elegido) return
-      if (!Number.isInteger(nQty) || !Number.isInteger(nMin)) {
+      if (!Number.isInteger(nQty) || (nMin !== null && !Number.isInteger(nMin))) {
         return toast.error("Lo del menú se cuenta en piezas enteras.")
       }
       startTransition(async () => {

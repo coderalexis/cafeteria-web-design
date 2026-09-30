@@ -107,6 +107,13 @@ describe("describirMovimiento", () => {
     )
   })
 
+  it("al volver a contar, la existencia inicial es lo contado, no la diferencia", () => {
+    // Se dejó de contar con 11, se vuelve a contar con 4: el cambio es -7.
+    expect(describirMovimiento({ ...base, kind: "conteo", qty: -7, qtyAfter: 4, reason: "Existencia inicial" })).toBe(
+      "Existencia inicial: 4 piezas",
+    )
+  })
+
   it("un conteo dice si faltaban o sobraban, que es lo que interesa", () => {
     expect(describirMovimiento({ ...base, kind: "conteo", qty: -3, qtyAfter: 9, reason: "Conteo" })).toBe(
       "Conteo: faltaban 3 piezas",
