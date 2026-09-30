@@ -49,6 +49,11 @@ jobs:
   sql:
     name: Pruebas SQL (migraciones + reglas de dinero)
     runs-on: ubuntu-latest
+    env:
+      # La imagen que el CLI de Supabase levanta para generar los tipos. Si el
+      # CLI cambia de versión y vuelve a pedirla al registro (se ve en el log
+      # como «Unable to find image … locally»), actualizar la etiqueta aquí.
+      PGMETA_IMAGE: public.ecr.aws/supabase/postgres-meta:v0.98.0
     services:
       postgres:
         image: postgres:17
@@ -84,6 +89,32 @@ jobs:
           cache: pnpm
       - name: Instalar dependencias (para el CLI de Supabase)
         run: pnpm install --frozen-lockfile
+      # El registro público de Amazon corta las descargas por límite de datos
+      # («toomanyrequests: Data limit exceeded») y eso puso rojo a main tres
+      # veces el 2026-09-30 con la suite en verde. La imagen se guarda en la
+      # caché del repo y solo se baja del registro la primera vez por versión.
+      - name: Imagen de postgres-meta desde la caché
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pgmeta
+          key: pgmeta-${{ env.PGMETA_IMAGE }}
+      - name: Tener la imagen a la mano (caché o registro, con reintentos)
+        run: |
+          set -e
+          if [ -f ~/.cache/pgmeta/imagen.tar ]; then
+            docker load -i ~/.cache/pgmeta/imagen.tar
+            echo "imagen cargada de la caché"
+          else
+            for i in 1 2 3 4 5; do
+              if docker pull "$PGMETA_IMAGE"; then break; fi
+              echo "el registro no la entregó (intento $i); se espera $((i * 20)) s…"
+              sleep $((i * 20))
+            done
+            docker image inspect "$PGMETA_IMAGE" > /dev/null
+            mkdir -p ~/.cache/pgmeta
+            docker save "$PGMETA_IMAGE" -o ~/.cache/pgmeta/imagen.tar
+            echo "imagen bajada del registro y guardada en la caché"
+          fi
       - name: Tipos al día con el esquema
         run: node scripts/verificar-tipos.mjs
         env:
