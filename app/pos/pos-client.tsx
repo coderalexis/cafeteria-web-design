@@ -1233,9 +1233,12 @@ export default function POSClient({
       if (!openAccount) return
       const { cobrar, queda } = repartirCuenta(lines, elegido, () => crypto.randomUUID())
       if (cobrar.length === 0 || queda.length === 0) return
+      // El sello más fresco que se conoce, igual que al guardar una ronda: el
+      // de la lista que el sondeo mantiene al día, no el de cuando se abrió.
+      const enLista = parked.orders.find((o) => o.id === openAccount.id)
       const r = await parked.update(
         openAccount.id,
-        openAccount.updatedAt,
+        enLista?.updatedAt || openAccount.updatedAt,
         serializeCart({ ...cartStateNow(), lines: queda }, Date.now()),
       )
       if (!r?.saved) {

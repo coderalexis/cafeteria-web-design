@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CartLine, PersistedCart, Product } from "@/app/pos/cart"
+import type { ParkedOrder } from "@/app/pos/parked"
 import {
   applyCartDelta,
   PARKED_VIEJA_MS,
@@ -9,6 +10,8 @@ import {
   conflictName,
   isVieja,
   lineKey,
+  mismoCarrito,
+  reconciliarLista,
   suggestAccountNames,
   cuentasParaSumar,
   nombreConHora,
@@ -405,5 +408,66 @@ describe("cambiosPendientes", () => {
   it("sin referencia de lo guardado, solo hay cambios si hay algo en pantalla", () => {
     expect(cambiosPendientes(null, cart([["p1", 1]])).hay).toBe(true)
     expect(cambiosPendientes(undefined, cart([])).hay).toBe(false)
+  })
+})
+
+describe("reconciliarLista", () => {
+  const carrito = (nota: string, lineas: Array<[string, number]> = []): PersistedCart =>
+    ({
+      v: 3,
+      savedAt: 0,
+      saleRef: "r",
+      paymentMethod: "efectivo",
+      ticketNotes: nota,
+      cashReceivedInput: "",
+      discount: null,
+      lines: lineas.map(([productId, quantity], i) => ({
+        lineId: `l${i}`,
+        productId,
+        sizeLabel: null,
+        modifierIds: [],
+        quantity,
+        notes: "",
+      })),
+    }) as unknown as PersistedCart
+  const cuenta = (id: string, updatedAt: string, nota = ""): ParkedOrder => ({
+    id,
+    name: "Mesa 2",
+    savedAt: 1,
+    cart: carrito(nota),
+    updatedAt,
+    owedSince: null,
+    owedContact: null,
+  })
+
+  it("un sondeo que llega tarde no regresa el sello de una cuenta ya guardada", () => {
+    // Lo que pasó el 2026-09-14: el aparato guardó (15:39:11) y después llegó la
+    // respuesta de un sondeo anterior (15:07:17). La cuenta se queda con lo suyo.
+    const local = [cuenta("a", "2026-09-14T15:39:11.256+00:00", "ronda 2")]
+    const servidor = [cuenta("a", "2026-09-14T15:07:17.164+00:00", "ronda 1")]
+    const r = reconciliarLista(local, servidor)
+    expect(r).toHaveLength(1)
+    expect(r[0].updatedAt).toBe("2026-09-14T15:39:11.256+00:00")
+    expect(r[0].cart.ticketNotes).toBe("ronda 2")
+  })
+
+  it("el servidor manda cuando su sello es más nuevo: otro aparato la movió", () => {
+    const local = [cuenta("a", "2026-09-14T15:07:17.164+00:00", "vieja")]
+    const servidor = [cuenta("a", "2026-09-14T15:39:11.256+00:00", "nueva")]
+    expect(reconciliarLista(local, servidor)[0].cart.ticketNotes).toBe("nueva")
+  })
+
+  it("el servidor manda sobre qué cuentas existen, y las provisionales se conservan", () => {
+    const local = [cuenta("local-x", ""), cuenta("borrada-alla", "2026-09-14T15:00:00+00:00")]
+    const servidor = [cuenta("b", "2026-09-14T15:10:00+00:00")]
+    expect(reconciliarLista(local, servidor).map((o) => o.id)).toEqual(["local-x", "b"])
+  })
+
+  it("mismoCarrito compara por contenido, sin importar el orden de las llaves ni savedAt", () => {
+    const a = carrito("x", [["p", 2]])
+    // Como lo devuelve Postgres: llaves reordenadas y otro savedAt.
+    const b = JSON.parse(JSON.stringify({ lines: a.lines, v: a.v, ticketNotes: "x", savedAt: 999, saleRef: "r", paymentMethod: "efectivo", cashReceivedInput: "", discount: null }))
+    expect(mismoCarrito(a, b)).toBe(true)
+    expect(mismoCarrito(carrito("x", [["p", 1]]), carrito("x", []))).toBe(false)
   })
 })
