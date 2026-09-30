@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Tag, Package, SlidersHorizontal, Receipt, Users, Wallet, Store, BarChart3, History, Stamp, HandCoins, Coins, Percent } from "lucide-react"
+import { LayoutDashboard, Tag, Package, Boxes, SlidersHorizontal, Receipt, Users, Wallet, Store, BarChart3, History, Stamp, HandCoins, Coins, Percent } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
@@ -28,6 +28,7 @@ const navGroups: { titulo?: string; items: { href: string; label: string; icon: 
     items: [
       { href: "/admin/categorias", label: "Categorías", icon: Tag },
       { href: "/admin/productos", label: "Productos", icon: Package },
+      { href: "/admin/existencias", label: "Existencias", icon: Boxes },
       // La ruta sigue siendo /modificadores para no romper enlaces guardados
       // ni los de la guía; lo que cambia es cómo se llama a la vista del
       // usuario. «Modificadores» es palabra de programador: una dueña real se

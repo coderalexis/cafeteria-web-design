@@ -158,14 +158,33 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
   —lo normal dentro de un diálogo— no se resuelve, el visor crece hasta su
   contenido y no queda NADA que desplazar. Así se quedó una dueña sin poder
   bajar por sus tickets ni cerrar la caja desde el iPhone.
+  **Corolario:** si un diálogo lleva `overflow-y-hidden`, TODOS sus pasos
+  necesitan su propia zona desplazable, no solo el que la motivó. Uno de dos
+  pasos (buscar / llenar el formulario) donde solo el buscador desplaza recorta
+  el formulario **en silencio** y deja el botón de guardar fuera de la
+  pantalla. Se ve con el teléfono ACOSTADO (812×375) o en la tablet de 10.4"
+  (1000×600), nunca con el celular de pie. El patrón bueno: cuerpo con
+  `flex-1 min-h-0 overflow-y-auto` y el `DialogFooter` FUERA de él, para que
+  los botones no se vayan con el desplazamiento.
 - **Deploy con pestañas abiertas**: una server action que revalida devuelve
   el árbol de la página del build nuevo y la pestaña vieja truena con
   «reading 'call'»; y si Vercel no reutilizó la caché de build, la sal de las
   acciones rota y TODAS dan 404 («Failed to find Server Action»). `lib/version.ts`
   cubre ambos; el sello del build tiene que ser determinista (commit), porque
   `next.config.mjs` se evalúa varias veces por build.
+- **Una server action dentro de `startTransition(async …)` que rechaza (sin
+  señal, deploy a medias) tumba la pantalla ENTERA al error boundary**: React 19
+  trata ese rechazo como error de render. En el POS eso es quedarse sin caja a
+  media fila por anotar una merma. Dentro de una transición, la acción va
+  SIEMPRE con `try/catch` y `mensajeDeFallo(e)` (`lib/version.ts`); y tras una
+  acción que ya revalida la ruta, NO va `router.refresh()`: la respuesta del
+  POST ya trae la página nueva y pedirla otra vez era descargarla dos veces.
 - Con `pg_get_functiondef` los anclajes del `replace` son el texto exacto de la
   migración anterior: si no se encuentra, la migración debe fallar, no seguir.
+  **Y lo que se pega en el conector es el archivo ENTERO, byte a byte** (nada
+  de «versión sin comentarios» para ahorrar): la 58 quedó distinta en
+  producción por eso. Una migración que crea funciones se autocomprueba al
+  final con `md5(prosrc)` contra los cuerpos del archivo (ver la 59).
 - **La suite SQL reproduce las migraciones sobre un Postgres pelón**, así que una
   migración que toque un esquema que Supabase trae puesto (`auth`, `storage`…)
   pone el CI en rojo hasta que `tests/sql/00_supabase_shim.sql` finja ese esquema.

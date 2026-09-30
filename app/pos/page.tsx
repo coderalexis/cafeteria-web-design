@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { esUnidad, type ItemExistencia, type Unidad } from "@/lib/existencias"
 import type { AccountVisit } from "./parked"
 import { creditAccountsFrom } from "@/lib/credit"
 import { getContext } from "@/lib/context"
@@ -63,6 +64,7 @@ export default async function POSPage() {
     { count: promosActivas },
     { data: fiados },
     { data: recientesFuera },
+    { data: contado },
   ] = await Promise.all([
     // Si la caja del turno pasado quedó abierta y ya venció, se cierra sola.
     // Aquí y no solo en el cron porque este es el momento en que importa:
@@ -104,6 +106,16 @@ export default async function POSPage() {
     settings.credit ? supabase.rpc("credit_balances") : Promise.resolve({ data: null }),
     // Fuera de menú (P39): lo vendido así en 60 días, para repetirlo en un toque.
     settings.customItems ? supabase.rpc("custom_items_recent", { p_days: 60 }) : Promise.resolve({ data: null }),
+    // Lo que el café cuenta (P45): insumos y artículos del menú, en una lista.
+    // Vacía en un café que no cuenta nada, y entonces el POS no enseña nada
+    // nuevo. Va aparte del menú porque los insumos no están en la carta, y
+    // aquí dentro para no sumar un viaje en serie a cada arranque del POS.
+    supabase
+      .from("stock_items")
+      .select(`id, variant_id, supply_id, qty, min_qty,
+         supplies(name, unit),
+         menu_variants(name, menu_products(name))`)
+      .eq("tracked", true),
   ])
 
   const session = barrido.session
@@ -282,12 +294,28 @@ export default async function POSPage() {
     .filter((id): id is string => !!id && !fijados.includes(id))
   const favoriteVariantIds = [...fijados, ...automaticos].slice(0, Math.max(8, fijados.length))
 
+  const existencias: ItemExistencia[] = (contado ?? []).map((f) => {
+    const v = f.menu_variants
+    const nombreMenu = v ? `${v.menu_products?.name ?? ""}${v.name && v.name !== "Único" ? ` · ${v.name}` : ""}` : ""
+    const unidad = f.supplies && esUnidad(f.supplies.unit) ? (f.supplies.unit as Unidad) : "pieza"
+    return {
+      itemId: f.id,
+      variantId: f.variant_id,
+      supplyId: f.supply_id,
+      nombre: f.supply_id ? (f.supplies?.name ?? "") : nombreMenu,
+      unidad,
+      qty: Number(f.qty),
+      minQty: Number(f.min_qty),
+    }
+  })
+
   const dbTotalSales = (todayTickets ?? []).reduce((sum, t) => sum + (t.total || 0), 0)
 
   return (
     <POSClient
       categories={categories}
       products={products}
+      existencias={existencias}
       isAdmin={isAdmin}
       businessId={businessId}
       cashierId={ctx.userId}

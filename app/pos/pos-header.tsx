@@ -5,6 +5,7 @@ import type { RefObject } from "react"
 import {
   AArrowUp,
   BookOpen,
+  Boxes,
   ChefHat,
   GraduationCap,
   Smartphone,
@@ -82,6 +83,8 @@ export interface PosHeaderProps {
   onTogglePractica: () => void
   /** «Aprender»: recorrido de la primera venta, práctica y lecturas cortas. */
   onAprender: () => void
+  /** Existencias por pieza (P45): entrada y merma desde el POS; undefined si el café no cuenta nada. */
+  onExistencias?: () => void
   /** «Instalar como app», cuando el navegador lo permite y aún no está instalada. */
   instalar: ReturnType<typeof useInstallPrompt>
   textSize: ReturnType<typeof usePosTextSize>
@@ -110,7 +113,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, creditEnabled, setShowCredit, textSize, practica, onTogglePractica, onAprender, instalar,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, creditEnabled, setShowCredit, textSize, practica, onTogglePractica, onAprender, onExistencias, instalar,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, cuentasEnBarra, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -264,6 +267,13 @@ export function PosHeader(p: PosHeaderProps) {
                     {creditEnabled && (
                       <DropdownMenuItem onSelect={() => setShowCredit(true)} data-menu-fiados>
                         <HandCoins className="h-4 w-4 mr-2" /> Fiados y abonos
+                      </DropdownMenuItem>
+                    )}
+                    {/* Solo aparece cuando el café cuenta algo por pieza: quien
+                        no cuenta nada no ve nada nuevo. */}
+                    {onExistencias && (
+                      <DropdownMenuItem onSelect={onExistencias} data-menu-existencias>
+                        <Boxes className="h-4 w-4 mr-2" /> Existencias
                       </DropdownMenuItem>
                     )}
                     {/* No es un DropdownMenuItem a propósito: ajustar la letra
