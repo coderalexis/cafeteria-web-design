@@ -7,6 +7,7 @@ import { serializeCart, type CartState } from "./cart"
 import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
 import { PARKED_MAX, mismoCarrito, reconciliarLista, type ParkedOrder } from "./parked"
 import { BUILD_ID, esErrorDeVersion, hayVersionNueva } from "@/lib/version"
+import { reportClientError } from "@/app/actions/errors"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
 const REFRESCO_MS = 10_000
@@ -56,7 +57,16 @@ export function useParkedOrders(businessId: string) {
     // Un sondeo que no contesta (señal a medias) no puede bloquear a los que
     // siguen para siempre: pasado un rato se deja pasar al siguiente, y si el
     // viejo llega tarde, reconciliarLista lo pone en su lugar.
-    if (cargando.current && Date.now() - cargandoDesde.current < SONDEO_MAX_MS) return
+    if (cargando.current) {
+      if (Date.now() - cargandoDesde.current < SONDEO_MAX_MS) return
+      // El anterior sigue sin contestar: se deja pasar a este, y queda rastro
+      // porque una señal así es justo lo que precede a los choques falsos.
+      void reportClientError({
+        route: "/pos",
+        message: `Sondeo de cuentas sin respuesta más de ${Math.round(SONDEO_MAX_MS / 1000)} s`,
+        digest: "sondeo-lento",
+      })
+    }
     cargando.current = true
     cargandoDesde.current = Date.now()
     try {
@@ -241,6 +251,14 @@ export function useParkedOrders(businessId: string) {
             return null
           }
           r = otra
+          // Se resolvió solo, pero que quede: si se repite mucho, algo anda
+          // mal con la señal o con el sondeo, y hay que verlo antes de que
+          // vuelva a estorbar en la barra.
+          void reportClientError({
+            route: "/pos",
+            message: `Cuenta «${mia.name}»: choque falso (mismo contenido), se reintentó y ${otra.saved ? "se guardó" : "volvió a chocar"}`,
+            digest: "cuenta-choque-falso",
+          })
         }
       }
       if (r.saved) {

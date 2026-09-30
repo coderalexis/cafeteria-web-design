@@ -16,6 +16,12 @@ import type { ActionResult } from "./types"
 /*  reportan aquí; el RPC lo guarda (con anti-tormenta), /super lo     */
 /*  enseña, y el cron de la mañana manda un resumen si hubo algo.      */
 /*                                                                     */
+/*  Por el mismo canal van los AVISOS (lib/avisos.ts): lo que no       */
+/*  revienta pero delata un problema — choques al guardar cuentas,     */
+/*  copias «(2)», ventas que subieron tarde desde la cola o que no     */
+/*  pudieron subir, sondeos sin respuesta. El 2026-09-14 hubo 26       */
+/*  choques y 8 copias en Gym Coffe y nadie lo supo en dos semanas.    */
+/*                                                                     */
 /*  Sin proveedor externo, a propósito: con dos cafeterías, una tabla  */
 /*  y el correo que ya existe alcanzan, y no se agrega otra cuenta que */
 /*  pagar ni otra llave que cuidar.                                    */
@@ -139,7 +145,7 @@ export async function sendErrorDigest(options: { dryRun: boolean }): Promise<{
   if (options.dryRun) return { sent: false, count: filas.length }
 
   const text = lista.map((g) => `${g.n}× · ${g.biz} · ${g.route}\n   ${g.message}`).join("\n\n")
-  const html = `<p>Errores de las últimas 24 horas en Cafecito POS (${filas.length} en total, ${lista.length} distintos):</p>
+  const html = `<p>Errores y avisos de las últimas 24 horas en Cafecito POS (${filas.length} en total, ${lista.length} distintos):</p>
 <table style="border-collapse:collapse;font:14px system-ui">
 ${lista
   .map(
@@ -155,7 +161,7 @@ ${lista
     fromName: "Cafecito POS",
     fromAddress: "alertas@cafecitopos.com",
     to: [destino],
-    subject: `Cafecito POS: ${filas.length} error${filas.length === 1 ? "" : "es"} en las últimas 24 h`,
+    subject: `Cafecito POS: ${filas.length} ${filas.length === 1 ? "aviso o error" : "avisos y errores"} en las últimas 24 h`,
     html,
     text,
   })

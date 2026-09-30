@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createTicket } from "@/app/actions/sales"
+import { reportClientError } from "@/app/actions/errors"
 import type { CambioExistencia } from "@/lib/existencias"
 import {
   canEnqueue,
@@ -111,6 +112,14 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
         if (r.success) {
           guardar(markUploaded(estadoRef.current, venta.clientRef, r.folio, r.total))
           onStockRef.current?.(r.stock)
+          // Que quede cuánto esperó: una racha de ventas que subieron tarde es
+          // un día de mala señal, y se ve en el correo de la mañana.
+          const minutos = Math.round((Date.now() - venta.capturedAt) / 60_000)
+          void reportClientError({
+            route: "/pos",
+            message: `Venta #${r.folio} subió desde la cola sin internet tras ${minutos} min`,
+            digest: "cola-subida",
+          })
         } else if (isNetworkError(r.error)) {
           // Volvió a caerse: se deja pendiente y se corta el ciclo — insistir
           // con las demás sin red solo gasta batería.
@@ -118,6 +127,13 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
           break
         } else {
           guardar(markNeedsReview(estadoRef.current, venta.clientRef, r.error))
+          // Esto es lo grave: una venta capturada que el servidor rechazó. Hoy
+          // solo lo veía la cajera en su pantalla.
+          void reportClientError({
+            route: "/pos",
+            message: `Venta en cola necesita revisión: ${r.error}`,
+            digest: "cola-revision",
+          })
         }
       } catch (e) {
         guardar(markRetry(estadoRef.current, venta.clientRef))
