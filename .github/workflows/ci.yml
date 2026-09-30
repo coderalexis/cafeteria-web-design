@@ -92,7 +92,7 @@ jobs:
       # El registro público de Amazon corta las descargas por límite de datos
       # («toomanyrequests: Data limit exceeded») y eso puso rojo a main tres
       # veces el 2026-09-30 con la suite en verde. La imagen se guarda en la
-      # caché del repo y solo se baja del registro la primera vez por versión.
+      # caché del repo y solo se baja de un registro la primera vez por versión.
       - name: Imagen de postgres-meta desde la caché
         uses: actions/cache@v4
         with:
@@ -105,9 +105,14 @@ jobs:
             docker load -i ~/.cache/pgmeta/imagen.tar
             echo "imagen cargada de la caché"
           else
-            for i in 1 2 3 4 5; do
+            # La misma imagen vive también en Docker Hub; si Amazon no la
+            # entrega, se baja de ahí y se le pone la etiqueta que el CLI busca.
+            ESPEJO="docker.io/supabase/${PGMETA_IMAGE#public.ecr.aws/supabase/}"
+            for i in 1 2 3; do
               if docker pull "$PGMETA_IMAGE"; then break; fi
-              echo "el registro no la entregó (intento $i); se espera $((i * 20)) s…"
+              echo "Amazon no la entregó (intento $i); se prueba Docker Hub…"
+              if docker pull "$ESPEJO"; then docker tag "$ESPEJO" "$PGMETA_IMAGE"; break; fi
+              echo "Docker Hub tampoco; se espera $((i * 20)) s…"
               sleep $((i * 20))
             done
             docker image inspect "$PGMETA_IMAGE" > /dev/null
