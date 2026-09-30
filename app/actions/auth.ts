@@ -134,9 +134,18 @@ export async function login(formData: FormData): Promise<ActionResult> {
 }
 
 /* ── Logout ───────────────────────────────────────────────────────── */
+/**
+ * Cierra la sesión de ESTE aparato y solo de este.
+ *
+ * `signOut()` a secas es GLOBAL: revoca todas las sesiones del usuario en
+ * todos sus aparatos. Así se cayó la sesión de una dueña en su iPhone en
+ * plena tarde (2026-09-10): alguien entró con su usuario desde otro lado para
+ * probar el login y al salir la sacó también a ella. Una cuenta de café puede
+ * vivir en varios teléfonos a la vez; salir de uno no debe tumbar los demás.
+ */
 export async function logout() {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  await supabase.auth.signOut({ scope: "local" })
   redirect("/login")
 }
 
