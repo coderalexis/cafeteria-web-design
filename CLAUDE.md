@@ -172,8 +172,19 @@ Servidores de prueba en `.claude/launch.json`: `dev` (3000) y `prod`
   acciones rota y TODAS dan 404 («Failed to find Server Action»). `lib/version.ts`
   cubre ambos; el sello del build tiene que ser determinista (commit), porque
   `next.config.mjs` se evalúa varias veces por build.
+- **Una server action dentro de `startTransition(async …)` que rechaza (sin
+  señal, deploy a medias) tumba la pantalla ENTERA al error boundary**: React 19
+  trata ese rechazo como error de render. En el POS eso es quedarse sin caja a
+  media fila por anotar una merma. Dentro de una transición, la acción va
+  SIEMPRE con `try/catch` y `mensajeDeFallo(e)` (`lib/version.ts`); y tras una
+  acción que ya revalida la ruta, NO va `router.refresh()`: la respuesta del
+  POST ya trae la página nueva y pedirla otra vez era descargarla dos veces.
 - Con `pg_get_functiondef` los anclajes del `replace` son el texto exacto de la
   migración anterior: si no se encuentra, la migración debe fallar, no seguir.
+  **Y lo que se pega en el conector es el archivo ENTERO, byte a byte** (nada
+  de «versión sin comentarios» para ahorrar): la 58 quedó distinta en
+  producción por eso. Una migración que crea funciones se autocomprueba al
+  final con `md5(prosrc)` contra los cuerpos del archivo (ver la 59).
 - **La suite SQL reproduce las migraciones sobre un Postgres pelón**, así que una
   migración que toque un esquema que Supabase trae puesto (`auth`, `storage`…)
   pone el CI en rojo hasta que `tests/sql/00_supabase_shim.sql` finja ese esquema.

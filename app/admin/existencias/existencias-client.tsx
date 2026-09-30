@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useTransition } from "react"
 import type { ReactNode } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
   ArrowDownToLine,
@@ -19,6 +18,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { contarDelMenu, dejarDeContar, guardarInsumo, historialDe } from "@/app/actions/existencias"
+import { mensajeDeFallo } from "@/lib/version"
 import { MovimientoDialog, type ItemMovimiento } from "@/components/movimiento-existencia-dialog"
 import {
   UNIDADES,
@@ -109,7 +109,6 @@ export function ExistenciasClient({
   candidatos: Candidato[]
   timezone: string
 }) {
-  const router = useRouter()
   const [agregar, setAgregar] = useState(false)
   const [mov, setMov] = useState<{ item: Fila; kind: KindManual } | null>(null)
   const [historial, setHistorial] = useState<Fila | null>(null)
@@ -123,14 +122,19 @@ export function ExistenciasClient({
 
   function dejar(f: Fila) {
     startTransition(async () => {
-      const r = await dejarDeContar({ variantId: f.variantId, supplyId: f.supplyId, nombre: f.nombre })
+      let r: Awaited<ReturnType<typeof dejarDeContar>>
+      try {
+        r = await dejarDeContar({ variantId: f.variantId, supplyId: f.supplyId, nombre: f.nombre })
+      } catch (e) {
+        toast.error(mensajeDeFallo(e))
+        return
+      }
       setQuitar(null)
       if (!r.success) {
         toast.error(r.error)
         return
       }
       toast.success(`${f.nombre} ya no se cuenta. Su historial se conserva.`)
-      router.refresh()
     })
   }
 
@@ -364,7 +368,6 @@ function AgregarDialog({
   onOpenChange: (o: boolean) => void
   candidatos: Candidato[]
 }) {
-  const router = useRouter()
   const [clase, setClase] = useState<"insumo" | "menu" | null>(null)
   const [q, setQ] = useState("")
   const [elegido, setElegido] = useState<Candidato | null>(null)
@@ -404,27 +407,37 @@ function AgregarDialog({
         return toast.error("Lo del menú se cuenta en piezas enteras.")
       }
       startTransition(async () => {
-        const r = await contarDelMenu({ variantId: elegido.variantId, qty: nQty, minQty: nMin })
+        let r: Awaited<ReturnType<typeof contarDelMenu>>
+        try {
+          r = await contarDelMenu({ variantId: elegido.variantId, qty: nQty, minQty: nMin })
+        } catch (e) {
+          toast.error(mensajeDeFallo(e))
+          return
+        }
         if (!r.success) {
           toast.error(r.error)
           return
         }
         toast.success(`${elegido.nombre}: se cuenta desde hoy, con ${nQty}.`)
         cerrar(false)
-        router.refresh()
       })
       return
     }
     if (!nombre.trim()) return toast.error("Escribe el nombre del insumo.")
     startTransition(async () => {
-      const r = await guardarInsumo({ nombre: nombre.trim(), unidad, qty: nQty, minQty: nMin })
+      let r: Awaited<ReturnType<typeof guardarInsumo>>
+      try {
+        r = await guardarInsumo({ nombre: nombre.trim(), unidad, qty: nQty, minQty: nMin })
+      } catch (e) {
+        toast.error(mensajeDeFallo(e))
+        return
+      }
       if (!r.success) {
         toast.error(r.error)
         return
       }
       toast.success(`${nombre.trim()}: se cuenta desde hoy, con ${conUnidad(nQty, unidad)}.`)
       cerrar(false)
-      router.refresh()
     })
   }
 
@@ -628,11 +641,16 @@ function HistorialDialog({ item, timezone, onClose }: { item: Fila; timezone: st
   const [fallo, setFallo] = useState<string | null>(null)
   useEffect(() => {
     let vivo = true
-    historialDe(item.itemId).then((r) => {
-      if (!vivo) return
-      if (!r.success) setFallo(r.error || "No se pudo leer el historial.")
-      else setHistorial({ movimientos: r.movimientos, completo: r.completo })
-    })
+    historialDe(item.itemId)
+      .then((r) => {
+        if (!vivo) return
+        if (!r.success) setFallo(r.error || "No se pudo leer el historial.")
+        else setHistorial({ movimientos: r.movimientos, completo: r.completo })
+      })
+      // Sin esto, abrir el historial sin señal se quedaba girando para siempre.
+      .catch((e) => {
+        if (vivo) setFallo(mensajeDeFallo(e))
+      })
     return () => {
       vivo = false
     }
@@ -686,7 +704,6 @@ function HistorialDialog({ item, timezone, onClose }: { item: Fila; timezone: st
 /* ------------------------------------------------------------------ */
 
 function EditarDialog({ item, onClose }: { item: Fila; onClose: () => void }) {
-  const router = useRouter()
   const [nombre, setNombre] = useState(item.nombre)
   const [unidad, setUnidad] = useState<Unidad>(item.unidad)
   const [min, setMin] = useState(item.minQty ? formatCantidad(item.minQty) : "")
@@ -698,9 +715,15 @@ function EditarDialog({ item, onClose }: { item: Fila; onClose: () => void }) {
     if (!item.esInsumo && !Number.isInteger(n)) return toast.error("Lo del menú se cuenta en piezas enteras.")
     if (item.esInsumo && !nombre.trim()) return toast.error("Escribe el nombre del insumo.")
     startTransition(async () => {
-      const r = item.esInsumo
-        ? await guardarInsumo({ supplyId: item.supplyId, nombre: nombre.trim(), unidad, minQty: n })
-        : await contarDelMenu({ variantId: item.variantId ?? "", qty: null, minQty: n })
+      let r: Awaited<ReturnType<typeof guardarInsumo>> | Awaited<ReturnType<typeof contarDelMenu>>
+      try {
+        r = item.esInsumo
+          ? await guardarInsumo({ supplyId: item.supplyId, nombre: nombre.trim(), unidad, minQty: n })
+          : await contarDelMenu({ variantId: item.variantId ?? "", qty: null, minQty: n })
+      } catch (e) {
+        toast.error(mensajeDeFallo(e))
+        return
+      }
       if (!r.success) {
         toast.error(r.error)
         return
@@ -709,7 +732,6 @@ function EditarDialog({ item, onClose }: { item: Fila; onClose: () => void }) {
         n === 0 ? `${nombre.trim()}: sin aviso.` : `${nombre.trim()}: avisa en ${formatCantidad(n)}.`,
       )
       onClose()
-      router.refresh()
     })
   }
 

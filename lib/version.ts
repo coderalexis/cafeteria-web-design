@@ -51,6 +51,28 @@ export function clasificarError(mensaje: string | null | undefined): TipoDeError
   return "otro"
 }
 
+/**
+ * Qué decirle a quien tocó «Guardar» y la llamada al servidor reventó (no
+ * contestó con error: NO llegó). Sin señal es lo normal en una barra; un
+ * deploy a media tarde, lo raro. Lo demás sí es un fallo nuestro.
+ *
+ * Importa dónde se usa: una server action que se llama dentro de
+ * `startTransition(async …)` y rechaza, React la trata como error de render
+ * y tumba la pantalla entera al error boundary. Dentro de una transición va
+ * SIEMPRE con try/catch y este mensaje.
+ */
+export function mensajeDeFallo(e: unknown): string {
+  const m = e instanceof Error ? e.message : typeof e === "string" ? e : ""
+  switch (clasificarError(m)) {
+    case "red":
+      return "Sin conexión: no se guardó. Vuelve a intentar cuando regrese la señal."
+    case "version":
+      return "Hay una versión nueva del sistema. Recarga la página y vuelve a intentar."
+    default:
+      return "No se pudo guardar. Vuelve a intentar."
+  }
+}
+
 /** Para lo que se atrapa con `catch`: ¿esta excepción es de versión vieja? */
 export function esErrorDeVersion(e: unknown): boolean {
   const m = e instanceof Error ? e.message : typeof e === "string" ? e : ""

@@ -669,7 +669,7 @@ begin
     '  v_stock_changes jsonb := ''[]''::jsonb;' || chr(10) || 'begin');
   v_def := replace(v_def, v_a2,
     '  -- P45: vuelve al estante exactamente lo que ESTA venta descontó, y solo' || chr(10) ||
-    '  -- si ese artículo se ha contado sin interrupción desde entonces.' || chr(10) ||
+    '  -- si ese renglón es posterior al sello de la cuenta viva.' || chr(10) ||
     '  for v_it in' || chr(10) ||
     '    select m.item_id, sum(-m.qty) as qty' || chr(10) ||
     '      from public.stock_movements m' || chr(10) ||

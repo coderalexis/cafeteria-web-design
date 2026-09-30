@@ -4,8 +4,9 @@
 -- con la venta. Aquí se prueba: permisos, la venta que descuenta, la
 -- cancelación que devuelve solo lo suyo, corregir, el negativo permitido, el
 -- costo que solo aplica al menú, la merma con motivo, el conteo, el diario que
--- cuadra, que ningún cliente escribe, que volver a contar empieza de cero y
--- que borrar el café se lleva todo.
+-- cuadra, que ningún cliente escribe, que la cajera no lee el diario (lleva
+-- costos), que volver a contar empieza de cero, que un insumo apagado se puede
+-- volver a agregar con su nombre y que borrar el café se lleva todo.
 do $t$
 declare
   c pruebas.cafe_ids;
@@ -15,6 +16,8 @@ declare
   v_item uuid;
   v_vitem uuid;
   v_gitem uuid;
+  v_sup uuid;
+  v_item2 uuid;
   v_q numeric;
   v_n int;
   v_ok boolean;
@@ -84,8 +87,13 @@ begin
   perform pruebas.espera(v_t->'stock' = jsonb_build_array(jsonb_build_object('variant_id', c.variant_chico, 'qty', 8)),
     'create_ticket devuelve la existencia nueva de lo que contó, y solo de eso');
   perform pruebas.espera(
+    (select count(*) from public.stock_movements where ticket_id = (v_t->>'ticket_id')::uuid) = 0,
+    'la cajera no lee el diario: lleva lo que cuesta cada cosa');
+  perform pruebas.como(c.owner_id);
+  perform pruebas.espera(
     (select count(*) from public.stock_movements where ticket_id = (v_t->>'ticket_id')::uuid) = 1,
     'un movimiento por renglón contado; lo grande y lo fuera de menú no dejan rastro');
+  perform pruebas.como(c.cashier_id);
 
   -- ── Cancelar devuelve ──────────────────────────────────────────────
   v_c := public.cancel_ticket((v_t->>'ticket_id')::uuid, 'se arrepintió');
@@ -237,6 +245,36 @@ begin
     (select supply_id from public.stock_items where id = v_item), null, 3);
   perform pruebas.espera((select name from public.supplies where id = (select supply_id from public.stock_items where id = v_item))
     = 'Café en grano premium', 'un insumo se puede renombrar');
+
+  -- Dejar de contar NO le cambia la unidad (la acción no manda p_unit)…
+  select supply_id into v_sup from public.stock_items where id = v_item;
+  perform public.supply_save('Café en grano premium', p_supply => v_sup, p_on => false);
+  perform pruebas.espera((select unit from public.supplies where id = v_sup) = 'kilo',
+    'apagar un insumo conserva su unidad');
+  perform pruebas.espera((select not tracked from public.stock_items where id = v_item),
+    'y lo apaga en vez de borrarlo');
+  -- …y su nombre queda libre: se vuelve a agregar y nace limpio, con su diario.
+  v_r := public.supply_save('café EN GRANO premium', 'kilo', null, 2, 1);
+  v_item2 := (v_r->>'item_id')::uuid;
+  perform pruebas.espera(v_item2 <> v_item and (v_r->>'qty')::numeric = 2,
+    'un insumo apagado no bloquea su nombre: el nuevo empieza de cero');
+  -- Reactivar el viejo ahora chocaría con el nuevo: mismo aviso amable, no un error crudo.
+  begin
+    perform public.supply_save('Café en grano premium', p_supply => v_sup, p_on => true);
+    raise exception 'FALLA: dejó dos insumos activos con el mismo nombre';
+  exception when others then
+    if sqlerrm not like 'Ya cuentas algo%' then raise; end if;
+  end;
+
+  -- La cantidad se redondea a lo que la columna guarda (3 decimales) al entrar.
+  v_r := public.stock_move(v_item2, 'entrada', 1.23456, null, null);
+  perform pruebas.espera((v_r->>'qty_after')::numeric = 3.235, 'una entrada de 1.23456 deja 3.235, ya redondeado');
+  begin
+    perform public.stock_move(v_item2, 'entrada', 0.0004, null, null);
+    raise exception 'FALLA: aceptó una entrada que redondea a cero';
+  exception when others then
+    if sqlerrm not like 'Indica cuánto%' then raise; end if;
+  end;
 
   -- ── Borrar la cafetería se lleva su inventario ─────────────────────
   perform pruebas.como_postgres();

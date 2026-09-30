@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { registrarMovimiento } from "@/app/actions/existencias"
+import { mensajeDeFallo } from "@/lib/version"
 import {
   MOTIVOS_MERMA,
   UNIDADES,
@@ -63,7 +63,6 @@ export function MovimientoDialog({
   /** Lo que se hace con la existencia nueva además de refrescar (el POS la aplica en vivo). */
   onDone?: (cambios: CambioExistencia[]) => void
 }) {
-  const router = useRouter()
   const [qty, setQty] = useState("")
   const [motivo, setMotivo] = useState<string>("")
   const [otro, setOtro] = useState("")
@@ -83,13 +82,21 @@ export function MovimientoDialog({
     const problema = validarMovimiento({ kind, qty: n, reason, unitCost: unitCost ?? null, esAdmin, entero })
     if (problema) return toast.error(problema)
     startTransition(async () => {
-      const r = await registrarMovimiento({
-        itemId: item.itemId,
-        kind,
-        qty: n,
-        reason: reason || undefined,
-        unitCost,
-      })
+      // Sin try/catch, una merma sin señal tumbaba el POS entero (React trata
+      // el rechazo dentro de la transición como error de render).
+      let r: Awaited<ReturnType<typeof registrarMovimiento>>
+      try {
+        r = await registrarMovimiento({
+          itemId: item.itemId,
+          kind,
+          qty: n,
+          reason: reason || undefined,
+          unitCost,
+        })
+      } catch (e) {
+        toast.error(mensajeDeFallo(e))
+        return
+      }
       if (!r.success) {
         toast.error(r.error)
         return
@@ -109,7 +116,8 @@ export function MovimientoDialog({
       }
       onDone?.(r.cambios)
       onClose()
-      router.refresh()
+      // Sin router.refresh(): la acción ya revalidó la ruta y su respuesta
+      // trae la página nueva; pedirla otra vez era descargar el POS dos veces.
     })
   }
 
