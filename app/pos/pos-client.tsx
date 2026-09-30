@@ -116,6 +116,7 @@ import {
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
 import { aplicarCambios, esquinaExistencia, esquinaProducto, porVariante, type CambioExistencia, type ItemExistencia } from "@/lib/existencias"
 import { ExistenciasPosDialog } from "./existencias-dialog"
+import { reportClientError } from "@/app/actions/errors"
 
 interface POSClientProps {
   categories: Category[]
@@ -789,6 +790,11 @@ export default function POSClient({
             toast.error("La bandeja está llena: cobra o descarta una cuenta y vuelve a guardar.")
             return
           }
+          void reportClientError({
+            route: "/pos",
+            message: `Cuenta «${existente.name}»: chocó al sumarle y se guardó como copia «${alterno}»`,
+            digest: "cuenta-copia",
+          })
           clearTip()
           clearCart()
           setOpenAccount(null)
@@ -874,6 +880,11 @@ export default function POSClient({
     clearCart()
     setOpenAccount(null)
     vibra(12)
+    void reportClientError({
+      route: "/pos",
+      message: `Cuenta «${openAccount.name}»: ${r.current === null ? "ya no existía" : "chocó al guardar la ronda"} y se guardó como copia «${alterno}»`,
+      digest: "cuenta-copia",
+    })
     toast.warning(
       r.current === null
         ? `«${openAccount.name}» ya no existe: se cobró o se descartó en otro aparato. Para no perder nada, esto se guardó como «${alterno}».`

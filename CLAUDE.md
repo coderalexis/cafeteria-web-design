@@ -16,6 +16,7 @@ plena fila: cada decisión de UI se mide en toques y segundos.
 | Qué puede hacer cada rol (reglas reales del servidor) | `app/admin/equipo/role-legend.tsx` |
 | Índice del buscador del panel (Ctrl+K) | `lib/admin-search.ts` |
 | Diseño de la cola sin internet | `docs/cola-sin-internet.md` |
+| Qué deja rastro y dónde, los avisos, y cómo reconstruir un día con los registros | `docs/registros.md` |
 | Historial de fases, decisiones con el usuario, gotchas, estado y pendientes | memoria del asistente (`MEMORY.md` → `estado-actual.md`) |
 
 No hace falta leer el POS entero para tocar una pieza: `docs/supabase/README.md`

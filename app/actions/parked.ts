@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { requireContext, requireRole } from "@/lib/context"
 import { dbErrorMessage } from "@/lib/db-errors"
+import { registrarAviso, segundosEntre } from "@/lib/avisos"
 import { BUILD_ID } from "@/lib/version"
 import type { ActionResult } from "./types"
 
@@ -187,9 +188,22 @@ export async function updateParked(
   // descartó en otro aparato), se dice con null.
   const { data: actual } = await supabase
     .from("parked_orders")
-    .select("cart, updated_at")
+    .select("name, cart, updated_at")
     .eq("id", parsed.data.id)
     .maybeSingle()
+  // Un choque no revienta nada, y por eso hasta el 2026-09-14 nadie se
+  // enteraba de 26 seguidos: se deja rastro con cuánto iba de viejo el sello.
+  // Si es un aparato de verdad, se verá un choque suelto; si es el propio
+  // sello viejo, se verá una racha con el mismo desfase.
+  const desfase = actual ? segundosEntre(parsed.data.expectedUpdatedAt, actual.updated_at) : null
+  await registrarAviso(supabase, {
+    route: "/pos",
+    digest: "cuenta-choque",
+    message: actual
+      ? `Cuenta «${actual.name}»: el sello iba viejo al guardar (${desfase ?? "?"} s de desfase)`
+      : "Cuenta: ya no existía al guardar (se cobró o se descartó en otro aparato)",
+    detalle: `id ${parsed.data.id} · esperado ${parsed.data.expectedUpdatedAt} · actual ${actual?.updated_at ?? "—"}`,
+  })
   return {
     success: true,
     saved: false,
