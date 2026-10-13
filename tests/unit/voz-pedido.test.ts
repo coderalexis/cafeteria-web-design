@@ -10,6 +10,7 @@ import {
   nombreDeCuenta,
   pesos,
   quitar,
+  validarConfirmacion,
 } from "@/app/pos/voz/pedido"
 
 const leche = {
@@ -202,10 +203,60 @@ describe("quitar", () => {
     expect(entero.respuesta.pedido.total).toBe(90)
   })
 
+  it("quita por código de producto sin buscar antes el renglón", () => {
+    const r = quitar(base(), { producto: "p4", cantidad: 1 }, cat)
+    expect(r.respuesta.ok).toBe(true)
+    expect(r.lines[0].quantity).toBe(2)
+    expect(quitar(base(), { producto: "p1" }, cat).respuesta.mensaje).toContain("No hay Latte")
+    expect(quitar(base(), {}, cat).respuesta.ok).toBe(false)
+  })
+
+  it("pide el renglón si hay dos del mismo producto", () => {
+    let lines = agregar([], { producto: "p2", cantidad: 1 }, cat, nuevoId).lines
+    lines = agregar(lines, { producto: "p2", cantidad: 1, nota: "sin azúcar" }, cat, nuevoId).lines
+    const r = quitar(lines, { producto: "p2" }, cat)
+    expect(r.respuesta.ok).toBe(false)
+    expect(r.respuesta.mensaje).toContain("2 renglones")
+  })
+
   it("rechaza un renglón que no existe", () => {
     const r = quitar(base(), { renglon: 9 })
     expect(r.respuesta.ok).toBe(false)
     expect(r.lines).toHaveLength(2)
+  })
+})
+
+describe("reglas para confirmar", () => {
+  const bien = { nombre: "Juan", articulos: 2, cambioDesdeLaLectura: false, clienteHabloDespues: true, preguntoEnLaMismaRespuesta: false }
+
+  it("guarda lo que el cliente oyó y aceptó, a su nombre", () => {
+    expect(validarConfirmacion({ ...bien, nombre: "  Juan   Pérez " })).toEqual({ ok: true, nombre: "Juan Pérez" })
+  })
+
+  it("no confirma en la misma respuesta en que pregunta", () => {
+    expect(validarConfirmacion({ ...bien, preguntoEnLaMismaRespuesta: true }).ok).toBe(false)
+  })
+
+  it("no guarda un pedido que cambió después de leerlo (un «ya lo quité» falso sale aquí)", () => {
+    const r = validarConfirmacion({ ...bien, cambioDesdeLaLectura: true })
+    expect(r.ok).toBe(false)
+    expect(r.ok === false && r.mensaje).toContain("ver_pedido")
+  })
+
+  it("espera a que el cliente conteste la lectura", () => {
+    expect(validarConfirmacion({ ...bien, clienteHabloDespues: false }).ok).toBe(false)
+  })
+
+  it("no acepta nombres inventados ni vacíos", () => {
+    for (const nombre of ["", "cliente", "Cliente", "sin nombre", "Anónimo", "señora"]) {
+      const r = validarConfirmacion({ ...bien, nombre })
+      expect(r.ok, nombre).toBe(false)
+      expect(r.ok === false && r.preguntar).toBe("¿A nombre de quién lo pongo?")
+    }
+  })
+
+  it("no guarda un pedido vacío", () => {
+    expect(validarConfirmacion({ ...bien, articulos: 0 }).ok).toBe(false)
   })
 })
 

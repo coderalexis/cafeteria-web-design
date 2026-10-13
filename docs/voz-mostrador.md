@@ -59,6 +59,40 @@ herramientas y la validación; lo nuevo sería el acceso público y sus topes.
 - **El total que dice el bot es antes de promociones y del cargo para llevar**:
   el que vale es el que cobra la caja (`create_ticket`).
 
+## Lo que enseñó el cliente simulado (2026-10-12)
+
+Se probó con un «cliente» automático: Chrome sin pantalla con el micrófono
+sustituido por audio grabado con la voz de Windows (es-MX), que lee lo que
+contesta el bot y responde según lo que pregunta. Cinco casos: pedido completo,
+sin tamaño, corrección («mejor nada más un capuchino»), producto que no existe
+y cliente que se arrepiente. Dos fallos del bot salieron ahí y los arregla la
+APP, no las instrucciones, porque el modelo no siempre las obedece:
+
+1. **Dijo «ya quité un cappuccino» sin quitarlo**, y se guardaron dos. Ahora
+   `confirmar_pedido` se niega si el pedido cambió desde la última vez que se
+   leyó con `ver_pedido`: lo que se guarda es exactamente lo que el cliente
+   oyó leer. Y `quitar_producto` acepta el código del producto, sin consultar
+   antes el número de renglón (el paso que el modelo se saltaba).
+2. **Preguntó el nombre y en la misma respuesta guardó a nombre de «cliente».**
+   Ahora no se confirma en una respuesta que trae una pregunta, el cliente
+   tiene que haber hablado después de la lectura, y se rechazan nombres
+   genéricos («cliente», «sin nombre»…). Las reglas viven en
+   `validarConfirmacion` (pura, con pruebas).
+
+Además: en el menú del café de prueba «Frio» es un TAMAÑO (Chico / Grande /
+Frio) y el bot lo tomaba por temperatura; se le dice explícitamente. Y una
+respuesta de una sola sílaba («Ana.») puede no registrarse como turno con
+reducción de ruido `far_field`; «Sí, a nombre de Ana» sí.
+
+Con eso, en las rondas finales los pedidos completos, sin tamaño, con
+corrección y con producto inexistente se guardaron con los renglones y el
+total exactos, y el arrepentido no guardó nada. El bot responde en 0.4–2 s
+(lo lento es cuando consulta el menú) y una conversación completa dura de 55
+a 75 s, con un tope estimado de US$0.04–0.12.
+
+Pendiente de pulir: todavía anuncia a veces lo que va a hacer («déjame
+revisar tu pedido»), lo que suma un turno de ~2 s.
+
 ## Variables de entorno
 
 | Variable | Para qué |

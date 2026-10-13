@@ -287,17 +287,38 @@ export function agregar(lines: CartLine[], args: ArgsAgregar, cat: Catalogo, nue
 }
 
 export interface ArgsQuitar {
-  renglon: number
+  /** Número de renglón (el de `pedido.renglones`). */
+  renglon?: number | null
+  /** O el código del producto, sin buscar antes el renglón. */
+  producto?: string | null
   cantidad?: number | null
 }
 
-/** Quita un renglón entero, o solo unas piezas si se dice cuántas. */
-export function quitar(lines: CartLine[], args: ArgsQuitar): { lines: CartLine[]; respuesta: Respuesta } {
-  const i = Number(args.renglon) - 1
-  const l = lines[i]
-  if (!Number.isInteger(i) || !l) {
-    return { lines, respuesta: { ok: false, mensaje: `No hay renglón ${args.renglon}. Revisa el pedido con ver_pedido.`, pedido: resumir(lines) } }
+/**
+ * Quita un renglón entero, o solo unas piezas si se dice cuántas.
+ *
+ * Acepta el CÓDIGO del producto además del renglón: en las pruebas con voz el
+ * modelo, para quitar, tenía que consultar primero el pedido y luego usar el
+ * número, y ese paso de más era justo el que se saltaba — decía «ya lo
+ * quité» sin haber quitado nada.
+ */
+export function quitar(lines: CartLine[], args: ArgsQuitar, cat?: Catalogo): { lines: CartLine[]; respuesta: Respuesta } {
+  const falla = (mensaje: string) => ({ lines, respuesta: { ok: false, mensaje, pedido: resumir(lines) } })
+  let i = -1
+  if (args.renglon != null) {
+    i = Number(args.renglon) - 1
+    if (!Number.isInteger(i) || !lines[i]) return falla(`No hay renglón ${args.renglon}. Los renglones están en «pedido.renglones».`)
+  } else if (args.producto) {
+    const product = cat?.porCodigo.get(String(args.producto).trim().toLowerCase())
+    if (!product) return falla(`No existe el código «${args.producto}».`)
+    const indices = lines.flatMap((l, j) => (l.product.id === product.id ? [j] : []))
+    if (indices.length === 0) return falla(`No hay ${product.name} en el pedido.`)
+    if (indices.length > 1) return falla(`Hay ${indices.length} renglones de ${product.name}: di cuál con su número de renglón.`)
+    i = indices[0]
+  } else {
+    return falla("Di qué quitar: el número de renglón o el código del producto.")
   }
+  const l = lines[i]
   const cantidad = args.cantidad == null ? l.quantity : Number(args.cantidad)
   if (!Number.isInteger(cantidad) || cantidad < 1) {
     return { lines, respuesta: { ok: false, mensaje: "La cantidad a quitar tiene que ser un entero positivo.", pedido: resumir(lines) } }
@@ -315,6 +336,46 @@ export function quitar(lines: CartLine[], args: ArgsQuitar): { lines: CartLine[]
 }
 
 export const NOMBRE_MAX = 30
+
+/** Lo que el modelo escribe cuando no sabe el nombre: nunca es un nombre. */
+const NOMBRES_GENERICOS = new Set(["cliente", "el cliente", "usuario", "anonimo", "sin nombre", "nombre", "desconocido", "senor", "senora", "amigo", "amiga", "persona", "invitado", "n/a", "na"])
+
+export interface Confirmacion {
+  nombre: string
+  articulos: number
+  /** El pedido cambió desde la última vez que el bot lo leyó con ver_pedido. */
+  cambioDesdeLaLectura: boolean
+  /** ¿El cliente habló después de esa lectura? */
+  clienteHabloDespues: boolean
+  /** ¿El bot hizo una pregunta en la MISMA respuesta en la que quiere confirmar? */
+  preguntoEnLaMismaRespuesta: boolean
+}
+
+/**
+ * Las reglas para guardar, que el modelo no puede saltarse porque las aplica
+ * la app y no las instrucciones. Salieron de probar con un cliente simulado:
+ * el bot preguntó «¿a nombre de quién?» y en la misma respuesta guardó el
+ * pedido como «cliente»; y en otra dijo «ya quité un cappuccino» sin haberlo
+ * quitado. Con estas reglas, lo que se guarda es exactamente lo que el
+ * cliente oyó leer y aceptó, a su nombre.
+ */
+export function validarConfirmacion(c: Confirmacion): { ok: true; nombre: string } | { ok: false; mensaje: string; preguntar?: string } {
+  if (c.articulos === 0) return { ok: false, mensaje: "El pedido está vacío: no hay nada que guardar." }
+  if (c.preguntoEnLaMismaRespuesta) {
+    return { ok: false, mensaje: "No confirmes en la misma respuesta en que preguntas: espera a que el cliente conteste." }
+  }
+  if (c.cambioDesdeLaLectura) {
+    return { ok: false, mensaje: "El pedido cambió desde la última vez que lo leíste. Usa ver_pedido, léeselo al cliente y espera su sí." }
+  }
+  if (!c.clienteHabloDespues) {
+    return { ok: false, mensaje: "El cliente todavía no ha contestado a la lectura del pedido. Espera su respuesta." }
+  }
+  const nombre = c.nombre.trim().replace(/\s+/g, " ")
+  if (!nombre || NOMBRES_GENERICOS.has(sinAcentos(nombre))) {
+    return { ok: false, mensaje: "Falta el nombre del cliente; no lo inventes.", preguntar: "¿A nombre de quién lo pongo?" }
+  }
+  return { ok: true, nombre }
+}
 
 /** El nombre con que la cajera la ve en su bandeja: «Juan (voz)». */
 export function nombreDeCuenta(nombre: string): string {
@@ -355,7 +416,7 @@ export const HERRAMIENTAS_VOZ = [
       type: "object",
       properties: {
         producto: { type: "string", description: "Código del producto en el menú, p. ej. p12." },
-        tamano: { type: "string", description: "Nombre del tamaño tal como aparece en el menú (p. ej. Grande). Omitir si el producto tiene un solo precio." },
+        tamano: { type: "string", description: "Uno de los tamaños que el menú lista para ese producto (p. ej. Grande). Si la lista incluye «Frio» y el cliente lo pide frío, el tamaño es «Frio». Omitir si el producto tiene un solo precio." },
         cantidad: { type: "integer", minimum: 1, maximum: CANTIDAD_MAX },
         extras: { type: "array", items: { type: "string" }, description: "Códigos de extras (e1, e2…) que pidió el cliente." },
         nota: { type: "string", description: "Indicación que no es un extra del menú, p. ej. «sin azúcar», «tibio»." },
@@ -366,14 +427,15 @@ export const HERRAMIENTAS_VOZ = [
   {
     type: "function",
     name: "quitar_producto",
-    description: "Quita un renglón del pedido, o solo algunas piezas de ese renglón.",
+    description:
+      "Quita un producto del pedido, o solo algunas piezas. Indica el código del producto (o el número de renglón si hay dos renglones del mismo producto). Úsala SIEMPRE que el cliente quite o reduzca algo: decir que lo quitaste sin llamarla no cambia el pedido.",
     parameters: {
       type: "object",
       properties: {
-        renglon: { type: "integer", minimum: 1, description: "Número de renglón según ver_pedido." },
-        cantidad: { type: "integer", minimum: 1, description: "Cuántas piezas quitar; omitir para quitar el renglón entero." },
+        producto: { type: "string", description: "Código del producto a quitar, p. ej. p5." },
+        renglon: { type: "integer", minimum: 1, description: "Número de renglón (viene en «pedido.renglones» de cada respuesta)." },
+        cantidad: { type: "integer", minimum: 1, description: "Cuántas piezas quitar; omitir para quitar todas las de ese renglón." },
       },
-      required: ["renglon"],
     },
   },
   {
@@ -386,10 +448,10 @@ export const HERRAMIENTAS_VOZ = [
     type: "function",
     name: "confirmar_pedido",
     description:
-      "Guarda el pedido para que lo preparen y lo cobren en caja. Llámala SOLO después de leerle el pedido y el total al cliente y de que diga que sí.",
+      "Guarda el pedido para que lo preparen y lo cobren en caja. Llámala SOLO cuando el cliente ya contestó que sí a la lectura del pedido Y te dijo su nombre. Si falta algo de eso, pregunta y espera.",
     parameters: {
       type: "object",
-      properties: { nombre: { type: "string", description: "Nombre del cliente para llamarlo cuando esté listo." } },
+      properties: { nombre: { type: "string", description: "El nombre que dijo el cliente. Nunca lo inventes." } },
       required: ["nombre"],
     },
   },
@@ -407,11 +469,14 @@ export function instruccionesVoz(cafe: string, menu: string): string {
 Cómo atiendes:
 - Saluda en una frase y pregunta qué va a llevar.
 - Cada vez que el cliente pida algo, llama a agregar_producto con los códigos del menú. No lo repitas todo después de cada producto: basta un «listo» o «va» y preguntar si algo más.
+- No anuncies lo que vas a hacer («déjame agregarlo», «déjame revisar»): llama a la herramienta directamente y habla cuando tengas su respuesta.
+- Los tamaños son los que lista el menú para cada producto. En algunos productos «Frio» es uno de esos tamaños: si el cliente lo pide frío, ya dijo el tamaño.
 - Si una herramienta responde con «preguntar», hazle esa pregunta al cliente con tus palabras y vuelve a llamarla con el dato.
 - Si piden algo que no está en el menú, dilo y ofrece lo más parecido que sí haya. Nunca inventes productos, tamaños, extras ni precios.
 - Los precios y el total salen SIEMPRE de las respuestas de las herramientas; no hagas cuentas tú.
-- Si el cliente quiere quitar o cambiar algo, usa ver_pedido para saber el número de renglón y luego quitar_producto (y agregar_producto si es un cambio).
-- Cuando diga que es todo: usa ver_pedido, léele el pedido de forma natural y el total, y pregunta si está bien. Si dice que sí, pregunta su nombre (si no lo sabes) y llama a confirmar_pedido.
+- Si el cliente quiere quitar o reducir algo, llama a quitar_producto (y a agregar_producto si es un cambio). Nunca digas que agregaste, quitaste o cambiaste algo si la herramienta no te respondió ok: el pedido solo cambia con las herramientas.
+- Cuando diga que es todo: usa ver_pedido, léele el pedido y el total de forma natural, y pregunta en la misma frase si está bien y a nombre de quién lo pones (si aún no sabes su nombre). Espera su respuesta; no confirmes en la misma respuesta en que preguntas.
+- Cuando el cliente diga que sí y tengas su nombre, llama a confirmar_pedido. Si la herramienta se niega, haz lo que te indique.
 - Después de confirmar, dile que pase a pagar a la caja y despídete en una frase.
 - No cobras ni hablas de formas de pago: eso se hace en caja. Si preguntan algo que no tiene que ver con el pedido, contesta en una frase y vuelve al pedido.
 - Si no entendiste, pide que lo repita; no adivines.

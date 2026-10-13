@@ -17,6 +17,7 @@ import {
   nombreDeCuenta,
   quitar,
   resumir,
+  validarConfirmacion,
   type ArgsAgregar,
   type ArgsQuitar,
   type Catalogo,
@@ -63,6 +64,12 @@ interface Sesion {
   rechazos: number
   guardado: boolean
   despidiendo: boolean
+  /** Sube con cada cambio al pedido; `versionLeida` es la que el bot leyó en voz alta con ver_pedido. */
+  version: number
+  versionLeida: number
+  /** Turnos de voz del cliente, y cuántos llevaba cuando el bot leyó el pedido. */
+  vocesCliente: number
+  vocesAlLeer: number
   reloj: number
   despedida: number | null
 }
@@ -188,7 +195,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
 
   /** Lo que hace cada herramienta del bot. Siempre contesta algo: un error también es respuesta. */
   const ejecutar = useCallback(
-    async (s: Sesion, nombre: string, argsJson: string): Promise<{ ok: boolean } & Record<string, unknown>> => {
+    async (s: Sesion, nombre: string, argsJson: string, preguntoAqui: boolean): Promise<{ ok: boolean } & Record<string, unknown>> => {
       let args: Record<string, unknown> = {}
       try {
         args = argsJson ? (JSON.parse(argsJson) as Record<string, unknown>) : {}
@@ -198,24 +205,38 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       switch (nombre) {
         case "agregar_producto": {
           const r = agregar(linesRef.current, args as unknown as ArgsAgregar, s.catalogo, () => `voz-${++idLinea.current}`)
+          if (r.respuesta.ok) s.version++
           ponerLineas(r.lines)
           return { ...r.respuesta }
         }
         case "quitar_producto": {
-          const r = quitar(linesRef.current, args as unknown as ArgsQuitar)
+          const r = quitar(linesRef.current, args as unknown as ArgsQuitar, s.catalogo)
+          if (r.respuesta.ok) s.version++
           ponerLineas(r.lines)
           return { ...r.respuesta }
         }
         case "ver_pedido":
+          // Releer un pedido que no cambió no exige que el cliente vuelva a contestar.
+          if (s.versionLeida !== s.version) {
+            s.versionLeida = s.version
+            s.vocesAlLeer = s.vocesCliente
+          }
           return { ok: true, mensaje: "Pedido actual.", pedido: resumir(linesRef.current) }
         case "cancelar_pedido":
+          s.version++
           ponerLineas([])
           return { ok: true, mensaje: "Pedido borrado.", pedido: resumir([]) }
         case "confirmar_pedido": {
           if (s.guardado) return { ok: false, mensaje: "Este pedido ya se guardó. Solo despídete." }
-          if (linesRef.current.length === 0) return { ok: false, mensaje: "El pedido está vacío: no hay nada que guardar." }
-          const nombreCliente = String(args.nombre ?? "").trim()
-          if (!nombreCliente) return { ok: false, mensaje: "Falta el nombre.", preguntar: "¿A nombre de quién lo pongo?" }
+          const v = validarConfirmacion({
+            nombre: String(args.nombre ?? ""),
+            articulos: linesRef.current.length,
+            cambioDesdeLaLectura: s.versionLeida !== s.version,
+            clienteHabloDespues: s.vocesCliente > s.vocesAlLeer,
+            preguntoEnLaMismaRespuesta: preguntoAqui,
+          })
+          if (!v.ok) return v
+          const nombreCliente = v.nombre
           try {
             const r = await parkOrder({
               name: nombreDeCuenta(nombreCliente),
@@ -252,6 +273,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
           break
         case "input_audio_buffer.speech_stopped":
           s.ultimaVoz = Date.now()
+          s.vocesCliente++
           setOyendo(false)
           break
         // El turno del cliente aparece en su lugar aunque la transcripción llegue después de la respuesta.
@@ -283,7 +305,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
             status?: string
             status_details?: unknown
             usage?: unknown
-            output?: Array<{ type?: string; name?: string; call_id?: string; arguments?: string }>
+            output?: Array<{ type?: string; name?: string; call_id?: string; arguments?: string; content?: Array<{ transcript?: string; text?: string }> }>
           }
           s.uso = sumarUso(s.uso, response.usage)
           if (response.status === "failed") {
@@ -295,10 +317,14 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
             })
           }
           const llamadas = (response.output ?? []).filter((o) => o.type === "function_call" && o.call_id && o.name)
+          // ¿Preguntó algo en esta misma respuesta? Entonces todavía no puede tener la contestación.
+          const preguntoAqui = (response.output ?? []).some(
+            (o) => o.type === "message" && (o.content ?? []).some((c) => /[?¿]/.test(c.transcript ?? c.text ?? "")),
+          )
           if (llamadas.length > 0) {
             for (const c of llamadas) {
               s.herramientas++
-              const salida = await ejecutar(s, c.name!, c.arguments ?? "")
+              const salida = await ejecutar(s, c.name!, c.arguments ?? "", preguntoAqui)
               if (!salida.ok) s.rechazos++
               enviar({ type: "conversation.item.create", item: { type: "function_call_output", call_id: c.call_id, output: JSON.stringify(salida) } })
             }
@@ -378,6 +404,10 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       rechazos: 0,
       guardado: false,
       despidiendo: false,
+      version: 0,
+      versionLeida: -1,
+      vocesCliente: 0,
+      vocesAlLeer: 0,
       despedida: null,
       reloj: window.setInterval(() => {
         const t = Date.now()
