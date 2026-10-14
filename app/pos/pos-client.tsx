@@ -173,6 +173,8 @@ interface POSClientProps {
   recientesFueraDeMenu: CustomRecent[]
   /** Lo que el café cuenta (P45): insumos y artículos del menú; vacío si no cuenta nada. */
   existencias: ItemExistencia[]
+  /** Pedido por voz en el mostrador (prototipo): solo en los cafés de VOZ_CAFES. */
+  vozEnMostrador?: boolean
 }
 
 /**
@@ -227,6 +229,7 @@ export default function POSClient({
   customItemsEnabled,
   recientesFueraDeMenu,
   existencias: existenciasIniciales,
+  vozEnMostrador = false,
 }: POSClientProps) {
   const router = useRouter()
   const appCtx = useAppContext()
@@ -1932,6 +1935,7 @@ export default function POSClient({
           onTogglePractica={togglePractica}
           onAprender={() => setShowAprender(true)}
           onExistencias={existencias.length > 0 ? () => setShowExistencias(true) : undefined}
+          vozEnMostrador={vozEnMostrador}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
