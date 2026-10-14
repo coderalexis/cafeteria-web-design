@@ -30,6 +30,29 @@ herramientas y la validación; lo nuevo sería el acceso público y sus topes.
   Medido: lo dictado aparece en el carrito ~1–1.6 s después de terminar de
   hablar; una sesión de ~40 s cuesta un tope estimado de US$0.03–0.06.
 
+**El ayudante también quita y cambia cantidades** (2026-10-14). La primera
+versión solo agregaba («el carrito está a la vista: que corrija con el dedo»).
+El usuario lo probó en su Android, le dictó «elimina el capuchino grande que
+no es deslactosado», y el bot, sin herramienta, lo metió como «No encontré: …
+no es posible modificar…». Ahora `quitar_producto` y `cambiar_cantidad`
+describen el renglón como lo dice el cajero — producto, tamaño, extras que
+TIENE (`extras`) o que NO tiene (`sin_extras`) — y `buscarEnCarrito` lo
+encuentra sin números de renglón. Reglas que salieron de probar:
+- Si quedan varios renglones, se toca el ÚLTIMO agregado y se dice «(el
+  último)».
+- `quitar` sin cantidad quita UNA pieza: «quita uno de los capuchinos» llegó
+  sin cantidad y se fueron los dos. Quitar de menos se corrige mejor.
+- «Ya no van los capuchinos» es `cambiar_cantidad` con 0, y quita TODOS los
+  renglones de ese producto (un deslactosado y uno normal son dos).
+- Vaciar el carrito entero NO existe por voz: una frase mal oída no puede
+  borrar un pedido; es un toque al bote.
+- Cada cambio de la voz trae **Deshacer** en la tarjeta.
+- Si el nombre empata («capuchino» a secas: el caliente y el frappé se
+  llaman igual), gana el más sencillo; quien quiere el frappé dice «frappé».
+- «No encontré» es solo para productos que no existen, con el nombre y nada
+  más; lo que no se encontró en el carrito se dice tal cual («No hay Mango en
+  el carrito»).
+
 Lo que comparten: el motor (`resolver` en `pedido.ts`, con las reglas de la
 hoja de extras), el menú del servidor, el micrófono y la conexión
 (`conexion.ts`), y los candados de dinero.

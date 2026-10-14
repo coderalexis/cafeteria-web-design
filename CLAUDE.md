@@ -440,8 +440,8 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-10-14 y pendientes
 
-- Producción = `main` hasta el PR #77 (pedido por voz, encendido solo en
-  `cafe-de-prueba`); migraciones aplicadas hasta la **59**
+- Producción = `main` hasta el PR #80 (pedido por voz en dos modos, cajero y
+  ayudante, encendido solo en `cafe-de-prueba`); migraciones aplicadas hasta la **59**
   (`p45_insumos_ajustes`). Inventario Fase 1 vivo (insumos + reventa); cuentas
   abiertas con reconciliación de sellos; avisos silenciosos en el correo de
   la mañana; CI con la imagen `postgres-meta` en caché.
