@@ -2,7 +2,8 @@ import { runTrialCheck } from "@/lib/trials"
 import { sendErrorDigest } from "@/app/actions/errors"
 
 /**
- * GET /api/pruebas — cron diario de Vercel (15:00 UTC ≈ 09:00 en CDMX).
+ * GET /api/pruebas — cron diario de Vercel (10:00 UTC = 04:00 en CDMX: después
+ * de que venza cualquier caja mexicana y antes de que nadie abra; ver vercel.json).
  * Avisa a quien está por terminar su prueba y suspende las vencidas, salvo que
  * tengan la caja abierta (ver lib/trials.ts).
  *
