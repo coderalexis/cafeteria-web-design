@@ -18,6 +18,8 @@ import {
   verificarProducto,
   cambiarCantidad,
   buscarEnCarrito,
+  HERRAMIENTAS_AYUDANTE,
+  HERRAMIENTAS_VOZ,
 } from "@/app/pos/voz/pedido"
 
 const leche = {
@@ -88,7 +90,7 @@ describe("catálogo para el bot", () => {
     expect(cat.productos.map((p) => p.codigo)).toEqual(["p1", "p2", "p3", "p4"])
     expect(cat.grupos.map((g) => g.grupo.id)).toEqual(["g-leche", "g-ing"])
     const texto = catalogoEnTexto(cat)
-    expect(texto).toContain("p1 Latte | Chico $45 · Grande $55 | extras: g1")
+    expect(texto).toContain("p1 Latte | Chico $45 · Grande $55 | grupos de extras: g1")
     expect(texto).toContain("p4 Panqué de plátano | $30")
     expect(texto).toContain(`g1 Leche [opcional, máximo 1]: ${e("m-entera")} Entera (por omisión), ${e("m-almendra")} Almendra +$10`)
     expect(texto).toContain("g2 Ingredientes [obligatorio, elige 2]")
@@ -175,6 +177,15 @@ describe("agregar", () => {
     const r = agregar([], { producto: "p4", cantidad: 1, extras: [e("m-almendra")] }, cat, nuevoId)
     expect(r.respuesta.ok).toBe(false)
     expect(r.respuesta.mensaje).toContain("no aplica")
+  })
+
+  it("ignora el código del GRUPO si llega entre los extras (extras: [g1, e2], visto con el bot real)", () => {
+    const r = agregar([], { producto: "p1", tamano: "Grande", cantidad: 1, extras: ["g1", e("m-almendra")] }, cat, nuevoId)
+    expect(r.respuesta.ok).toBe(true)
+    expect(r.lines[0].modifiers.map((m) => m.id)).toEqual(["m-almendra"])
+    // y si solo llega el grupo, entra con la opción por omisión
+    const solo = agregar([], { producto: "p1", tamano: "Grande", cantidad: 1, extras: ["g1"] }, cat, nuevoId)
+    expect(solo.lines[0].modifiers.map((m) => m.id)).toEqual(["m-entera"])
   })
 
   it("rechaza cantidades fuera de rango", () => {
@@ -469,5 +480,17 @@ describe("el ayudante encuentra el renglón que el cajero describe", () => {
     const lines = carrito()
     expect(buscarEnCarrito(lines, { producto: "p4", nombre: "Panqué de plátano" }, cat)).toEqual({ ok: false, mensaje: "No hay Panqué de plátano en el carrito." })
     expect(buscarEnCarrito(lines, { producto: "p1", nombre: "Latte", tamano: "Chico" }, cat)).toEqual({ ok: false, mensaje: "No hay Latte así en el carrito." })
+  })
+})
+
+describe("vaciar el carrito por voz", () => {
+  it("existe en el ayudante (el cajero lo pidió) y no en el modo cajero", () => {
+    expect(HERRAMIENTAS_AYUDANTE.map((h) => h.name)).toContain("vaciar_carrito")
+    expect(HERRAMIENTAS_VOZ.map((h) => h.name)).not.toContain("vaciar_carrito")
+  })
+  it("las instrucciones lo piden solo con una orden clara para el carrito entero", () => {
+    const t = instruccionesAyudante("Café", "p1 Latte")
+    expect(t).toContain("elimina todo lo del carrito")
+    expect(t).toContain("vaciar_carrito")
   })
 })

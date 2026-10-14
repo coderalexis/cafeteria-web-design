@@ -223,6 +223,19 @@ export function useDictado(opciones: {
         }
         return { ok: true }
       }
+      if (nombre === "vaciar_carrito") {
+        // Renglón por renglón, como los toques: no toca la cuenta abierta, el
+        // descuento ni el método de pago. Y con Deshacer que regresa todo.
+        const todas = [...opcionesRef.current.lineas]
+        if (todas.length === 0) return { ok: true, sinCambio: true }
+        for (const l of todas) opcionesRef.current.alQuitarLinea(l.lineId)
+        s.cambios++
+        const piezas = todas.reduce((n, l) => n + l.quantity, 0)
+        avisar(`Vacié el carrito: ${piezas} ${piezas === 1 ? "artículo" : "artículos"}`, "quitado", () => {
+          for (const l of todas) opcionesRef.current.alAgregar(l.product, l.size, l.modifiers, l.quantity, l.notes)
+        })
+        return { ok: true }
+      }
       if (nombre !== "agregar_producto") return { ok: false, mensaje: `No existe la herramienta «${nombre}».` }
 
       const r = resolver(args as unknown as ArgsAgregar, s.catalogo)
@@ -244,8 +257,14 @@ export function useDictado(opciones: {
         return { ok: true, pendiente: true }
       }
       s.noEntendidos++
-      // El mensaje de `resolver` es para el modelo; al cajero, lo que pidió.
-      avisarNoEncontrado(`No encontré: «${String(args.nombre ?? args.producto ?? "").slice(0, 60)}»`)
+      // El mensaje de `resolver` es para el modelo; al cajero, lo que pidió. Si
+      // el producto SÍ existe, decir «no encontré» sería mentira: se dice que
+      // no se pudo agregar y por qué.
+      avisarNoEncontrado(
+        r.product
+          ? `No pude agregar ${r.product.name}: ${r.mensaje.replace(/ Usa solo los códigos del menú\.?/, "")}`
+          : `No encontré: «${String(args.nombre ?? args.producto ?? "").slice(0, 60)}»`,
+      )
       return { ok: false, mensaje: r.mensaje }
     },
     [avisar, avisarNoEncontrado, entregar],

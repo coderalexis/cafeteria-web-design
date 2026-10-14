@@ -44,8 +44,16 @@ encuentra sin números de renglón. Reglas que salieron de probar:
   sin cantidad y se fueron los dos. Quitar de menos se corrige mejor.
 - «Ya no van los capuchinos» es `cambiar_cantidad` con 0, y quita TODOS los
   renglones de ese producto (un deslactosado y uno normal son dos).
-- Vaciar el carrito entero NO existe por voz: una frase mal oída no puede
-  borrar un pedido; es un toque al bote.
+- Vaciar el carrito entero: al principio NO existía por voz (una frase mal
+  oída no puede borrar un pedido). El usuario lo pidió («elimina todo lo del
+  carrito» no hacía nada) y con Deshacer el riesgo es un toque, así que entró
+  `vaciar_carrito`: solo con orden clara para el carrito entero, renglón por
+  renglón como los toques (no toca cuenta abierta, descuento ni pago) y con
+  Deshacer que regresa todo.
+- El modelo a veces mandaba el código del GRUPO entre los extras
+  (`extras: [g1, e1]`) y el producto entero caía como «No encontré: Cappuccino»
+  — era la falla intermitente que parecía de nombres. Ahora los códigos de
+  grupo se ignoran y el menú dice «grupos de extras: g1».
 - Cada cambio de la voz trae **Deshacer** en la tarjeta.
 - Si el nombre empata («capuchino» a secas: el caliente y el frappé se
   llaman igual), gana el más sencillo; quien quiere el frappé dice «frappé».
