@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Loader2, Mic, X } from "lucide-react"
+import { ArrowRightLeft, Check, Loader2, Mic, Minus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/format"
 import type { Dictado } from "./use-dictado"
@@ -12,7 +12,7 @@ import type { Dictado } from "./use-dictado"
  * toque, sin abrir la rejilla ni buscar el producto.
  */
 export function DictadoPanel({ dictado, isMobile }: { dictado: Dictado; isMobile: boolean }) {
-  const { estado, oyendo, oido, agregados, pendientes, noEncontrados, error, ofrecerRecarga } = dictado
+  const { estado, oyendo, oido, acciones, pendientes, noEncontrados, error, ofrecerRecarga } = dictado
   const activo = estado === "conectando" || estado === "escuchando"
   if (!activo && pendientes.length === 0 && noEncontrados.length === 0 && !error) return null
 
@@ -44,12 +44,32 @@ export function DictadoPanel({ dictado, isMobile }: { dictado: Dictado; isMobile
 
       {oido && <p className="truncate text-xs text-stone-500">Oí: «{oido}»</p>}
 
-      {agregados.length > 0 && (
+      {acciones.length > 0 && (
         <ul className="flex flex-col gap-0.5" data-dictado-agregados>
-          {agregados.map((a) => (
-            <li key={a.id} className="flex items-center gap-1.5 text-emerald-800">
-              <Check className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{a.texto}</span>
+          {acciones.map((a) => (
+            <li
+              key={a.id}
+              className={`flex items-center gap-1.5 ${a.tipo === "agregado" ? "text-emerald-800" : a.tipo === "quitado" ? "text-red-700" : "text-sky-800"}`}
+              data-dictado-accion={a.tipo}
+            >
+              {a.tipo === "agregado" ? (
+                <Check className="h-3.5 w-3.5 shrink-0" />
+              ) : a.tipo === "quitado" ? (
+                <Minus className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <ArrowRightLeft className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="min-w-0 flex-1 truncate">{a.texto}</span>
+              {a.deshacer && (
+                <button
+                  type="button"
+                  className="blanco-comodo shrink-0 rounded px-1.5 text-xs font-medium text-stone-600 underline-offset-2 hover:underline"
+                  onClick={() => dictado.deshacer(a.id)}
+                  data-dictado-deshacer
+                >
+                  Deshacer
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -97,8 +117,8 @@ export function DictadoPanel({ dictado, isMobile }: { dictado: Dictado; isMobile
       ))}
 
       {noEncontrados.map((n) => (
-        <div key={n.id} className="flex items-start gap-2 rounded-lg bg-stone-100 p-2 text-stone-700" data-dictado-no-encontrado>
-          <p className="flex-1">No encontré: «{n.texto}»</p>
+        <div key={n.id} className="flex items-start gap-2 rounded-lg bg-stone-100 px-2 py-1.5 text-stone-700" data-dictado-no-encontrado>
+          <p className="flex-1">{n.texto}</p>
           <button
             type="button"
             className="blanco-comodo -m-1 p-1 text-stone-500 hover:text-stone-700"

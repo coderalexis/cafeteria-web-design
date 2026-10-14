@@ -585,6 +585,9 @@ export default function POSClient({
       vibra(12)
     },
     alAbrirHoja: (product, size) => setPendingModifiers({ product, size }),
+    lineas: lines,
+    alQuitarLinea: removeLine,
+    alCambiarCantidad: (lineId, cantidad) => (cantidad <= 0 ? removeLine(lineId) : setQuantityTo(lineId, cantidad)),
   })
   const [cartOpen, setCartOpen] = useState(false)
 

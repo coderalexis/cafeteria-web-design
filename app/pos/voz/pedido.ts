@@ -262,8 +262,9 @@ export function afinidad(dicho: string, product: Product): number {
  * MANZANA del renglón de al lado. Por eso cada llamada trae también el nombre:
  *   · si el nombre corresponde al producto del código, el código vale;
  *   · si no, se busca el producto al que sí corresponde el nombre — si es uno
- *     solo (o uno se parece claramente más), ese es; si hay empate, se rechaza
- *     para que el modelo revise en vez de que la app adivine;
+ *     solo (o uno se parece claramente más), ese es; si empatan, gana el más
+ *     sencillo («capuchino» → el caliente, no el frappé); si ni así, se
+ *     rechaza para que el modelo revise en vez de que la app adivine;
  *   · si el nombre no corresponde a NADA (lo escribió distinto: «capuchino»),
  *     se queda el código.
  */
@@ -279,10 +280,16 @@ export function verificarProducto(
     .filter((x) => x.a > 0)
     .sort((x, y) => y.a - x.a)
   if (candidatos.length === 0) return { product: codigo }
-  if (candidatos.length > 1 && candidatos[0].a === candidatos[1].a) {
-    return { ambiguo: candidatos.filter((x) => x.a === candidatos[0].a).map((x) => x.p) }
-  }
-  return { product: candidatos[0].p }
+  const empatados = candidatos.filter((x) => x.a === candidatos[0].a)
+  if (empatados.length === 1) return { product: empatados[0].p }
+  // Empate («capuchino» a secas: el caliente y el frappé se llaman igual): gana
+  // el MÁS SENCILLO, el que menos palabras trae de descripción. Quien quiere el
+  // frappé dice «frappé de capuchino», y eso ya desempata por afinidad. Solo si
+  // también empatan en sencillez se rechaza.
+  const sencillez = (p: Product) => palabras(`${p.name} ${p.description ?? ""} ${p.subcategory ?? ""}`).size
+  empatados.sort((x, y) => sencillez(x.p) - sencillez(y.p))
+  if (sencillez(empatados[0].p) < sencillez(empatados[1].p)) return { product: empatados[0].p }
+  return { ambiguo: empatados.filter((x) => sencillez(x.p) === sencillez(empatados[0].p)).map((x) => x.p) }
 }
 
 /** Lo que le faltó a un producto para poder entrar al carrito. */
@@ -706,18 +713,53 @@ export const HERRAMIENTAS_VOZ = [
   },
 ] as const
 
-/** Herramientas del modo ayudante: agregar, y decir qué no entendió. Nada de quitar ni confirmar: el carrito está a la vista del cajero. */
+/**
+ * Cómo se describe un renglón del carrito al quitarlo o cambiarlo: sin números
+ * de renglón (el cajero no los ve), con producto, tamaño y extras.
+ */
+function propiedadesRenglon(cantidad: string) {
+  return {
+    producto: { type: "string", description: "Código del producto, p. ej. p5." },
+    nombre: { type: "string", description: "El nombre de ese producto en el menú, para verificar el código." },
+    tamano: { type: "string", description: "El tamaño, si lo dijo." },
+    extras: { type: "array", items: { type: "string" }, description: "Códigos de extras que el renglón SÍ tiene, si los dijo («el deslactosado»)." },
+    sin_extras: { type: "array", items: { type: "string" }, description: "Códigos de extras que el renglón NO tiene («el que no es deslactosado»)." },
+    cantidad: { type: "integer", minimum: 0, maximum: CANTIDAD_MAX, description: cantidad },
+  } as const
+}
+
+/**
+ * Herramientas del modo ayudante. La primera versión solo agregaba («el carrito
+ * está a la vista, que corrija con el dedo»): el usuario lo probó, le dictó
+ * «elimina el capuchino que no es deslactosado», y el bot, sin herramienta, lo
+ * metió como «No encontré: … no es posible modificar…». Quitar y cambiar
+ * cantidad por voz es parte de dictar. Vaciar el carrito entero NO: una frase
+ * mal oída no puede borrar un pedido completo; eso es un toque al bote.
+ */
 export const HERRAMIENTAS_AYUDANTE = [
   herramientaAgregar(
     "Agrega al carrito un producto que dictó el cajero. Llámala una vez por cada producto, todas en la misma respuesta. Si no dijo el tamaño o un extra obligatorio, llámala igual sin ese dato: el cajero lo completa en pantalla.",
   ),
   {
     type: "function",
+    name: "quitar_producto",
+    description:
+      "Quita del carrito algo que el cajero pide quitar («quita el mocha», «elimina el capuchino que no es deslactosado», «quita uno de los capuchinos»). Describe el renglón con el producto y, si lo dijo, el tamaño y los extras que tiene o que NO tiene.",
+    parameters: { type: "object", properties: propiedadesRenglon("Cuántas piezas quitar; sin dato se quita UNA. Para quitar todas, usa cambiar_cantidad con 0."), required: ["producto", "nombre"] },
+  },
+  {
+    type: "function",
+    name: "cambiar_cantidad",
+    description: "Deja un renglón del carrito con la cantidad FINAL que dice el cajero («que sean tres capuchinos», «nada más un mocha»). Con 0 quita el renglón entero («quita los capuchinos», «ya no van los mokas»).",
+    parameters: { type: "object", properties: propiedadesRenglon("La cantidad final de ese renglón."), required: ["producto", "nombre", "cantidad"] },
+  },
+  {
+    type: "function",
     name: "no_entendi",
-    description: "Avisa al cajero de algo que dictó y no está en el menú o no entendiste. No adivines: usa esta herramienta.",
+    description: "Avisa al cajero de un PRODUCTO que dictó y no está en el menú. No adivines uno parecido. No la uses para nada más.",
     parameters: {
       type: "object",
-      properties: { texto: { type: "string", description: "Lo que oíste, tal cual, en pocas palabras." } },
+      properties: { texto: { type: "string", description: "Solo el producto que oíste, en máximo 6 palabras, sin explicaciones." } },
       required: ["texto"],
     },
   },
@@ -767,10 +809,13 @@ ${menu}`
 export function instruccionesAyudante(cafe: string, menu: string): string {
   return `Eres el ayudante del cajero de ${cafe}, una cafetería en México. El cajero te dicta pedidos en voz alta mientras atiende; tú solo los capturas.
 
-- Por cada producto que diga, llama a agregar_producto con los códigos del menú. Varios productos son varias llamadas, todas en la misma respuesta.
+- Por cada producto que diga, llama a agregar_producto con los códigos del menú. Varios productos son varias llamadas, todas en la misma respuesta. «Dos capuchinos» es UNA llamada con cantidad 2.
+- Si pide quitar algo («quita», «elimina», «ya no»), llama a quitar_producto describiendo el renglón: producto, y si lo dijo, tamaño y extras que tiene (extras) o que NO tiene (sin_extras). «Quita uno de los capuchinos» es cantidad 1; sin cantidad se quita uno.
+- Si quita TODOS los de algo («quita los capuchinos», «ya no van los mokas»), llama a cambiar_cantidad con cantidad 0.
+- Si cambia cuántos quiere («que sean tres», «nada más uno»), llama a cambiar_cantidad con la cantidad final.
 - No converses: no saludes, no confirmes, no preguntes, no respondas con texto. Solo llamadas a herramientas.
 - Si no dijo el tamaño o un extra obligatorio, llama igual a agregar_producto sin ese dato: el cajero lo completa en pantalla.
-- Si algo no está en el menú o no lo entendiste, llama a no_entendi con lo que oíste. No adivines un producto parecido.
+- Si dicta un producto que no está en el menú, llama a no_entendi solo con el nombre de ese producto. No adivines uno parecido y no la uses para explicar nada.
 - Si lo que oyes no es un pedido (plática, ruido, alguien más hablando), no hagas nada.
 - Los tamaños son los que lista el menú. En algunos productos «Frio» es un tamaño.
 - No pongas en «nota» extras del menú: van en «extras».
@@ -824,4 +869,53 @@ export function enMenuDelPos(
     modifiers.push(o)
   }
   return { product, size, modifiers }
+}
+
+/** Cómo describe el cajero un renglón del carrito para quitarlo o cambiarlo. */
+export interface ArgsRenglonDictado {
+  producto: string
+  nombre?: string | null
+  tamano?: string | null
+  /** El renglón TIENE estos extras («el deslactosado»). */
+  extras?: string[] | null
+  /** El renglón NO tiene estos extras («el que no es deslactosado»). */
+  sin_extras?: string[] | null
+  /** quitar: cuántas piezas (sin dato, todas); cambiar: la cantidad final. */
+  cantidad?: number | null
+}
+
+/**
+ * Encuentra en el carrito del POS el renglón que describe el cajero: producto
+ * (verificado con su nombre), tamaño, y con o sin ciertos extras. Así «quita
+ * el capuchino grande que no es deslactosado» se resuelve sin números de
+ * renglón, que el cajero no ve ni tendría por qué decir. Si quedan varios
+ * («quita uno de los capuchinos»), toca el ÚLTIMO agregado — lo que una
+ * persona entendería — y lo dice, para que el cajero vea cuál fue.
+ */
+export function buscarEnCarrito(
+  lines: CartLine[],
+  args: ArgsRenglonDictado,
+  cat: Catalogo,
+): { ok: true; indice: number; indices: number[]; varios: boolean } | { ok: false; mensaje: string } {
+  const v = verificarProducto(cat.porCodigo.get(String(args.producto ?? "").trim().toLowerCase()), args.nombre, cat)
+  if ("ambiguo" in v) return { ok: false, mensaje: `No supe cuál de los ${args.nombre ?? "productos"}.` }
+  const product = v.product
+  if (!product) return { ok: false, mensaje: `No existe el código «${args.producto}».` }
+
+  const ids = (codigos: string[] | null | undefined) =>
+    (codigos ?? []).map((c) => cat.extraPorCodigo.get(String(c).trim().toLowerCase())?.id).filter((x): x is string => !!x)
+  const con = ids(args.extras)
+  const sin = ids(args.sin_extras)
+
+  let candidatos = lines.map((l, i) => ({ l, i })).filter(({ l }) => l.product.id === product.id)
+  if (candidatos.length === 0) return { ok: false, mensaje: `No hay ${product.name} en el carrito.` }
+  if (args.tamano && args.tamano.trim()) {
+    const t = elegirTamano(product, args.tamano)
+    if (typeof t === "object" && t) candidatos = candidatos.filter(({ l }) => l.size?.variantId === t.variantId)
+  }
+  candidatos = candidatos.filter(
+    ({ l }) => con.every((id) => l.modifiers.some((m) => m.id === id)) && sin.every((id) => !l.modifiers.some((m) => m.id === id)),
+  )
+  if (candidatos.length === 0) return { ok: false, mensaje: `No hay ${product.name} así en el carrito.` }
+  return { ok: true, indice: candidatos[candidatos.length - 1].i, indices: candidatos.map((c) => c.i), varios: candidatos.length > 1 }
 }

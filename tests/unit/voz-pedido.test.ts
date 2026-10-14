@@ -17,6 +17,7 @@ import {
   validarConfirmacion,
   verificarProducto,
   cambiarCantidad,
+  buscarEnCarrito,
 } from "@/app/pos/voz/pedido"
 
 const leche = {
@@ -376,11 +377,22 @@ describe("el nombre verifica el código (el modelo copió p75, el panqué de al 
     expect(verificarProducto(c.porCodigo.get("p5"), "frappé de taro", c)).toEqual({ product: VECINOS[3] })
   })
 
-  it("si el nombre puede ser dos productos y el código no es ninguno, rechaza en vez de adivinar", () => {
-    const v = verificarProducto(c.porCodigo.get("p5"), "taro", c)
-    expect("ambiguo" in v && v.ambiguo.map((p) => p.id)).toEqual(["taro-cal", "taro-fra"])
-    const r = resolver({ producto: "p5", nombre: "taro", cantidad: 1 }, c)
-    expect(r.ok).toBe(false)
+  it("si el nombre empata («taro» a secas), gana el más sencillo: el caliente, no el frappé", () => {
+    expect(verificarProducto(c.porCodigo.get("p5"), "taro", c)).toEqual({ product: VECINOS[2] })
+    const r = resolver({ producto: "p5", nombre: "Cappuccino", cantidad: 1 }, c)
+    expect(r.ok && r.product.id).toBe("capu")
+  })
+
+  it("si empatan también en sencillez, rechaza en vez de adivinar", () => {
+    const gemelos: Product[] = [
+      { id: "choco-1", name: "Chocolate", category: "a", subcategory: "Bebidas", price: 40, variantId: "v1" },
+      { id: "choco-2", name: "Chocolate", category: "b", subcategory: "Postres", price: 30, variantId: "v2" },
+      { id: "otro", name: "Americano", category: "a", subcategory: "Bebidas", price: 30, variantId: "v3" },
+    ]
+    const g = armarCatalogo(gemelos)
+    const v = verificarProducto(g.porCodigo.get("p3"), "chocolate", g)
+    expect("ambiguo" in v && v.ambiguo.map((p) => p.id)).toEqual(["choco-1", "choco-2"])
+    const r = resolver({ producto: "p3", nombre: "chocolate", cantidad: 1 }, g)
     expect(!r.ok && r.mensaje).toContain("Revisa cuál pidió")
   })
 
@@ -413,5 +425,49 @@ describe("cambiar la cantidad («mejor nada más uno»)", () => {
   it("rechaza cantidades raras y productos que no están", () => {
     expect(cambiarCantidad(dos(), { producto: "p2", cantidad: -1 }, cat).respuesta.ok).toBe(false)
     expect(cambiarCantidad(dos(), { producto: "p1", cantidad: 1 }, cat).respuesta.ok).toBe(false)
+  })
+})
+
+describe("el ayudante encuentra el renglón que el cajero describe", () => {
+  // Como en la captura del usuario: dos con un extra, uno sin él, y otra cosa.
+  const carrito = () => {
+    let lines = agregar([], { producto: "p1", tamano: "Grande", cantidad: 2, extras: [e("m-almendra")] }, cat, nuevoId).lines
+    lines = agregar(lines, { producto: "p1", tamano: "Grande", cantidad: 1 }, cat, nuevoId).lines
+    lines = agregar(lines, { producto: "p2", cantidad: 1 }, cat, nuevoId).lines
+    return lines
+  }
+
+  it("«el latte grande que NO es de almendra»", () => {
+    const lines = carrito()
+    const r = buscarEnCarrito(lines, { producto: "p1", nombre: "Latte", tamano: "Grande", sin_extras: [e("m-almendra")] }, cat)
+    expect(r.ok && lines[r.indice].modifiers.map((m) => m.id)).toEqual(["m-entera"])
+    expect(r.ok && r.varios).toBe(false)
+  })
+
+  it("«el de almendra»", () => {
+    const lines = carrito()
+    const r = buscarEnCarrito(lines, { producto: "p1", nombre: "Latte", extras: [e("m-almendra")] }, cat)
+    expect(r.ok && lines[r.indice].quantity).toBe(2)
+  })
+
+  it("«quita uno de los lattes»: el último agregado, y avisa que había varios", () => {
+    const lines = carrito()
+    const r = buscarEnCarrito(lines, { producto: "p1", nombre: "Latte" }, cat)
+    expect(r.ok && r.indice).toBe(1)
+    expect(r.ok && r.varios).toBe(true)
+    // y entrega todos los que coinciden, para «ya no van los lattes»
+    expect(r.ok && r.indices).toEqual([0, 1])
+  })
+
+  it("si el código es el del vecino, el nombre manda", () => {
+    const lines = carrito()
+    const r = buscarEnCarrito(lines, { producto: "p3", nombre: "Americano" }, cat)
+    expect(r.ok && lines[r.indice].product.id).toBe("americano")
+  })
+
+  it("dice qué no hay, en vez de quitar otra cosa", () => {
+    const lines = carrito()
+    expect(buscarEnCarrito(lines, { producto: "p4", nombre: "Panqué de plátano" }, cat)).toEqual({ ok: false, mensaje: "No hay Panqué de plátano en el carrito." })
+    expect(buscarEnCarrito(lines, { producto: "p1", nombre: "Latte", tamano: "Chico" }, cat)).toEqual({ ok: false, mensaje: "No hay Latte así en el carrito." })
   })
 })

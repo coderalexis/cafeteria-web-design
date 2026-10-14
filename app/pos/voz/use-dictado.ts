@@ -4,14 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { iniciarSesionVoz } from "@/app/actions/voz"
 import { reportClientError } from "@/app/actions/errors"
 import { mensajeDeFallo } from "@/lib/version"
-import type { ModifierOption, Product, SizeOption } from "../cart"
+import { getLineLabel, type CartLine, type ModifierOption, type Product, type SizeOption } from "../cart"
 import { conectarVoz, pedirMicrofono, type ConexionVoz } from "./conexion"
 import {
   armarCatalogo,
+  buscarEnCarrito,
   describirResuelto,
   enMenuDelPos,
   resolver,
   type ArgsAgregar,
+  type ArgsRenglonDictado,
   type Catalogo,
   type PendienteDictado,
 } from "./pedido"
@@ -44,9 +46,20 @@ interface Sesion {
   reloj: number
   uso: UsoVoz
   agregados: number
+  cambios: number
   pendientes: number
   noEntendidos: number
 }
+
+/** Lo que la voz hizo en el carrito, con cómo deshacerlo si entendió mal. */
+export interface AccionDictado {
+  id: number
+  texto: string
+  tipo: "agregado" | "quitado" | "cambiado"
+  deshacer?: () => void
+}
+
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export interface Dictado {
   estado: EstadoDictado
@@ -54,8 +67,10 @@ export interface Dictado {
   oyendo: boolean
   /** Lo último que se oyó, tal cual. */
   oido: string
-  /** Lo último que entró al carrito, para la tarjeta. */
-  agregados: Array<{ id: number; texto: string }>
+  /** Lo último que la voz hizo en el carrito, para la tarjeta. */
+  acciones: AccionDictado[]
+  /** Deshace una acción de la voz (quitar o cambiar cantidad). */
+  deshacer: (id: number) => void
   pendientes: PendienteDictado[]
   noEncontrados: Array<{ id: number; texto: string }>
   error: string | null
@@ -75,11 +90,15 @@ export function useDictado(opciones: {
   productos: Product[]
   alAgregar: (product: Product, size: SizeOption | undefined, modifiers: ModifierOption[], cantidad: number, nota: string) => void
   alAbrirHoja: (product: Product, size: SizeOption | undefined) => void
+  /** El carrito de ahora, para quitar o cambiar lo que el cajero describa. */
+  lineas: CartLine[]
+  alQuitarLinea: (lineId: string) => void
+  alCambiarCantidad: (lineId: string, cantidad: number) => void
 }): Dictado {
   const [estado, setEstado] = useState<EstadoDictado>("apagado")
   const [oyendo, setOyendo] = useState(false)
   const [oido, setOido] = useState("")
-  const [agregados, setAgregados] = useState<Array<{ id: number; texto: string }>>([])
+  const [acciones, setAcciones] = useState<AccionDictado[]>([])
   const [pendientes, setPendientes] = useState<PendienteDictado[]>([])
   const [noEncontrados, setNoEncontrados] = useState<Array<{ id: number; texto: string }>>([])
   const [error, setError] = useState<string | null>(null)
@@ -94,10 +113,12 @@ export function useDictado(opciones: {
   opcionesRef.current = opciones
   const pendientesRef = useRef<PendienteDictado[]>([])
   pendientesRef.current = pendientes
+  const accionesRef = useRef<AccionDictado[]>([])
+  accionesRef.current = acciones
 
-  const avisarAgregado = useCallback((texto: string) => {
+  const avisar = useCallback((texto: string, tipo: AccionDictado["tipo"] = "agregado", deshacer?: () => void) => {
     const id = ++contador.current
-    setAgregados((prev) => [{ id, texto }, ...prev].slice(0, MAX_VISIBLES))
+    setAcciones((prev) => [{ id, texto, tipo, deshacer }, ...prev].slice(0, MAX_VISIBLES))
   }, [])
 
   const avisarNoEncontrado = useCallback((texto: string) => {
@@ -114,10 +135,10 @@ export function useDictado(opciones: {
         return false
       }
       opcionesRef.current.alAgregar(enPos.product, enPos.size, enPos.modifiers, r.cantidad, r.nota)
-      avisarAgregado(describirResuelto(r))
+      avisar(describirResuelto(r))
       return true
     },
-    [avisarAgregado, avisarNoEncontrado],
+    [avisar, avisarNoEncontrado],
   )
 
   const detener = useCallback(() => {
@@ -137,6 +158,7 @@ export function useDictado(opciones: {
         segundos: Math.round((Date.now() - s.inicio) / 1000),
         modelo: s.modelo,
         agregados: s.agregados,
+        cambios: s.cambios,
         pendientes: s.pendientes,
         noEntendidos: s.noEntendidos,
         uso: s.uso,
@@ -158,7 +180,47 @@ export function useDictado(opciones: {
       }
       if (nombre === "no_entendi") {
         s.noEntendidos++
-        avisarNoEncontrado(String(args.texto ?? "").slice(0, 80) || "algo que no entendí")
+        avisarNoEncontrado(`No encontré: «${String(args.texto ?? "").slice(0, 60) || "algo que no entendí"}»`)
+        return { ok: true }
+      }
+      if (nombre === "quitar_producto" || nombre === "cambiar_cantidad") {
+        const o = opcionesRef.current
+        const b = buscarEnCarrito(o.lineas, args as unknown as ArgsRenglonDictado, s.catalogo)
+        if (!b.ok) {
+          avisarNoEncontrado(b.mensaje)
+          return { ok: false, mensaje: b.mensaje }
+        }
+        const linea = o.lineas[b.indice]
+        const pedida = args.cantidad == null ? null : Math.max(0, Math.round(Number(args.cantidad)))
+        // quitar: cuántas piezas se van — sin dato, UNA: «quita el capuchino» con
+        // dos en el carrito es casi siempre uno, y quitar de menos se corrige
+        // mejor que quitar de más (se probó: «quita uno de los capuchinos» llegó
+        // sin cantidad y se fueron los dos). Cambiar: con cuántas se queda.
+        const queda = nombre === "quitar_producto" ? Math.max(0, linea.quantity - (pedida ?? 1)) : (pedida ?? linea.quantity)
+        if (!Number.isFinite(queda) || queda === linea.quantity) return { ok: true, sinCambio: true }
+        const etiqueta = getLineLabel(linea) + (linea.modifiers.length ? ` con ${linea.modifiers.map((m) => m.name).join(", ")}` : "")
+        const cual = b.varios ? " (el último)" : ""
+        s.cambios++
+        // «Ya no van los capuchinos»: con 0 se van TODOS los renglones que
+        // coinciden (un deslactosado y uno normal son dos renglones).
+        if (nombre === "cambiar_cantidad" && queda === 0 && b.indices.length > 1) {
+          const todas = b.indices.map((i) => o.lineas[i])
+          for (const l of todas) o.alQuitarLinea(l.lineId)
+          const piezas = todas.reduce((n, l) => n + l.quantity, 0)
+          avisar(`Quité: ${piezas} × ${linea.product.name} (todos)`, "quitado", () => {
+            for (const l of todas) opcionesRef.current.alAgregar(l.product, l.size, l.modifiers, l.quantity, l.notes)
+          })
+          return { ok: true }
+        }
+        if (queda === 0) {
+          o.alQuitarLinea(linea.lineId)
+          avisar(`Quité: ${linea.quantity} × ${etiqueta}${cual}`, "quitado", () =>
+            opcionesRef.current.alAgregar(linea.product, linea.size, linea.modifiers, linea.quantity, linea.notes),
+          )
+        } else {
+          o.alCambiarCantidad(linea.lineId, queda)
+          avisar(`Ahora: ${queda} × ${etiqueta}${cual}`, "cambiado", () => opcionesRef.current.alCambiarCantidad(linea.lineId, linea.quantity))
+        }
         return { ok: true }
       }
       if (nombre !== "agregar_producto") return { ok: false, mensaje: `No existe la herramienta «${nombre}».` }
@@ -182,10 +244,11 @@ export function useDictado(opciones: {
         return { ok: true, pendiente: true }
       }
       s.noEntendidos++
-      avisarNoEncontrado(r.mensaje)
+      // El mensaje de `resolver` es para el modelo; al cajero, lo que pidió.
+      avisarNoEncontrado(`No encontré: «${String(args.nombre ?? args.producto ?? "").slice(0, 60)}»`)
       return { ok: false, mensaje: r.mensaje }
     },
-    [avisarNoEncontrado, entregar],
+    [avisar, avisarNoEncontrado, entregar],
   )
 
   const manejar = useCallback(
@@ -212,13 +275,19 @@ export function useDictado(opciones: {
             output?: Array<{ type?: string; name?: string; call_id?: string; arguments?: string }>
           }
           s.uso = sumarUso(s.uso, response.usage)
-          for (const c of response.output ?? []) {
-            if (c.type !== "function_call" || !c.call_id || !c.name) continue
-            const salida = ejecutar(s, c.name, c.arguments ?? "")
-            // Se contesta cada llamada para que la conversación quede en orden,
-            // pero SIN pedir otra respuesta: el ayudante no tiene nada que decir.
-            s.conexion.enviar({ type: "conversation.item.create", item: { type: "function_call_output", call_id: c.call_id, output: JSON.stringify(salida) } })
-          }
+          const llamadas = (response.output ?? []).filter((c) => c.type === "function_call" && c.call_id && c.name)
+          void (async () => {
+            for (const [i, c] of llamadas.entries()) {
+              // Entre una llamada y otra se deja que el POS pinte: «un mocha… no,
+              // quítalo» llega en la MISMA respuesta, y quitar tiene que ver el
+              // carrito con el mocha ya puesto.
+              if (i > 0) await dormir(80)
+              const salida = ejecutar(s, c.name!, c.arguments ?? "")
+              // Se contesta cada llamada para que la conversación quede en orden,
+              // pero SIN pedir otra respuesta: el ayudante no tiene nada que decir.
+              s.conexion.enviar({ type: "conversation.item.create", item: { type: "function_call_output", call_id: c.call_id, output: JSON.stringify(salida) } })
+            }
+          })()
           break
         }
         case "error": {
@@ -284,6 +353,7 @@ export function useDictado(opciones: {
       ultimaVoz: ahora,
       uso: USO_VACIO,
       agregados: 0,
+      cambios: 0,
       pendientes: 0,
       noEntendidos: 0,
       reloj: window.setInterval(() => {
@@ -343,11 +413,19 @@ export function useDictado(opciones: {
     setNoEncontrados((prev) => prev.filter((x) => x.id !== id))
   }, [])
 
+  // El efecto va FUERA del actualizador de estado: React puede llamar dos veces
+  // a un actualizador en desarrollo, y eso desharía dos veces.
+  const deshacer = useCallback((id: number) => {
+    accionesRef.current.find((a) => a.id === id)?.deshacer?.()
+    setAcciones((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
   return {
     estado,
     oyendo,
     oido,
-    agregados,
+    acciones,
+    deshacer,
     pendientes,
     noEncontrados,
     error,
