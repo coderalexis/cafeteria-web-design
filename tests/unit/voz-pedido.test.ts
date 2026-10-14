@@ -10,7 +10,13 @@ import {
   nombreDeCuenta,
   pesos,
   quitar,
+  resolver,
+  describirResuelto,
+  enMenuDelPos,
+  instruccionesAyudante,
   validarConfirmacion,
+  verificarProducto,
+  cambiarCantidad,
 } from "@/app/pos/voz/pedido"
 
 const leche = {
@@ -295,5 +301,117 @@ describe("guardar como cuenta abierta", () => {
   it("marca el nombre para que la cajera sepa que vino de la voz", () => {
     expect(nombreDeCuenta("  Juan   Pérez ")).toBe("Juan Pérez (voz)")
     expect(nombreDeCuenta("x".repeat(60)).length).toBeLessThanOrEqual(40)
+  })
+})
+
+describe("modo ayudante", () => {
+  it("lo completo se resuelve y se describe para la tarjeta", () => {
+    const r = resolver({ producto: "p1", tamano: "Grande", cantidad: 2, extras: [e("m-almendra")] }, cat)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(describirResuelto(r)).toBe("2 × Latte (Grande) con Almendra")
+  })
+
+  it("sin tamaño queda pendiente con lo que sí se dijo, para completarlo con un toque", () => {
+    const r = resolver({ producto: "p1", cantidad: 2, extras: [e("m-almendra")] }, cat)
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.falta).toEqual({ tipo: "tamano" })
+      expect(r.product?.id).toBe("latte")
+      expect(r.cantidad).toBe(2)
+    }
+    // Al tocar «Grande», se resuelve con los mismos datos y el tamaño elegido.
+    const completo = resolver({ producto: "p1", cantidad: 2, extras: [e("m-almendra")], tamano: "Grande" }, cat)
+    expect(completo.ok && completo.modifiers.map((m) => m.id)).toEqual(["m-almendra"])
+  })
+
+  it("sin un extra obligatorio queda pendiente de la hoja de extras", () => {
+    const r = resolver({ producto: "p3", cantidad: 1 }, cat)
+    expect(!r.ok && r.falta).toEqual({ tipo: "extras", grupo: expect.objectContaining({ id: "g-ing" }) })
+  })
+
+  it("lo que no existe no queda pendiente: es un error a la vista", () => {
+    const r = resolver({ producto: "p99", cantidad: 1 }, cat)
+    expect(!r.ok && r.falta).toBeUndefined()
+  })
+
+  it("entrega al carrito los objetos del POS, para que lo dictado y lo tocado se junten", () => {
+    const delPos = MENU.map((p) => ({ ...p })) // otra copia, como la de la rejilla
+    const r = resolver({ producto: "p1", tamano: "Chico", cantidad: 1, extras: [e("m-almendra")] }, cat)
+    if (!r.ok) throw new Error("debía resolverse")
+    const m = enMenuDelPos(r, delPos)
+    expect(m?.product).toBe(delPos[0])
+    expect(m?.size?.variantId).toBe("v-chico")
+    expect(m?.modifiers.map((x) => x.id)).toEqual(["m-almendra"])
+    expect(enMenuDelPos(r, delPos.slice(1))).toBeNull()
+  })
+
+  it("las instrucciones prohíben conversar y piden no_entendi en vez de adivinar", () => {
+    const t = instruccionesAyudante("Café de prueba", "p1 Latte")
+    expect(t).toContain("No converses")
+    expect(t).toContain("no_entendi")
+  })
+})
+
+describe("el nombre verifica el código (el modelo copió p75, el panqué de al lado)", () => {
+  const VECINOS: Product[] = [
+    { id: "limon", name: "Panque de Limon", category: "pan", subcategory: "Rebanada de Panque", description: "Rebanada de Panque", price: 20, variantId: "v-limon" },
+    { id: "manzana", name: "Panque de Manzana", category: "pan", subcategory: "Rebanada de Panque", description: "Rebanada de Panque", price: 20, variantId: "v-manzana" },
+    { id: "taro-cal", name: "Taro", category: "leche", subcategory: "A Base de Leche", price: 55, variantId: "v-taro-cal" },
+    { id: "taro-fra", name: "Taro", category: "frappes", subcategory: "Frappe a base de leche", description: "Frappe a base de leche", price: 45, variantId: "v-taro-fra" },
+    { id: "capu", name: "Cappuccino", category: "cafe", subcategory: "Con Cafe", price: 35, variantId: "v-capu" },
+  ]
+  const c = armarCatalogo(VECINOS)
+
+  it("si el nombre corresponde al código, el código vale", () => {
+    expect(verificarProducto(c.porCodigo.get("p1"), "Rebanada de panqué de limón", c)).toEqual({ product: VECINOS[0] })
+  })
+
+  it("si el código es el del vecino, gana el producto que corresponde al nombre", () => {
+    expect(verificarProducto(c.porCodigo.get("p2"), "panqué de limón", c)).toEqual({ product: VECINOS[0] })
+    const r = resolver({ producto: "p2", nombre: "Panqué de limón", cantidad: 1 }, c)
+    expect(r.ok && r.product.id).toBe("limon")
+  })
+
+  it("con la descripción distingue el taro en frappé del caliente", () => {
+    expect(verificarProducto(c.porCodigo.get("p5"), "frappé de taro", c)).toEqual({ product: VECINOS[3] })
+  })
+
+  it("si el nombre puede ser dos productos y el código no es ninguno, rechaza en vez de adivinar", () => {
+    const v = verificarProducto(c.porCodigo.get("p5"), "taro", c)
+    expect("ambiguo" in v && v.ambiguo.map((p) => p.id)).toEqual(["taro-cal", "taro-fra"])
+    const r = resolver({ producto: "p5", nombre: "taro", cantidad: 1 }, c)
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.mensaje).toContain("Revisa cuál pidió")
+  })
+
+  it("si el nombre está escrito distinto y no corresponde a nada, se queda el código", () => {
+    expect(verificarProducto(c.porCodigo.get("p5"), "capuchino", c)).toEqual({ product: VECINOS[4] })
+  })
+
+  it("sin nombre, como antes", () => {
+    expect(verificarProducto(c.porCodigo.get("p2"), undefined, c)).toEqual({ product: VECINOS[1] })
+  })
+})
+
+describe("cambiar la cantidad («mejor nada más uno»)", () => {
+  const dos = () => {
+    let lines = agregar([], { producto: "p2", cantidad: 2 }, cat, nuevoId).lines
+    lines = agregar(lines, { producto: "p4", cantidad: 1 }, cat, nuevoId).lines
+    return lines
+  }
+  it("deja la cantidad final sin que el bot haga cuentas", () => {
+    const r = cambiarCantidad(dos(), { producto: "p2", cantidad: 1 }, cat)
+    expect(r.respuesta.ok).toBe(true)
+    expect(r.lines[0].quantity).toBe(1)
+    expect(r.respuesta.pedido.total).toBe(65)
+    expect(r.respuesta.mensaje).toContain("Ahora: 1 × Americano")
+  })
+  it("con 0 lo quita", () => {
+    const r = cambiarCantidad(dos(), { producto: "p4", cantidad: 0 }, cat)
+    expect(r.lines).toHaveLength(1)
+  })
+  it("rechaza cantidades raras y productos que no están", () => {
+    expect(cambiarCantidad(dos(), { producto: "p2", cantidad: -1 }, cat).respuesta.ok).toBe(false)
+    expect(cambiarCantidad(dos(), { producto: "p1", cantidad: 1 }, cat).respuesta.ok).toBe(false)
   })
 })

@@ -196,6 +196,8 @@ function extraNombradoEn(nota: string, cat: Catalogo): ModifierOption | null {
 
 export interface ArgsAgregar {
   producto: string
+  /** El nombre del producto, como verificación del código (ver `verificarProducto`). */
+  nombre?: string | null
   tamano?: string | null
   cantidad?: number | null
   extras?: string[] | null
@@ -220,33 +222,106 @@ function opcionesDeTamano(product: Product): string {
   return (product.sizes ?? []).map((s) => `${s.label} (${pesos(s.price)})`).join(", ")
 }
 
-/**
- * Agrega un producto. Aplica las mismas reglas que la hoja de extras del POS:
- * el tamaño es obligatorio si hay más de uno, cada extra tiene que ser de un
- * grupo del producto, ningún grupo pasa de su máximo, la opción por omisión
- * entra sola donde el cliente no eligió nada, y un grupo obligatorio sin
- * respuesta detiene el alta para preguntar — nunca se adivina.
- */
-export function agregar(lines: CartLine[], args: ArgsAgregar, cat: Catalogo, nuevoId: () => string): { lines: CartLine[]; respuesta: Respuesta } {
-  const falla = (mensaje: string, preguntar?: string) => ({
-    lines,
-    respuesta: { ok: false, mensaje, ...(preguntar ? { preguntar } : {}), pedido: resumir(lines) },
-  })
+/* ── El nombre como dígito verificador del código ─────────────────── */
 
-  const product = cat.porCodigo.get(String(args.producto ?? "").trim().toLowerCase())
-  if (!product) return falla(`No existe el código «${args.producto}». Usa solo los códigos del menú.`)
+const PALABRAS_VACIAS = new Set(["de", "del", "la", "el", "los", "las", "con", "sin", "y", "un", "una", "unos", "unas", "al", "a", "en", "por", "para"])
+
+/** Palabras con peso de un nombre: sin acentos, sin palabras vacías y en singular («lattes» → «latte»). */
+function palabras(texto: string): Set<string> {
+  return new Set(
+    sinAcentos(texto)
+      .replace(/[^a-z0-9ñ]+/g, " ")
+      .split(" ")
+      .filter((p) => p.length > 1 && !PALABRAS_VACIAS.has(p))
+      .map((p) => (p.length > 4 && p.endsWith("s") ? p.slice(0, -1) : p)),
+  )
+}
+
+/**
+ * ¿Cuánto se parece lo que dijo el modelo al producto? 0 si no corresponde.
+ * Corresponde si todas las palabras del nombre del producto están en lo dicho
+ * («panqué de limón» ⊇ «panque limon»), o todas las de lo dicho están en el
+ * producto con su descripción. La cifra es cuántas palabras comparten
+ * contando la descripción: así «frappé de taro» se va con el Taro que se
+ * describe como frappé y no con el caliente.
+ */
+export function afinidad(dicho: string, product: Product): number {
+  const d = palabras(dicho)
+  const nombre = palabras(product.name)
+  const completo = palabras(`${product.name} ${product.description ?? ""} ${product.subcategory ?? ""}`)
+  if (d.size === 0 || nombre.size === 0) return 0
+  const nombreEnDicho = [...nombre].every((p) => d.has(p))
+  const dichoEnProducto = [...d].every((p) => completo.has(p))
+  if (!nombreEnDicho && !dichoEnProducto) return 0
+  return [...d].filter((p) => completo.has(p)).length
+}
+
+/**
+ * El código es lo que el modelo más fácil copia mal: en una prueba pidió
+ * «panqué de limón» (la transcripción lo dice así) y mandó p75, el panqué de
+ * MANZANA del renglón de al lado. Por eso cada llamada trae también el nombre:
+ *   · si el nombre corresponde al producto del código, el código vale;
+ *   · si no, se busca el producto al que sí corresponde el nombre — si es uno
+ *     solo (o uno se parece claramente más), ese es; si hay empate, se rechaza
+ *     para que el modelo revise en vez de que la app adivine;
+ *   · si el nombre no corresponde a NADA (lo escribió distinto: «capuchino»),
+ *     se queda el código.
+ */
+export function verificarProducto(
+  codigo: Product | undefined,
+  dicho: string | null | undefined,
+  cat: Catalogo,
+): { product: Product | undefined } | { ambiguo: Product[] } {
+  if (!dicho || !dicho.trim()) return { product: codigo }
+  if (codigo && afinidad(dicho, codigo) > 0) return { product: codigo }
+  const candidatos = cat.productos
+    .map((p) => ({ p: p.product, a: afinidad(dicho, p.product) }))
+    .filter((x) => x.a > 0)
+    .sort((x, y) => y.a - x.a)
+  if (candidatos.length === 0) return { product: codigo }
+  if (candidatos.length > 1 && candidatos[0].a === candidatos[1].a) {
+    return { ambiguo: candidatos.filter((x) => x.a === candidatos[0].a).map((x) => x.p) }
+  }
+  return { product: candidatos[0].p }
+}
+
+/** Lo que le faltó a un producto para poder entrar al carrito. */
+export type Falta = { tipo: "tamano" } | { tipo: "extras"; grupo: ModifierGroup }
+
+export type Resolucion =
+  | { ok: true; product: Product; size?: SizeOption; modifiers: ModifierOption[]; cantidad: number; nota: string }
+  | {
+      ok: false
+      mensaje: string
+      preguntar?: string
+      /** Solo cuando el producto existe pero le falta un dato: el modo ayudante lo deja pendiente. */
+      falta?: Falta
+      product?: Product
+      size?: SizeOption
+      cantidad?: number
+    }
+
+/**
+ * Traduce lo que pidió el bot a un renglón válido, o dice qué falta. Aplica
+ * las mismas reglas que la hoja de extras del POS: el tamaño es obligatorio
+ * si hay más de uno, cada extra tiene que ser de un grupo del producto,
+ * ningún grupo pasa de su máximo, la opción por omisión entra sola donde no
+ * se eligió nada, y un grupo obligatorio sin respuesta detiene el alta —
+ * nunca se adivina. Lo usan los dos modos: el cajero pregunta lo que falta,
+ * el ayudante lo deja pendiente para que el cajero lo complete con un toque.
+ */
+export function resolver(args: ArgsAgregar, cat: Catalogo): Resolucion {
+  const verificado = verificarProducto(cat.porCodigo.get(String(args.producto ?? "").trim().toLowerCase()), args.nombre, cat)
+  if ("ambiguo" in verificado) {
+    const cuales = verificado.ambiguo.map((p) => `${cat.productos.find((x) => x.product === p)?.codigo} ${p.name}${p.description ? ` (${p.description})` : ""}`).join("; ")
+    return { ok: false, mensaje: `El código «${args.producto}» no es «${args.nombre}», y ese nombre puede ser: ${cuales}. Revisa cuál pidió.` }
+  }
+  const product = verificado.product
+  if (!product) return { ok: false, mensaje: `No existe el código «${args.producto}». Usa solo los códigos del menú.` }
 
   const cantidad = args.cantidad == null ? 1 : Number(args.cantidad)
   if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > CANTIDAD_MAX) {
-    return falla(`La cantidad tiene que ser un entero de 1 a ${CANTIDAD_MAX}.`)
-  }
-
-  const size = elegirTamano(product, args.tamano)
-  if (size === "falta") {
-    return falla(`Falta el tamaño de ${product.name}.`, `¿De qué tamaño? ${opcionesDeTamano(product)}`)
-  }
-  if (size === "no-existe") {
-    return falla(`${product.name} no viene en «${args.tamano}».`, `Los tamaños son: ${opcionesDeTamano(product)}`)
+    return { ok: false, mensaje: `La cantidad tiene que ser un entero de 1 a ${CANTIDAD_MAX}.`, product }
   }
 
   const grupos = product.modifierGroups ?? []
@@ -254,21 +329,75 @@ export function agregar(lines: CartLine[], args: ArgsAgregar, cat: Catalogo, nue
   const vistos = new Set<string>()
   for (const codigo of args.extras ?? []) {
     const opt = cat.extraPorCodigo.get(String(codigo).trim().toLowerCase())
-    if (!opt) return falla(`No existe el extra «${codigo}». Usa solo los códigos del menú.`)
+    if (!opt) return { ok: false, mensaje: `No existe el extra «${codigo}». Usa solo los códigos del menú.`, product }
     if (!grupos.some((g) => g.options.some((o) => o.id === opt.id))) {
-      return falla(`«${opt.name}» no aplica a ${product.name}.`)
+      return { ok: false, mensaje: `«${opt.name}» no aplica a ${product.name}.`, product }
     }
     if (vistos.has(opt.id)) continue
     vistos.add(opt.id)
     elegidos.push(opt)
   }
+  for (const g of grupos) {
+    const n = elegidos.filter((o) => g.options.some((x) => x.id === o.id)).length
+    if (g.maxSelect != null && n > g.maxSelect) {
+      return {
+        ok: false,
+        mensaje: `En «${g.name}» se elige máximo ${g.maxSelect}.`,
+        preguntar: `¿Cuál${g.maxSelect > 1 ? "es" : ""} de esas quiere?`,
+        product,
+      }
+    }
+  }
+
+  const tam = elegirTamano(product, args.tamano)
+  const conocido = typeof tam === "object" && tam ? tam : undefined
+
+  const nota = (args.nota ?? "").trim().replace(/\s+/g, " ").slice(0, 120)
+  const extraEnNota = nota ? extraNombradoEn(nota, cat) : null
+  if (extraEnNota) {
+    const codigo = cat.codigoDeExtra.get(extraEnNota.id)
+    if (grupos.some((g) => g.options.some((o) => o.id === extraEnNota.id))) {
+      return {
+        ok: false,
+        mensaje: `«${extraEnNota.name}» es un extra del menú: mándalo en «extras» con su código (${codigo}), no como nota, para que se cobre.`,
+        product,
+      }
+    }
+    if (extraEnNota.priceDelta > 0) {
+      const cual = `${product.name}${conocido ? ` ${conocido.label}` : ""}`
+      return {
+        ok: false,
+        mensaje: `«${extraEnNota.name}» no está disponible para ${product.name} (es un extra con costo que este producto no tiene): no lo pongas como nota. Si el cliente acepta ${cual} sin eso, vuelve a llamar agregar_producto igual pero sin la nota.`,
+        preguntar: `${extraEnNota.name} no está disponible para ${product.name}. ¿Te lo preparo sin eso?`,
+        product,
+      }
+    }
+  }
+
+  if (tam === "falta") {
+    return {
+      ok: false,
+      mensaje: `Falta el tamaño de ${product.name}.`,
+      preguntar: `¿De qué tamaño? ${opcionesDeTamano(product)}`,
+      falta: { tipo: "tamano" },
+      product,
+      cantidad,
+    }
+  }
+  if (tam === "no-existe") {
+    return {
+      ok: false,
+      mensaje: `${product.name} no viene en «${args.tamano}».`,
+      preguntar: `Los tamaños son: ${opcionesDeTamano(product)}`,
+      falta: { tipo: "tamano" },
+      product,
+      cantidad,
+    }
+  }
 
   const modifiers: ModifierOption[] = []
   for (const g of grupos) {
     const delGrupo = elegidos.filter((o) => g.options.some((x) => x.id === o.id))
-    if (g.maxSelect != null && delGrupo.length > g.maxSelect) {
-      return falla(`En «${g.name}» se elige máximo ${g.maxSelect}.`, `¿Cuál${g.maxSelect > 1 ? "es" : ""} de esas quiere?`)
-    }
     if (delGrupo.length === 0 && g.defaultOptionId) {
       const omision = g.options.find((o) => o.id === g.defaultOptionId)
       if (omision) delGrupo.push(omision)
@@ -276,39 +405,42 @@ export function agregar(lines: CartLine[], args: ArgsAgregar, cat: Catalogo, nue
     if (delGrupo.length < g.minSelect) {
       const opciones = g.options.map((o) => `${o.name}${o.priceDelta ? ` (+${pesos(o.priceDelta)})` : ""}`).join(", ")
       const cuantos = g.minSelect > 1 ? `Elige ${g.minSelect}` : "Elige una"
-      return falla(`Para ${product.name} falta «${g.name}».`, `${g.name}: ${cuantos} de: ${opciones}`)
+      return {
+        ok: false,
+        mensaje: `Para ${product.name} falta «${g.name}».`,
+        preguntar: `${g.name}: ${cuantos} de: ${opciones}`,
+        falta: { tipo: "extras", grupo: g },
+        product,
+        size: conocido,
+        cantidad,
+      }
     }
     modifiers.push(...delGrupo)
   }
 
-  const nota = (args.nota ?? "").trim().replace(/\s+/g, " ").slice(0, 120)
-  const extraEnNota = nota ? extraNombradoEn(nota, cat) : null
-  if (extraEnNota) {
-    const codigo = cat.codigoDeExtra.get(extraEnNota.id)
-    if (grupos.some((g) => g.options.some((o) => o.id === extraEnNota.id))) {
-      return falla(`«${extraEnNota.name}» es un extra del menú: mándalo en «extras» con su código (${codigo}), no como nota, para que se cobre.`)
-    }
-    if (extraEnNota.priceDelta > 0) {
-      const cual = `${product.name}${size ? ` ${size.label}` : ""}`
-      return falla(
-        `«${extraEnNota.name}» no está disponible para ${product.name} (es un extra con costo que este producto no tiene): no lo pongas como nota. Si el cliente acepta ${cual} sin eso, vuelve a llamar agregar_producto igual pero sin la nota.`,
-        `${extraEnNota.name} no está disponible para ${product.name}. ¿Te lo preparo sin eso?`,
-      )
-    }
+  return { ok: true, product, size: conocido, modifiers, cantidad, nota }
+}
+
+/** Agrega un producto al pedido del modo cajero, con las reglas de `resolver`. */
+export function agregar(lines: CartLine[], args: ArgsAgregar, cat: Catalogo, nuevoId: () => string): { lines: CartLine[]; respuesta: Respuesta } {
+  const r = resolver(args, cat)
+  if (!r.ok) {
+    return { lines, respuesta: { ok: false, mensaje: r.mensaje, ...(r.preguntar ? { preguntar: r.preguntar } : {}), pedido: resumir(lines) } }
   }
+  const { product, size, modifiers, cantidad, nota } = r
   let nuevas: CartLine[]
   if (nota) {
     // Con nota no se fusiona: «uno sin azúcar» es otro renglón, como en el POS.
     nuevas = [
       ...lines.map((l) => ({ ...l, isNew: false })),
-      { lineId: nuevoId(), product, size: size ?? undefined, modifiers, quantity: cantidad, notes: nota, isNew: true },
+      { lineId: nuevoId(), product, size, modifiers, quantity: cantidad, notes: nota, isNew: true },
     ]
   } else {
     nuevas = lines
-    for (let i = 0; i < cantidad; i++) nuevas = addUnit(nuevas, product, size ?? undefined, modifiers, nuevoId)
+    for (let i = 0; i < cantidad; i++) nuevas = addUnit(nuevas, product, size, modifiers, nuevoId)
   }
 
-  const linea: CartLine = { lineId: "", product, size: size ?? undefined, modifiers, quantity: cantidad, notes: nota }
+  const linea: CartLine = { lineId: "", product, size, modifiers, quantity: cantidad, notes: nota }
   const importe = getLinePrice(linea) * cantidad
   const pedido = resumir(nuevas)
   return {
@@ -337,22 +469,59 @@ export interface ArgsQuitar {
  * número, y ese paso de más era justo el que se saltaba — decía «ya lo
  * quité» sin haber quitado nada.
  */
+/** El renglón al que se refiere el bot: por número o por código de producto. */
+function encontrarRenglon(lines: CartLine[], args: { renglon?: number | null; producto?: string | null }, cat?: Catalogo): number | string {
+  if (args.renglon != null) {
+    const i = Number(args.renglon) - 1
+    return Number.isInteger(i) && lines[i] ? i : `No hay renglón ${args.renglon}. Los renglones están en «pedido.renglones».`
+  }
+  if (args.producto) {
+    const product = cat?.porCodigo.get(String(args.producto).trim().toLowerCase())
+    if (!product) return `No existe el código «${args.producto}».`
+    const indices = lines.flatMap((l, j) => (l.product.id === product.id ? [j] : []))
+    if (indices.length === 0) return `No hay ${product.name} en el pedido.`
+    if (indices.length > 1) return `Hay ${indices.length} renglones de ${product.name}: di cuál con su número de renglón.`
+    return indices[0]
+  }
+  return "Di cuál: el número de renglón o el código del producto."
+}
+
+export interface ArgsCambiarCantidad {
+  renglon?: number | null
+  producto?: string | null
+  /** La cantidad FINAL de ese renglón; 0 lo quita. */
+  cantidad: number
+}
+
+/**
+ * Deja un renglón con la cantidad que dijo el cliente. Existe porque «mejor
+ * nada más un capuchino» obligaba al modelo a calcular «quitar 1 de 2», y en
+ * las pruebas con las instrucciones breves a veces contestaba «va, lo ajusto»
+ * sin hacer nada: se guardaron dos. Con esto solo tiene que repetir el número.
+ */
+export function cambiarCantidad(lines: CartLine[], args: ArgsCambiarCantidad, cat?: Catalogo): { lines: CartLine[]; respuesta: Respuesta } {
+  const falla = (mensaje: string) => ({ lines, respuesta: { ok: false, mensaje, pedido: resumir(lines) } })
+  const i = encontrarRenglon(lines, args, cat)
+  if (typeof i === "string") return falla(i)
+  const n = Number(args.cantidad)
+  if (!Number.isInteger(n) || n < 0 || n > CANTIDAD_MAX) return falla(`La cantidad tiene que ser un entero de 0 a ${CANTIDAD_MAX}.`)
+  const l = lines[i]
+  const nuevas = n === 0 ? lines.filter((_, j) => j !== i) : lines.map((x, j) => (j === i ? { ...x, quantity: n } : x))
+  const pedido = resumir(nuevas)
+  return {
+    lines: nuevas,
+    respuesta: {
+      ok: true,
+      mensaje: n === 0 ? `Quitado: ${getLineLabel(l)}. Total del pedido: ${pesos(pedido.total)}.` : `Ahora: ${n} × ${getLineLabel(l)}. Total del pedido: ${pesos(pedido.total)}.`,
+      pedido,
+    },
+  }
+}
+
 export function quitar(lines: CartLine[], args: ArgsQuitar, cat?: Catalogo): { lines: CartLine[]; respuesta: Respuesta } {
   const falla = (mensaje: string) => ({ lines, respuesta: { ok: false, mensaje, pedido: resumir(lines) } })
-  let i = -1
-  if (args.renglon != null) {
-    i = Number(args.renglon) - 1
-    if (!Number.isInteger(i) || !lines[i]) return falla(`No hay renglón ${args.renglon}. Los renglones están en «pedido.renglones».`)
-  } else if (args.producto) {
-    const product = cat?.porCodigo.get(String(args.producto).trim().toLowerCase())
-    if (!product) return falla(`No existe el código «${args.producto}».`)
-    const indices = lines.flatMap((l, j) => (l.product.id === product.id ? [j] : []))
-    if (indices.length === 0) return falla(`No hay ${product.name} en el pedido.`)
-    if (indices.length > 1) return falla(`Hay ${indices.length} renglones de ${product.name}: di cuál con su número de renglón.`)
-    i = indices[0]
-  } else {
-    return falla("Di qué quitar: el número de renglón o el código del producto.")
-  }
+  const i = encontrarRenglon(lines, args, cat)
+  if (typeof i === "string") return falla(i)
   const l = lines[i]
   const cantidad = args.cantidad == null ? l.quantity : Number(args.cantidad)
   if (!Number.isInteger(cantidad) || cantidad < 1) {
@@ -440,28 +609,49 @@ export function carritoParaGuardar(lines: CartLine[], saleRef: string, now: numb
 /*  Las herramientas y las instrucciones del bot                       */
 /* ------------------------------------------------------------------ */
 
-/** Definición de herramientas para la sesión de voz (formato Realtime de OpenAI). */
-export const HERRAMIENTAS_VOZ = [
-  {
+/**
+ * Los dos modos del pedido por voz. Mismo motor, mismas reglas de dinero;
+ * cambia quién habla y a dónde va el pedido.
+ *   · cajero   — el CLIENTE habla con el bot en un aparato del mostrador; el
+ *                bot pregunta lo que falta, lee el total y guarda una cuenta.
+ *   · ayudante — el CAJERO dicta en su propio POS; el bot no habla ni
+ *                pregunta, y lo dictado entra directo al carrito.
+ */
+export type ModoVoz = "cajero" | "ayudante"
+
+function herramientaAgregar(description: string) {
+  return {
     type: "function",
     name: "agregar_producto",
-    description:
-      "Agrega un producto al pedido. Úsala en cuanto el cliente pida algo; si la respuesta dice que falta un dato, pregúntaselo al cliente con el texto de «preguntar» y vuelve a llamarla completa.",
+    description,
     parameters: {
       type: "object",
       properties: {
         producto: { type: "string", description: "Código del producto en el menú, p. ej. p12." },
-        tamano: { type: "string", description: "Uno de los tamaños que el menú lista para ese producto (p. ej. Grande). Si la lista incluye «Frio» y el cliente lo pide frío, el tamaño es «Frio». Omitir si el producto tiene un solo precio." },
+        nombre: { type: "string", description: "El nombre de ese producto tal como aparece en el menú, para verificar que el código es el correcto." },
+        tamano: {
+          type: "string",
+          description:
+            "Uno de los tamaños que el menú lista para ese producto (p. ej. Grande). Si la lista incluye «Frio» y lo piden frío, el tamaño es «Frio». Omitir si el producto tiene un solo precio o si no lo dijeron.",
+        },
         cantidad: { type: "integer", minimum: 1, maximum: CANTIDAD_MAX },
-        extras: { type: "array", items: { type: "string" }, description: "Códigos de extras (e1, e2…) que pidió el cliente." },
+        extras: { type: "array", items: { type: "string" }, description: "Códigos de extras (e1, e2…) que pidieron." },
         nota: {
           type: "string",
-          description: "Indicación que NO es un extra del menú, p. ej. «sin azúcar», «tibio». Nunca pongas aquí un extra del menú (leches, jarabes, shots…): esos van en «extras» y tienen precio.",
+          description:
+            "Indicación que NO es un extra del menú, p. ej. «sin azúcar», «tibio». Nunca pongas aquí un extra del menú (leches, jarabes, shots…): esos van en «extras» y tienen precio.",
         },
       },
-      required: ["producto", "cantidad"],
+      required: ["producto", "nombre", "cantidad"],
     },
-  },
+  } as const
+}
+
+/** Herramientas del modo cajero (formato Realtime de OpenAI). */
+export const HERRAMIENTAS_VOZ = [
+  herramientaAgregar(
+    "Agrega un producto al pedido. Úsala en cuanto el cliente pida algo; si la respuesta dice que falta un dato, pregúntaselo al cliente con el texto de «preguntar» y vuelve a llamarla completa.",
+  ),
   {
     type: "function",
     name: "quitar_producto",
@@ -474,6 +664,21 @@ export const HERRAMIENTAS_VOZ = [
         renglon: { type: "integer", minimum: 1, description: "Número de renglón (viene en «pedido.renglones» de cada respuesta)." },
         cantidad: { type: "integer", minimum: 1, description: "Cuántas piezas quitar; omitir para quitar todas las de ese renglón." },
       },
+    },
+  },
+  {
+    type: "function",
+    name: "cambiar_cantidad",
+    description:
+      "Deja un producto del pedido con la cantidad FINAL que dijo el cliente («mejor nada más uno» → 1; «que sean tres» → 3; 0 lo quita). Úsala SIEMPRE que el cliente cambie cuántos quiere, antes de contestarle.",
+    parameters: {
+      type: "object",
+      properties: {
+        producto: { type: "string", description: "Código del producto, p. ej. p5." },
+        renglon: { type: "integer", minimum: 1, description: "Número de renglón, solo si hay dos renglones del mismo producto." },
+        cantidad: { type: "integer", minimum: 0, maximum: CANTIDAD_MAX, description: "Cuántos quiere en total." },
+      },
+      required: ["cantidad"],
     },
   },
   {
@@ -501,24 +706,122 @@ export const HERRAMIENTAS_VOZ = [
   },
 ] as const
 
-export function instruccionesVoz(cafe: string, menu: string): string {
-  return `Eres quien toma los pedidos en el mostrador de ${cafe}, una cafetería en México. Hablas español mexicano, cálido y breve, como un buen cajero con fila: frases cortas, una pregunta a la vez, sin listas largas en voz alta.
+/** Herramientas del modo ayudante: agregar, y decir qué no entendió. Nada de quitar ni confirmar: el carrito está a la vista del cajero. */
+export const HERRAMIENTAS_AYUDANTE = [
+  herramientaAgregar(
+    "Agrega al carrito un producto que dictó el cajero. Llámala una vez por cada producto, todas en la misma respuesta. Si no dijo el tamaño o un extra obligatorio, llámala igual sin ese dato: el cajero lo completa en pantalla.",
+  ),
+  {
+    type: "function",
+    name: "no_entendi",
+    description: "Avisa al cajero de algo que dictó y no está en el menú o no entendiste. No adivines: usa esta herramienta.",
+    parameters: {
+      type: "object",
+      properties: { texto: { type: "string", description: "Lo que oíste, tal cual, en pocas palabras." } },
+      required: ["texto"],
+    },
+  },
+] as const
 
-Cómo atiendes:
-- Saluda en una frase y pregunta qué va a llevar.
-- Cada vez que el cliente pida algo, llama a agregar_producto con los códigos del menú. No lo repitas todo después de cada producto: basta un «listo» o «va» y preguntar si algo más.
-- No anuncies lo que vas a hacer («déjame agregarlo», «déjame revisar»): llama a la herramienta directamente y habla cuando tengas su respuesta.
-- Los tamaños son los que lista el menú para cada producto. En algunos productos «Frio» es uno de esos tamaños: si el cliente lo pide frío, ya dijo el tamaño.
-- Si una herramienta responde con «preguntar», hazle esa pregunta al cliente con tus palabras y vuelve a llamarla con el dato.
-- Si piden algo que no está en el menú, dilo y ofrece lo más parecido que sí haya. Nunca inventes productos, tamaños, extras ni precios.
-- Los precios y el total salen SIEMPRE de las respuestas de las herramientas; no hagas cuentas tú.
-- Si el cliente quiere quitar o reducir algo, llama a quitar_producto (y a agregar_producto si es un cambio). Nunca digas que agregaste, quitaste o cambiaste algo si la herramienta no te respondió ok: el pedido solo cambia con las herramientas.
-- Cuando diga que es todo: usa ver_pedido, léele el pedido y el total de forma natural, y pregunta en la misma frase si está bien y a nombre de quién lo pones (si aún no sabes su nombre). Espera su respuesta; no confirmes en la misma respuesta en que preguntas.
-- Cuando el cliente diga que sí y tengas su nombre, llama a confirmar_pedido. Si la herramienta se niega, haz lo que te indique.
-- Después de confirmar, dile que pase a pagar a la caja y despídete en una frase.
-- No cobras ni hablas de formas de pago: eso se hace en caja. Si preguntan algo que no tiene que ver con el pedido, contesta en una frase y vuelve al pedido.
+/**
+ * Modo cajero. El usuario lo probó en su teléfono y su queja fue una: «habla
+ * demasiado». Por eso las instrucciones fijan un tope de palabras y dan
+ * frases modelo; describir el tono («breve, cálido») no bastaba — el modelo
+ * igual decía «Perfecto, déjame revisar tu pedido y te lo leo rápidamente».
+ */
+export function instruccionesVoz(cafe: string, menu: string): string {
+  return `Tomas pedidos en el mostrador de ${cafe}, una cafetería en México. Hablas español mexicano.
+
+REGLA PRINCIPAL: habla lo mínimo. Cada turno es UNA frase corta, de preferencia menos de 10 palabras. Sin muletillas («perfecto», «claro que sí», «con gusto»), sin repetir lo que dijo el cliente, sin explicar lo que haces y sin anunciar lo que vas a hacer. Una pregunta a la vez.
+
+Así suenas (copia el estilo, no las palabras exactas):
+- Saludo: «Hola, ¿qué vas a llevar?»
+- Después de agregar: «Va. ¿Algo más?»
+- Falta un dato: «¿Chico o grande?»
+- No está en el menú: «No tenemos eso. ¿Te doy un frappé de mango?»
+- Al final: «Dos lattes grandes y un panqué, 92 pesos. ¿Está bien y a nombre de quién?»
+- Despedida: «Listo, Juan. Pasa a pagar a caja.»
+
+Reglas del pedido:
+- Cada vez que el cliente pida algo, llama a agregar_producto con los códigos del menú, sin avisar antes.
+- Los tamaños son los que lista el menú. En algunos productos «Frio» es un tamaño: si lo pide frío, ya dijo el tamaño.
+- Si una herramienta responde con «preguntar», haz esa pregunta con tus palabras, corta, y vuelve a llamarla con el dato.
+- Nunca inventes productos, tamaños, extras ni precios. Los importes salen SIEMPRE de las herramientas.
+- Cuando el cliente cambie el pedido, PRIMERO llama a la herramienta y DESPUÉS contesta: si cambia cuántos quiere («mejor nada más uno»), cambiar_cantidad con la cantidad final; si quita un producto, quitar_producto; si lo cambia por otro, quitar_producto y agregar_producto. Nunca digas que cambiaste algo si la herramienta no respondió ok: decirlo no cambia el pedido.
+- Al leer el pedido, di EXACTAMENTE las cantidades y productos que devolvió ver_pedido, aunque no coincidan con lo que crees que pidió; si no coinciden, corrígelo con las herramientas y vuelve a leerlo.
+- Cuando diga que es todo: llama a ver_pedido y di el pedido y el total en una sola frase, preguntando si está bien y a nombre de quién (si no lo sabes). Espera su respuesta; no confirmes en la misma respuesta en que preguntas.
+- Cuando diga que sí y tengas su nombre, llama a confirmar_pedido. Si se niega, haz lo que indique.
+- Después de confirmar, despídete en una frase y dile que pague en caja.
+- No hablas de formas de pago. A lo que no sea el pedido, contesta en pocas palabras y vuelve al pedido.
 - Si no entendiste, pide que lo repita; no adivines.
 
 Menú (código, nombre, precios, grupos de extras que aplican):
 ${menu}`
+}
+
+/**
+ * Modo ayudante. El cajero ya sabe lo que quiere y tiene el carrito enfrente:
+ * cualquier palabra del bot le estorba. No conversa — ni siquiera tiene voz
+ * (la sesión es solo de texto) —, solo convierte lo dictado en llamadas.
+ */
+export function instruccionesAyudante(cafe: string, menu: string): string {
+  return `Eres el ayudante del cajero de ${cafe}, una cafetería en México. El cajero te dicta pedidos en voz alta mientras atiende; tú solo los capturas.
+
+- Por cada producto que diga, llama a agregar_producto con los códigos del menú. Varios productos son varias llamadas, todas en la misma respuesta.
+- No converses: no saludes, no confirmes, no preguntes, no respondas con texto. Solo llamadas a herramientas.
+- Si no dijo el tamaño o un extra obligatorio, llama igual a agregar_producto sin ese dato: el cajero lo completa en pantalla.
+- Si algo no está en el menú o no lo entendiste, llama a no_entendi con lo que oíste. No adivines un producto parecido.
+- Si lo que oyes no es un pedido (plática, ruido, alguien más hablando), no hagas nada.
+- Los tamaños son los que lista el menú. En algunos productos «Frio» es un tamaño.
+- No pongas en «nota» extras del menú: van en «extras».
+
+Menú (código, nombre, precios, grupos de extras que aplican):
+${menu}`
+}
+
+/* ------------------------------------------------------------------ */
+/*  Modo ayudante: lo dictado va al carrito del POS                    */
+/* ------------------------------------------------------------------ */
+
+/** Lo que el cajero dictó sin un dato: queda a la vista para completarlo con un toque. */
+export interface PendienteDictado {
+  id: string
+  args: ArgsAgregar
+  product: Product
+  cantidad: number
+  falta: Falta
+  size?: SizeOption
+}
+
+/** «2 × Latte (Grande) con Leche de avena — sin azúcar», para la tarjeta del dictado. */
+export function describirResuelto(r: Extract<Resolucion, { ok: true }>): string {
+  return describirRenglon({ lineId: "", product: r.product, size: r.size, modifiers: r.modifiers, quantity: r.cantidad, notes: r.nota })
+}
+
+/**
+ * El dictado se resuelve con el menú que mandó el servidor al abrir la sesión,
+ * pero el carrito tiene que recibir los MISMOS objetos que la rejilla del POS:
+ * así una línea dictada y una tocada del mismo latte se juntan en un renglón.
+ * null si el POS ya no tiene ese producto, tamaño o extra (su menú quedó viejo).
+ */
+export function enMenuDelPos(
+  r: Extract<Resolucion, { ok: true }>,
+  productosPos: Product[],
+): { product: Product; size?: SizeOption; modifiers: ModifierOption[] } | null {
+  const product = productosPos.find((p) => p.id === r.product.id)
+  if (!product) return null
+  let size: SizeOption | undefined
+  if (r.size) {
+    size = product.sizes?.find((s) => s.variantId === r.size!.variantId)
+    if (!size) return null
+  }
+  const opciones = new Map<string, ModifierOption>()
+  for (const g of product.modifierGroups ?? []) for (const o of g.options) opciones.set(o.id, o)
+  const modifiers: ModifierOption[] = []
+  for (const m of r.modifiers) {
+    const o = opciones.get(m.id)
+    if (!o) return null
+    modifiers.push(o)
+  }
+  return { product, size, modifiers }
 }

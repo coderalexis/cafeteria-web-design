@@ -58,9 +58,12 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/(.*)", headers: encabezadosSeguridad },
-      // El pedido por voz es la ÚNICA pantalla que necesita el micrófono. Next
-      // aplica la última regla que coincide con la misma cabecera, así que esta
-      // abre el micrófono solo aquí y para este mismo sitio, nada más.
+      // El micrófono solo se abre donde hay voz: el modo cajero (/pos/voz) y
+      // el dictado del modo ayudante (dentro del POS). Next aplica la última
+      // regla que coincide con la misma cabecera, así que estas dos lo abren
+      // solo ahí y para este mismo sitio. OJO: la cabecera es del DOCUMENTO
+      // (ver app/pos/voz/microfono.ts).
+      { source: "/pos", headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), payment=()" }] },
       { source: "/pos/voz", headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), payment=()" }] },
       // El service worker del POS: que el navegador lo re-pregunte en cada
       // visita (así un deploy lo actualiza) en vez de quedarse con uno viejo.

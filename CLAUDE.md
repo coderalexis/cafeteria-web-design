@@ -112,13 +112,16 @@ revientan pero delatan algo (`lib/avisos.ts`: `cuenta-choque`,
 caja, cancelaciones) que ve `/admin/actividad`. Para reconstruir un incidente,
 `docs/registros.md`.
 
-**Pedido por voz (prototipo).** `/pos/voz`: un aparato en el mostrador donde
-el cliente pide hablando con un bot (OpenAI Realtime por WebRTC). El bot usa
+**Pedido por voz (prototipo), dos modos.** *Cajero* (`/pos/voz`): un aparato
+en el mostrador donde el cliente pide hablando con un bot (OpenAI Realtime por
+WebRTC). *Ayudante* (micrófono en el encabezado del POS): el cajero dicta y
+entra directo a su carrito, sin que el bot hable. El bot usa
 códigos cortos que `app/pos/voz/pedido.ts` valida contra el menú real; el
 pedido se guarda como cuenta abierta «Nombre (voz)» y la cajera lo cobra. La
 app, no el modelo, decide cuándo se puede confirmar (`validarConfirmacion`).
-Solo existe donde `VOZ_CAFES` lo nombra y hay `OPENAI_API_KEY`; es la única
-ruta que abre el micrófono (`Permissions-Policy` en `next.config.mjs`).
+Solo existe donde `VOZ_CAFES` lo nombra y hay `OPENAI_API_KEY`; `/pos` y
+`/pos/voz` son las únicas rutas que abren el micrófono (`Permissions-Policy` en
+`next.config.mjs`).
 
 **Arranque instantáneo del POS.** `public/sw-pos.js` + `lib/arranque-rapido.ts`:
 service worker con alcance `/pos` que guarda la página y sus chunks; la
