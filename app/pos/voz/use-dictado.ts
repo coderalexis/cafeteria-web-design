@@ -49,6 +49,9 @@ interface Sesion {
   cambios: number
   pendientes: number
   noEntendidos: number
+  /** Segundos que habló el cajero (para el costo de la transcripción). */
+  segundosDeVoz: number
+  vozDesde: number | null
 }
 
 /** Lo que la voz hizo en el carrito, con cómo deshacerlo si entendió mal. */
@@ -162,7 +165,7 @@ export function useDictado(opciones: {
         pendientes: s.pendientes,
         noEntendidos: s.noEntendidos,
         uso: s.uso,
-        costoUsd: costoEstimadoUsd(s.uso, s.modelo),
+        costoUsd: costoEstimadoUsd(s.uso, s.modelo, s.segundosDeVoz),
       })
       localStorage.setItem(CLAVE_MEDIDAS, JSON.stringify(lista.slice(0, SESIONES_GUARDADAS)))
     } catch {
@@ -277,10 +280,13 @@ export function useDictado(opciones: {
       switch (ev.type) {
         case "input_audio_buffer.speech_started":
           s.ultimaVoz = Date.now()
+          s.vozDesde = Date.now()
           setOyendo(true)
           break
         case "input_audio_buffer.speech_stopped":
           s.ultimaVoz = Date.now()
+          if (s.vozDesde) s.segundosDeVoz += (Date.now() - s.vozDesde) / 1000
+          s.vozDesde = null
           setOyendo(false)
           break
         case "conversation.item.input_audio_transcription.completed": {
@@ -375,6 +381,8 @@ export function useDictado(opciones: {
       cambios: 0,
       pendientes: 0,
       noEntendidos: 0,
+      segundosDeVoz: 0,
+      vozDesde: null,
       reloj: window.setInterval(() => {
         const t = Date.now()
         if (t - ahora > DURACION_MAX_MS || t - s.ultimaVoz > SILENCIO_MAX_MS) detener()

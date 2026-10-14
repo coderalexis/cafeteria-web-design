@@ -186,6 +186,24 @@ revisar tu pedido»), lo que suma un turno de ~2 s.
 | `VOZ_CAFES` | Slugs separados por coma donde se enciende, p. ej. `cafe-de-prueba`. |
 | `OPENAI_REALTIME_MODEL` | Opcional; por omisión `gpt-realtime-2.1-mini`. |
 
+## Cuánto cuesta (medido el 2026-10-14)
+
+Con el desglose exacto de OpenAI (`usage` por modalidad y caché) y las tarifas
+oficiales de `gpt-realtime-2.1-mini` (por 1M de tokens: texto $0.60 / caché
+$0.06 / salida $2.40; audio $10 / caché $0.30 / salida $20; transcripción
+~$0.003 por minuto de voz):
+
+| Modo | Costo real |
+|---|---|
+| Cajero (el cliente conversa, ~50 s) | ~US$0.02 por pedido (0.019–0.025) |
+| Ayudante (el cajero dicta) | ~US$0.0017 por orden dictada |
+
+Lo caro del cajero es la VOZ del bot (salida de audio, ~40 % del costo) y el
+texto de las instrucciones y el menú que se relee en cada respuesta (casi
+todo en caché). El ayudante no tiene salida de audio. El contador de la
+pantalla calcula así desde el 2026-10-14; antes lo cobraba todo a precio de
+audio y exageraba de 2 a 5 veces.
+
 ## Cómo se mide
 
 Cada conversación se guarda **en el aparato** (localStorage, últimas 30) y se
