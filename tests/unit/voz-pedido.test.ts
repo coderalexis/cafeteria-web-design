@@ -176,6 +176,24 @@ describe("agregar", () => {
     expect(agregar([], { producto: "p4", cantidad: 1.5 }, cat, nuevoId).respuesta.ok).toBe(false)
   })
 
+  it("no deja regalar un extra con costo escribiéndolo como nota (lo que pasó con la deslactosada en el mocha)", () => {
+    const r = agregar([], { producto: "p4", cantidad: 1, nota: "con leche de almendra" }, cat, nuevoId)
+    expect(r.respuesta.ok).toBe(false)
+    expect(r.lines).toHaveLength(0)
+    expect(r.respuesta.mensaje).toContain("no está disponible para Panqué de plátano")
+  })
+
+  it("si el extra sí aplica, pide mandarlo como extra para que se cobre", () => {
+    const r = agregar([], { producto: "p2", cantidad: 1, nota: "Almendra" }, cat, nuevoId)
+    expect(r.respuesta.ok).toBe(false)
+    expect(r.respuesta.mensaje).toContain(`código (${e("m-almendra")})`)
+  })
+
+  it("deja pasar notas que no son extras, y extras sin costo que no aplican", () => {
+    expect(agregar([], { producto: "p4", cantidad: 1, nota: "tibio, por favor" }, cat, nuevoId).respuesta.ok).toBe(true)
+    expect(agregar([], { producto: "p4", cantidad: 1, nota: "entera" }, cat, nuevoId).respuesta.ok).toBe(true)
+  })
+
   it("junta lo igual y separa lo que lleva nota, como el POS", () => {
     let lines = agregar([], { producto: "p4", cantidad: 1 }, cat, nuevoId).lines
     lines = agregar(lines, { producto: "p4", cantidad: 2 }, cat, nuevoId).lines

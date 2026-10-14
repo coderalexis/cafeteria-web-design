@@ -262,12 +262,16 @@ export function PosHeader(p: PosHeaderProps) {
                         acciones. Marcar se hace en «Por preparar» — dos
                         lugares donde marcar serían dos donde equivocarse. */}
                     {/* Prototipo: se abre en ESTA pestaña porque el aparato
-                        del mostrador se queda en esa pantalla para clientes. */}
+                        del mostrador se queda en esa pantalla para clientes.
+                        Un <a> y NO un <Link>, a propósito: el permiso del
+                        micrófono viene con el DOCUMENTO, y una navegación
+                        interna se quedaba con el del POS, que lo prohíbe
+                        (ver app/pos/voz/microfono.ts). */}
                     {vozEnMostrador && (
                       <DropdownMenuItem asChild>
-                        <Link href="/pos/voz" data-menu-voz>
+                        <a href="/pos/voz" data-menu-voz>
                           <Mic className="h-4 w-4 mr-2" /> Pedido por voz (prueba)
-                        </Link>
+                        </a>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onSelect={() => setShowRecent(true)}>

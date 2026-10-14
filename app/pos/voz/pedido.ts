@@ -173,6 +173,27 @@ export function resumir(lines: CartLine[]): Resumen {
   }
 }
 
+/**
+ * ¿La nota nombra un extra del menú? La nota libre era una puerta trasera:
+ * en la primera prueba en un teléfono el cliente pidió leche deslactosada en
+ * un mocha, el menú no ofrece ese extra ($8) para el mocha, y el bot lo puso
+ * como NOTA — la barra lo prepara y la caja no lo cobra. Se compara sin
+ * acentos y en las dos direcciones («deslactosada» ⊂ «Leche deslactosada»),
+ * con un mínimo de largo para que «con» no case con nada.
+ */
+function extraNombradoEn(nota: string, cat: Catalogo): ModifierOption | null {
+  const n = sinAcentos(nota)
+  let mejor: ModifierOption | null = null
+  for (const o of cat.extraPorCodigo.values()) {
+    const nombre = sinAcentos(o.name)
+    if (nombre.length < 4) continue
+    const casa = n.includes(nombre) || (n.length >= 6 && nombre.includes(n))
+    // El nombre más largo gana: «leche de avena» antes que «avena».
+    if (casa && (!mejor || nombre.length > sinAcentos(mejor.name).length)) mejor = o
+  }
+  return mejor
+}
+
 export interface ArgsAgregar {
   producto: string
   tamano?: string | null
@@ -261,6 +282,20 @@ export function agregar(lines: CartLine[], args: ArgsAgregar, cat: Catalogo, nue
   }
 
   const nota = (args.nota ?? "").trim().replace(/\s+/g, " ").slice(0, 120)
+  const extraEnNota = nota ? extraNombradoEn(nota, cat) : null
+  if (extraEnNota) {
+    const codigo = cat.codigoDeExtra.get(extraEnNota.id)
+    if (grupos.some((g) => g.options.some((o) => o.id === extraEnNota.id))) {
+      return falla(`«${extraEnNota.name}» es un extra del menú: mándalo en «extras» con su código (${codigo}), no como nota, para que se cobre.`)
+    }
+    if (extraEnNota.priceDelta > 0) {
+      const cual = `${product.name}${size ? ` ${size.label}` : ""}`
+      return falla(
+        `«${extraEnNota.name}» no está disponible para ${product.name} (es un extra con costo que este producto no tiene): no lo pongas como nota. Si el cliente acepta ${cual} sin eso, vuelve a llamar agregar_producto igual pero sin la nota.`,
+        `${extraEnNota.name} no está disponible para ${product.name}. ¿Te lo preparo sin eso?`,
+      )
+    }
+  }
   let nuevas: CartLine[]
   if (nota) {
     // Con nota no se fusiona: «uno sin azúcar» es otro renglón, como en el POS.
@@ -419,7 +454,10 @@ export const HERRAMIENTAS_VOZ = [
         tamano: { type: "string", description: "Uno de los tamaños que el menú lista para ese producto (p. ej. Grande). Si la lista incluye «Frio» y el cliente lo pide frío, el tamaño es «Frio». Omitir si el producto tiene un solo precio." },
         cantidad: { type: "integer", minimum: 1, maximum: CANTIDAD_MAX },
         extras: { type: "array", items: { type: "string" }, description: "Códigos de extras (e1, e2…) que pidió el cliente." },
-        nota: { type: "string", description: "Indicación que no es un extra del menú, p. ej. «sin azúcar», «tibio»." },
+        nota: {
+          type: "string",
+          description: "Indicación que NO es un extra del menú, p. ej. «sin azúcar», «tibio». Nunca pongas aquí un extra del menú (leches, jarabes, shots…): esos van en «extras» y tienen precio.",
+        },
       },
       required: ["producto", "cantidad"],
     },

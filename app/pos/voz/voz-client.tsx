@@ -8,6 +8,7 @@ import { iniciarSesionVoz } from "@/app/actions/voz"
 import { parkOrder } from "@/app/actions/parked"
 import { reportClientError } from "@/app/actions/errors"
 import { mensajeDeFallo } from "@/lib/version"
+import { RUTA_VOZ, falloDeMicrofono, hayQueRecargar } from "./microfono"
 import { formatCurrency } from "@/lib/format"
 import type { CartLine } from "../cart"
 import {
@@ -50,6 +51,27 @@ const DESPEDIDA_MAX_MS = 8_000
 /** La pantalla de «¡Listo!» vuelve sola al inicio para el siguiente cliente. */
 const LISTO_MS = 12_000
 const CLAVE_SESIONES = "voz-sesiones"
+const CLAVE_RECARGA = "voz-recarga"
+
+/** Dónde nació el documento (no cambia con las navegaciones internas de Next). */
+function rutaDondeNacio(): string | null {
+  try {
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined
+    return nav ? new URL(nav.name).pathname : null
+  } catch {
+    return null
+  }
+}
+
+/** ¿La cabecera de ESTE documento deja usar el micrófono? null si el navegador no lo dice (Safari). */
+function politicaPermiteMicrofono(): boolean | null {
+  const fp = (document as Document & { featurePolicy?: { allowsFeature(f: string): boolean } }).featurePolicy
+  try {
+    return fp ? fp.allowsFeature("microphone") : null
+  } catch {
+    return null
+  }
+}
 
 interface Sesion {
   pc: RTCPeerConnection
@@ -101,6 +123,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
   const [hablando, setHablando] = useState(false)
   const [segundos, setSegundos] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [ofrecerRecarga, setOfrecerRecarga] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [guardado, setGuardado] = useState<{ nombre: string; total: number } | null>(null)
   const [historial, setHistorial] = useState<SesionMedida[]>([])
@@ -112,6 +135,26 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
   const idLinea = useRef(0)
 
   useEffect(() => setHistorial(leerSesiones()), [])
+
+  // Red de seguridad: si se llegó aquí sin cargar documento nuevo, el
+  // micrófono sigue prohibido por la cabecera del documento anterior. Una
+  // recarga lo arregla; se hace sola, y como mucho una vez cada 30 s.
+  useEffect(() => {
+    const nacioEn = rutaDondeNacio()
+    let ultima: number | null = null
+    try {
+      ultima = Number(sessionStorage.getItem(CLAVE_RECARGA)) || null
+    } catch {
+      // sin almacenamiento: igual se decide, solo sin freno guardado
+    }
+    if (window.location.pathname !== RUTA_VOZ || !hayQueRecargar(nacioEn, ultima, Date.now())) return
+    try {
+      sessionStorage.setItem(CLAVE_RECARGA, String(Date.now()))
+    } catch {
+      return // sin dónde anotar la recarga, no se arriesga un bucle
+    }
+    window.location.reload()
+  }, [])
 
   // La conversación siempre a la vista: lo último que se dijo, abajo.
   useEffect(() => {
@@ -354,6 +397,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
     // iPhone solo deja sonar audio que arrancó con un toque: se «desbloquea» aquí, antes de cualquier espera.
     void audioRef.current?.play().catch(() => {})
     setError(null)
+    setOfrecerRecarga(false)
     setAviso(null)
     setGuardado(null)
     setMensajes([])
@@ -366,9 +410,19 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       mic = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       })
-    } catch {
-      setError("No hay permiso para usar el micrófono. Actívalo en los ajustes del navegador para esta página.")
+    } catch (e) {
+      const nombre = e instanceof Error ? e.name : String(e)
+      const politica = politicaPermiteMicrofono()
+      const fallo = falloDeMicrofono(nombre, politica)
+      setError(fallo.mensaje)
+      setOfrecerRecarga(fallo.recargar)
       setFase("error")
+      // Que quede rastro: así se supo que el «no hay permiso» no lo había negado nadie.
+      void reportClientError({
+        route: "/pos/voz",
+        digest: "voz-microfono",
+        message: `Micrófono: ${nombre} · cabecera ${politica === null ? "¿?" : politica ? "lo permite" : "lo prohíbe"} · documento nació en ${rutaDondeNacio() ?? "¿?"}`,
+      })
       return
     }
 
@@ -452,6 +506,8 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       if (!resp.ok) throw new Error(`calls ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
       await pc.setRemoteDescription({ type: "answer", sdp: await resp.text() })
     } catch (e) {
+      // Colgaron mientras conectaba: la conexión se cerró a propósito, no es un fallo.
+      if (sesion.current !== s) return
       void reportClientError({
         route: "/pos/voz",
         digest: "voz-conexion",
@@ -534,9 +590,16 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
             Toca y dile al cajero virtual lo que quieres. Tu pedido llega a la caja y ahí lo pagas.
           </p>
           {error && (
-            <p role="alert" className="max-w-sm rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </p>
+            <div className="flex max-w-sm flex-col items-center gap-3">
+              <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </p>
+              {ofrecerRecarga && (
+                <Button variant="outline" onClick={() => window.location.reload()} data-voz-recargar>
+                  Recargar la página
+                </Button>
+              )}
+            </div>
           )}
           {aviso && <p className="max-w-sm rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{aviso}</p>}
           <Medicion historial={historial} modelo={modelo} />

@@ -420,6 +420,16 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   de «versión sin comentarios» para ahorrar): la 58 quedó distinta en
   producción por eso. Una migración que crea funciones se autocomprueba al
   final con `md5(prosrc)` contra los cuerpos del archivo (ver la 59).
+- **`Permissions-Policy` es del DOCUMENTO, no de la pantalla.** El sitio
+  prohíbe micrófono y cámara, y `/pos/voz` abre el micrófono por cabecera. Pero
+  un `<Link>` de Next cambia de pantalla sin cargar documento nuevo: quien
+  entraba desde el ⋮ del POS seguía con la cabecera de `/pos` y el navegador
+  negaba el micrófono SIN PREGUNTAR (el usuario, 2026-10-14: «solo funciona si
+  recargo»). A una pantalla que necesita un permiso distinto se entra con `<a>`
+  normal, y la pantalla se protege recargándose si el documento nació en otra
+  ruta (`performance.getEntriesByType("navigation")[0].name`; ver
+  `app/pos/voz/microfono.ts`). Se reproduce con Chrome headless y
+  `--use-fake-device-for-media-stream` sin sustituir `getUserMedia`.
 - **La suite SQL reproduce las migraciones sobre un Postgres pelón**, así que una
   migración que toque un esquema que Supabase trae puesto (`auth`, `storage`…)
   pone el CI en rojo hasta que `tests/sql/00_supabase_shim.sql` finja ese esquema.

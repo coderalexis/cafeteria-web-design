@@ -49,6 +49,12 @@ herramientas y la validación; lo nuevo sería el acceso público y sus topes.
 - **El micrófono está bloqueado en todo el sitio** (`Permissions-Policy:
   microphone=()` en `next.config.mjs`). Solo `/pos/voz` lo abre, para el mismo
   sitio. Next aplica la última regla que coincide con la misma cabecera.
+- **Se entra con navegación completa.** La cabecera que abre el micrófono es
+  del documento: entrando con un `<Link>` desde el POS el documento seguía
+  siendo el de `/pos` y el navegador negaba el micrófono sin preguntar. El ⋮
+  usa un `<a>`, y la pantalla se recarga sola (una vez cada 30 s como mucho)
+  si detecta que el documento nació en otra ruta (`microfono.ts`). Los fallos
+  del micrófono dicen la causa real y dejan aviso `voz-microfono`.
 - **Encendido por lista, no por módulo de Negocio**: `VOZ_CAFES` (slugs). Es
   un prototipo y cada minuto cuesta; lo enciende el operador, no cada dueño.
 - **Modelo por omisión `gpt-realtime-2.1-mini`** (cambiar con
@@ -90,6 +96,15 @@ total exactos, y el arrepentido no guardó nada. El bot responde en 0.4–2 s
 (lo lento es cuando consulta el menú) y una conversación completa dura de 55
 a 75 s, con un tope estimado de US$0.04–0.12.
 
+En la primera prueba en un teléfono real (2026-10-14) salió otra fuga: el
+cliente pidió leche deslactosada en un mocha, el menú no ofrece ese extra
+($8) para el mocha, y el bot lo puso como NOTA, que la barra prepara y la
+caja no cobra. Ahora una nota que nombra un extra del menú se rechaza: si el
+extra aplica al producto, hay que mandarlo como extra (y se cobra); si es un
+extra con costo que no aplica, el bot le dice al cliente que no está
+disponible y le ofrece el producto sin él. Probado con el bot real: el mocha
+se guardó sin la nota.
+
 Pendiente de pulir: todavía anuncia a veces lo que va a hacer («déjame
 revisar tu pedido»), lo que suma un turno de ~2 s.
 
@@ -117,6 +132,10 @@ si el costo por pedido cabe en lo que se cobraría por el módulo.
 ## Pendiente
 
 - Probar con voz real en el mostrador (ruido, nombres del menú, acentos).
+- Turnos partidos: si el cliente hace pausa a media frase («Ah, bueno…
+  entonces así, normal»), `semantic_vad` con `eagerness: "medium"` a veces
+  corta el turno, la segunda mitad se pierde y la sesión termina por
+  silencio. Probar `eagerness: "low"` midiendo cuánto sube la latencia.
 - Copiar el menú de un piloto al café de prueba para probar con su carta
   real (pedir permiso antes: son datos de un café real).
 - Si convence: opción B (QR por mesa), con acceso público blindado y topes
