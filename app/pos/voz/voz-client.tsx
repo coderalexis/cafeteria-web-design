@@ -8,17 +8,21 @@ import { iniciarSesionVoz } from "@/app/actions/voz"
 import { parkOrder } from "@/app/actions/parked"
 import { reportClientError } from "@/app/actions/errors"
 import { mensajeDeFallo } from "@/lib/version"
+import { RUTA_VOZ, hayQueRecargar } from "./microfono"
+import { conectarVoz, pedirMicrofono, rutaDondeNacio, type ConexionVoz } from "./conexion"
 import { formatCurrency } from "@/lib/format"
 import type { CartLine } from "../cart"
 import {
   agregar,
   armarCatalogo,
+  cambiarCantidad,
   carritoParaGuardar,
   nombreDeCuenta,
   quitar,
   resumir,
   validarConfirmacion,
   type ArgsAgregar,
+  type ArgsCambiarCantidad,
   type ArgsQuitar,
   type Catalogo,
 } from "./pedido"
@@ -50,11 +54,10 @@ const DESPEDIDA_MAX_MS = 8_000
 /** La pantalla de «¡Listo!» vuelve sola al inicio para el siguiente cliente. */
 const LISTO_MS = 12_000
 const CLAVE_SESIONES = "voz-sesiones"
+const CLAVE_RECARGA = "voz-recarga"
 
 interface Sesion {
-  pc: RTCPeerConnection
-  dc: RTCDataChannel
-  mic: MediaStream
+  conexion: ConexionVoz
   catalogo: Catalogo
   modelo: string
   inicio: number
@@ -101,6 +104,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
   const [hablando, setHablando] = useState(false)
   const [segundos, setSegundos] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [ofrecerRecarga, setOfrecerRecarga] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [guardado, setGuardado] = useState<{ nombre: string; total: number } | null>(null)
   const [historial, setHistorial] = useState<SesionMedida[]>([])
@@ -113,6 +117,26 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
 
   useEffect(() => setHistorial(leerSesiones()), [])
 
+  // Red de seguridad: si se llegó aquí sin cargar documento nuevo, el
+  // micrófono sigue prohibido por la cabecera del documento anterior. Una
+  // recarga lo arregla; se hace sola, y como mucho una vez cada 30 s.
+  useEffect(() => {
+    const nacioEn = rutaDondeNacio()
+    let ultima: number | null = null
+    try {
+      ultima = Number(sessionStorage.getItem(CLAVE_RECARGA)) || null
+    } catch {
+      // sin almacenamiento: igual se decide, solo sin freno guardado
+    }
+    if (window.location.pathname !== RUTA_VOZ || !hayQueRecargar(nacioEn, ultima, Date.now())) return
+    try {
+      sessionStorage.setItem(CLAVE_RECARGA, String(Date.now()))
+    } catch {
+      return // sin dónde anotar la recarga, no se arriesga un bucle
+    }
+    window.location.reload()
+  }, [])
+
   // La conversación siempre a la vista: lo último que se dijo, abajo.
   useEffect(() => {
     listaRef.current?.scrollTo({ top: listaRef.current.scrollHeight })
@@ -124,8 +148,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
   }, [])
 
   const enviar = useCallback((ev: object) => {
-    const dc = sesion.current?.dc
-    if (dc?.readyState === "open") dc.send(JSON.stringify(ev))
+    sesion.current?.conexion.enviar(ev)
   }, [])
 
   const escribir = useCallback((id: string, quien: Mensaje["quien"], texto: string, modo: "agregar" | "final") => {
@@ -145,13 +168,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       sesion.current = null
       window.clearInterval(s.reloj)
       if (s.despedida) window.clearTimeout(s.despedida)
-      try {
-        s.dc.close()
-        s.pc.close()
-      } catch {
-        // ya estaba cerrada
-      }
-      s.mic.getTracks().forEach((t) => t.stop())
+      s.conexion.cerrar()
       setOyendo(false)
       setHablando(false)
 
@@ -211,6 +228,12 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
         }
         case "quitar_producto": {
           const r = quitar(linesRef.current, args as unknown as ArgsQuitar, s.catalogo)
+          if (r.respuesta.ok) s.version++
+          ponerLineas(r.lines)
+          return { ...r.respuesta }
+        }
+        case "cambiar_cantidad": {
+          const r = cambiarCantidad(linesRef.current, args as unknown as ArgsCambiarCantidad, s.catalogo)
           if (r.respuesta.ok) s.version++
           ponerLineas(r.lines)
           return { ...r.respuesta }
@@ -354,6 +377,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
     // iPhone solo deja sonar audio que arrancó con un toque: se «desbloquea» aquí, antes de cualquier espera.
     void audioRef.current?.play().catch(() => {})
     setError(null)
+    setOfrecerRecarga(false)
     setAviso(null)
     setGuardado(null)
     setMensajes([])
@@ -361,20 +385,18 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
     setSegundos(0)
     setFase("conectando")
 
-    let mic: MediaStream
-    try {
-      mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      })
-    } catch {
-      setError("No hay permiso para usar el micrófono. Actívalo en los ajustes del navegador para esta página.")
+    const pedido = await pedirMicrofono("/pos/voz")
+    if ("fallo" in pedido) {
+      setError(pedido.fallo.mensaje)
+      setOfrecerRecarga(pedido.fallo.recargar)
       setFase("error")
       return
     }
+    const mic = pedido.mic
 
     let r: Awaited<ReturnType<typeof iniciarSesionVoz>>
     try {
-      r = await iniciarSesionVoz()
+      r = await iniciarSesionVoz("cajero")
     } catch (e) {
       mic.getTracks().forEach((t) => t.stop())
       setError(mensajeDeFallo(e))
@@ -388,13 +410,22 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       return
     }
 
-    const pc = new RTCPeerConnection()
-    const dc = pc.createDataChannel("oai-events")
     const ahora = Date.now()
-    const s: Sesion = {
-      pc,
-      dc,
+    const conexion = conectarVoz({
+      clave: r.clave,
       mic,
+      ruta: "/pos/voz",
+      audio: audioRef.current,
+      alEvento: (ev) => void manejar(ev),
+      alAbrir: () => {
+        setFase("en-curso")
+        // Que el bot salude primero: el cliente no sabe que le toca hablar.
+        enviar({ type: "response.create" })
+      },
+      alFallar: (mensaje) => terminar("error", mensaje),
+    })
+    const s: Sesion = {
+      conexion,
       catalogo: armarCatalogo(r.products),
       modelo: r.modelo,
       inicio: ahora,
@@ -417,48 +448,6 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       }, 1000),
     }
     sesion.current = s
-
-    pc.ontrack = (e) => {
-      const audio = audioRef.current
-      if (!audio) return
-      audio.srcObject = e.streams[0]
-      void audio.play().catch(() => {})
-    }
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed") terminar("error", "Se perdió la conexión con el servicio de voz.")
-    }
-    pc.addTrack(mic.getAudioTracks()[0], mic)
-    dc.addEventListener("message", (e) => {
-      try {
-        void manejar(JSON.parse(String(e.data)))
-      } catch {
-        // un evento ilegible no detiene la conversación
-      }
-    })
-    dc.addEventListener("open", () => {
-      setFase("en-curso")
-      // Que el bot salude primero: el cliente no sabe que le toca hablar.
-      enviar({ type: "response.create" })
-    })
-
-    try {
-      const oferta = await pc.createOffer()
-      await pc.setLocalDescription(oferta)
-      const resp = await fetch("https://api.openai.com/v1/realtime/calls", {
-        method: "POST",
-        body: oferta.sdp,
-        headers: { Authorization: `Bearer ${r.clave}`, "Content-Type": "application/sdp" },
-      })
-      if (!resp.ok) throw new Error(`calls ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
-      await pc.setRemoteDescription({ type: "answer", sdp: await resp.text() })
-    } catch (e) {
-      void reportClientError({
-        route: "/pos/voz",
-        digest: "voz-conexion",
-        message: `No se pudo conectar la voz: ${e instanceof Error ? e.message : String(e)}`.slice(0, 500),
-      })
-      terminar("error", "No se pudo conectar con el servicio de voz. Revisa la señal e intenta de nuevo.")
-    }
   }, [enviar, manejar, ponerLineas, terminar])
 
   // Salir de la página cuelga: un micrófono abierto en segundo plano cuesta dinero y es raro.
@@ -491,7 +480,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
         </Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-bold text-stone-800">Pedido por voz</h1>
-          <p className="truncate text-xs text-stone-500">{cafe} · prueba</p>
+          <p className="truncate text-xs text-stone-500">{cafe} · modo cajero · prueba</p>
         </div>
         {fase === "en-curso" && (
           <span className="shrink-0 tabular-nums text-sm text-stone-500" aria-label="Tiempo de la conversación">
@@ -534,9 +523,16 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
             Toca y dile al cajero virtual lo que quieres. Tu pedido llega a la caja y ahí lo pagas.
           </p>
           {error && (
-            <p role="alert" className="max-w-sm rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </p>
+            <div className="flex max-w-sm flex-col items-center gap-3">
+              <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </p>
+              {ofrecerRecarga && (
+                <Button variant="outline" onClick={() => window.location.reload()} data-voz-recargar>
+                  Recargar la página
+                </Button>
+              )}
+            </div>
           )}
           {aviso && <p className="max-w-sm rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{aviso}</p>}
           <Medicion historial={historial} modelo={modelo} />

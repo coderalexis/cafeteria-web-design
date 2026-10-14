@@ -88,6 +88,8 @@ export interface PosHeaderProps {
   onExistencias?: () => void
   /** Pedido por voz en el mostrador (prototipo). */
   vozEnMostrador?: boolean
+  /** Modo ayudante: dictar el pedido al carrito. Undefined si la voz está apagada en este café. */
+  dictado?: { activo: boolean; alternar: () => void }
   /** «Instalar como app», cuando el navegador lo permite y aún no está instalada. */
   instalar: ReturnType<typeof useInstallPrompt>
   textSize: ReturnType<typeof usePosTextSize>
@@ -116,7 +118,7 @@ export function PosHeader(p: PosHeaderProps) {
     businessName, appCtx, isMobile, isAdmin, lockMinutes, tz, totalSales,
     searchInputRef, searchQuery, setSearchQuery, gridScrolled, searchPinned, setSearchPinned, setSizePickerFor,
     openSession, cajaDeOtroDia, setShowCashDialog,
-    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, creditEnabled, setShowCredit, textSize, practica, onTogglePractica, onAprender, onExistencias, vozEnMostrador, instalar,
+    setShowTray, setShowRecent, setShowTickets, setShowShortcuts, creditEnabled, setShowCredit, textSize, practica, onTogglePractica, onAprender, onExistencias, vozEnMostrador, dictado, instalar,
     parkedEnabled, openAccount, cuentasVisibles, chipsCuentas, cuentasEnBarra, setCartOpen, resumeParked,
     categories, activeCategory, setActiveCategory,
   } = p
@@ -227,6 +229,23 @@ export function PosHeader(p: PosHeaderProps) {
                   <Search className="h-4 w-4" />
                 </Button>
               )}
+              {/* Dictar al carrito (modo ayudante). Junto a la caja y no dentro
+                  del buscador: tiene que estar a mano también con el
+                  encabezado encogido, que es cuando hay fila. */}
+              {dictado && (
+                <Button
+                  variant={dictado.activo ? "default" : "outline"}
+                  size="icon"
+                  className={`blanco-comodo h-9 w-9 ${dictado.activo ? "bg-emerald-600 text-white hover:bg-emerald-700" : ""}`}
+                  aria-label={dictado.activo ? "Dejar de dictar" : "Dictar el pedido"}
+                  aria-pressed={dictado.activo}
+                  title={dictado.activo ? "Dejar de dictar" : "Dictar el pedido (modo ayudante)"}
+                  onClick={dictado.alternar}
+                  data-dictar
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              )}
               <span className="lg:hidden">{cashChip(true)}</span>
               <span className="hidden lg:inline-flex">{cashChip(false)}</span>
               {isMobile && (
@@ -262,12 +281,16 @@ export function PosHeader(p: PosHeaderProps) {
                         acciones. Marcar se hace en «Por preparar» — dos
                         lugares donde marcar serían dos donde equivocarse. */}
                     {/* Prototipo: se abre en ESTA pestaña porque el aparato
-                        del mostrador se queda en esa pantalla para clientes. */}
+                        del mostrador se queda en esa pantalla para clientes.
+                        Un <a> y NO un <Link>, a propósito: el permiso del
+                        micrófono viene con el DOCUMENTO, y una navegación
+                        interna se quedaba con el del POS, que lo prohíbe
+                        (ver app/pos/voz/microfono.ts). */}
                     {vozEnMostrador && (
                       <DropdownMenuItem asChild>
-                        <Link href="/pos/voz" data-menu-voz>
-                          <Mic className="h-4 w-4 mr-2" /> Pedido por voz (prueba)
-                        </Link>
+                        <a href="/pos/voz" data-menu-voz>
+                          <Mic className="h-4 w-4 mr-2" /> Voz: modo cajero (prueba)
+                        </a>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onSelect={() => setShowRecent(true)}>

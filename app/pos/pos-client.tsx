@@ -57,6 +57,8 @@ import { DividirCuentaDialog } from "./dividir-cuenta-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { RecentOrdersDialog } from "./recent-orders-dialog"
 import { ModifierSheet } from "./modifier-sheet"
+import { useDictado } from "./voz/use-dictado"
+import { DictadoPanel } from "./voz/dictado-panel"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
 import { AccountDialog } from "./account-dialog"
 import { useParkedOrders } from "./use-parked-orders"
@@ -258,6 +260,7 @@ export default function POSClient({
     setDiscount,
     saleRef,
     addLine,
+    addLineas,
     removeLine,
     updateQuantity,
     setQuantityTo,
@@ -572,6 +575,17 @@ export default function POSClient({
   }, [openSession])
   // Layout: en pantallas chicas el carrito vive en una hoja inferior
   const isMobile = useIsMobile()
+
+  // Modo ayudante (voz): el cajero dicta y entra directo al carrito. Lo que
+  // llega sin un extra obligatorio abre la MISMA hoja que un toque.
+  const dictado = useDictado({
+    productos: products,
+    alAgregar: (product, size, modifiers, cantidad, nota) => {
+      addLineas(product, size, modifiers, cantidad, nota)
+      vibra(12)
+    },
+    alAbrirHoja: (product, size) => setPendingModifiers({ product, size }),
+  })
   const [cartOpen, setCartOpen] = useState(false)
 
   // ── Encabezado que se encoge (móvil) ──
@@ -1936,6 +1950,7 @@ export default function POSClient({
           onAprender={() => setShowAprender(true)}
           onExistencias={existencias.length > 0 ? () => setShowExistencias(true) : undefined}
           vozEnMostrador={vozEnMostrador}
+          dictado={vozEnMostrador ? { activo: dictado.estado === "conectando" || dictado.estado === "escuchando", alternar: dictado.alternar } : undefined}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
@@ -2508,6 +2523,7 @@ export default function POSClient({
           onClose={() => setAccountToView(null)}
         />
       )}
+      {vozEnMostrador && <DictadoPanel dictado={dictado} isMobile={isMobile === true} />}
       <ModifierSheet
         pending={pendingModifiers}
         onClose={() => setPendingModifiers(null)}

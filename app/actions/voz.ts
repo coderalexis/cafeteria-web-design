@@ -6,7 +6,15 @@ import { requireContext } from "@/lib/context"
 import { registrarAviso } from "@/lib/avisos"
 import { VOZ_CLAVE_SEGUNDOS, VOZ_MODELO, vozHabilitada } from "@/lib/voz"
 import { MENU_PRODUCTS_SELECT, armarProductos, productosVendibles } from "@/app/pos/menu"
-import { HERRAMIENTAS_VOZ, armarCatalogo, catalogoEnTexto, instruccionesVoz } from "@/app/pos/voz/pedido"
+import {
+  HERRAMIENTAS_AYUDANTE,
+  HERRAMIENTAS_VOZ,
+  armarCatalogo,
+  catalogoEnTexto,
+  instruccionesAyudante,
+  instruccionesVoz,
+  type ModoVoz,
+} from "@/app/pos/voz/pedido"
 import type { Product } from "@/app/pos/cart"
 import type { ActionResult } from "./types"
 
@@ -28,7 +36,8 @@ export interface SesionVoz {
   products: Product[]
 }
 
-export async function iniciarSesionVoz(): Promise<ActionResult<SesionVoz>> {
+export async function iniciarSesionVoz(modoPedido: ModoVoz = "cajero"): Promise<ActionResult<SesionVoz>> {
+  const modo: ModoVoz = modoPedido === "ayudante" ? "ayudante" : "cajero"
   const { ctx, error: ctxError } = await requireContext()
   if (ctxError !== null) return { error: ctxError }
   if (!vozHabilitada(ctx.business.slug)) return { error: "El pedido por voz no está encendido para esta cafetería." }
@@ -45,28 +54,54 @@ export async function iniciarSesionVoz(): Promise<ActionResult<SesionVoz>> {
   if (products.length === 0) return { error: "El menú está vacío: no hay nada que pedir todavía." }
   const catalogo = armarCatalogo(products)
 
-  const cuerpo = {
-    expires_after: { anchor: "created_at", seconds: VOZ_CLAVE_SEGUNDOS },
-    session: {
-      type: "realtime",
-      model: VOZ_MODELO,
-      instructions: instruccionesVoz(ctx.business.name, catalogoEnTexto(catalogo)),
-      tools: HERRAMIENTAS_VOZ,
-      tool_choice: "auto",
-      max_output_tokens: 1024,
-      audio: {
-        input: {
-          // Mostrador: el cliente habla a medio metro, con la cafetera atrás.
-          noise_reduction: { type: "far_field" },
-          // La transcripción es para la pantalla y para revisar después; el
-          // modelo escucha el audio directo, no este texto.
-          transcription: { model: "gpt-4o-mini-transcribe", language: "es" },
-          turn_detection: { type: "semantic_vad", eagerness: "medium" },
-        },
-        output: { voice: "marin" },
-      },
-    },
-  }
+  const menu = catalogoEnTexto(catalogo)
+  // La transcripción es para la pantalla y para revisar después; el modelo
+  // escucha el audio directo, no este texto.
+  const transcription = { model: "gpt-4o-mini-transcribe", language: "es" }
+  const session =
+    modo === "cajero"
+      ? {
+          type: "realtime",
+          model: VOZ_MODELO,
+          instructions: instruccionesVoz(ctx.business.name, menu),
+          tools: HERRAMIENTAS_VOZ,
+          tool_choice: "auto",
+          max_output_tokens: 1024,
+          audio: {
+            input: {
+              // Mostrador: el cliente habla a medio metro, con la cafetera atrás.
+              noise_reduction: { type: "far_field" },
+              transcription,
+              turn_detection: { type: "semantic_vad", eagerness: "medium" },
+            },
+            output: { voice: "marin" },
+          },
+        }
+      : {
+          type: "realtime",
+          model: VOZ_MODELO,
+          instructions: instruccionesAyudante(ctx.business.name, menu),
+          tools: HERRAMIENTAS_AYUDANTE,
+          tool_choice: "auto",
+          // Sin voz: el ayudante no le habla al cajero. Solo texto (que nadie
+          // ve) y llamadas a herramientas — y la salida de audio, que es lo
+          // caro, ni existe.
+          output_modalities: ["text"],
+          max_output_tokens: 800,
+          audio: {
+            input: {
+              noise_reduction: { type: "far_field" },
+              transcription,
+              // Semántico, como el cajero: decide que el cajero terminó por el
+              // SENTIDO de lo dictado, así una pausa a media lista («dos
+              // lattes… y un panqué») no la parte. Con silencio fijo
+              // (server_vad) el turno nunca terminaba si el audio dejaba de
+              // llegar en el silencio — se probó y no agregaba nada.
+              turn_detection: { type: "semantic_vad", eagerness: "medium" },
+            },
+          },
+        }
+  const cuerpo = { expires_after: { anchor: "created_at", seconds: VOZ_CLAVE_SEGUNDOS }, session }
 
   let respuesta: Response
   try {
@@ -93,7 +128,7 @@ export async function iniciarSesionVoz(): Promise<ActionResult<SesionVoz>> {
       route: "/pos/voz",
       digest: "voz-sesion-fallo",
       message: `No se pudo abrir la sesión de voz (${respuesta.status})`,
-      detalle: `modelo ${VOZ_MODELO} · ${detalle}`,
+      detalle: `modo ${modo} · modelo ${VOZ_MODELO} · ${detalle}`,
     })
     return { error: "El servicio de voz no respondió. Intenta de nuevo en un momento." }
   }

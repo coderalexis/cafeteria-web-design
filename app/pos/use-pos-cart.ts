@@ -92,6 +92,34 @@ export function usePosCart(storageKey: string, products: Product[]) {
     [touch],
   )
 
+  /**
+   * Varias piezas de golpe, y con nota si la hay — lo que llega del dictado
+   * por voz («dos lattes grandes, uno sin azúcar»). Sin nota se juntan con lo
+   * igual, como un toque repetido; con nota van en su propio renglón.
+   */
+  const addLineas = useCallback(
+    (product: Product, size: SizeOption | undefined, modifiers: ModifierOption[], cantidad: number, nota = "") => {
+      const n = Math.min(99, Math.max(1, Math.round(cantidad)))
+      touch()
+      setLines((prev) => {
+        if (nota) {
+          return [
+            ...prev.map((l) => ({ ...l, isNew: false })),
+            { lineId: crypto.randomUUID(), product, size, modifiers, quantity: n, notes: nota.slice(0, 200), isNew: true },
+          ]
+        }
+        let next = prev
+        for (let i = 0; i < n; i++) next = addUnit(next, product, size, modifiers, () => crypto.randomUUID())
+        return next
+      })
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => {
+        setLines((prev) => (prev.some((l) => l.isNew) ? prev.map((l) => ({ ...l, isNew: false })) : prev))
+      }, NEW_LINE_FLASH_MS)
+    },
+    [touch],
+  )
+
   const removeLine = useCallback(
     (lineId: string) => {
       touch()
@@ -205,6 +233,7 @@ export function usePosCart(storageKey: string, products: Product[]) {
     setDiscount,
     saleRef,
     addLine,
+    addLineas,
     removeLine,
     updateQuantity,
     setQuantityTo,
