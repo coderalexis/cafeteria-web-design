@@ -66,10 +66,14 @@ jobs:
           openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -in db.dump -out db.dump.enc
           rm db.dump
 
-      - name: Guardar artefacto (30 días)
+      # 90 días, el máximo que permite el repo. Eran 30: el 2026-10-16 ya no
+      # quedaba el respaldo del 14 de septiembre (el día de las cuentas
+      # duplicadas de Gym Coffe), y un problema de datos puede tardar semanas
+      # en notarse. Cada respaldo pesa ~1 MB y en un repo público no se cobra.
+      - name: Guardar artefacto (90 días)
         uses: actions/upload-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
           path: db.dump.enc
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: error
