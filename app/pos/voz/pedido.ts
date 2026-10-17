@@ -104,7 +104,9 @@ export function catalogoEnTexto(cat: Catalogo): string {
       : pesos(product.price ?? 0)
     const grupos = (product.modifierGroups ?? []).map((g) => cat.codigoDeGrupo.get(g.id)).filter(Boolean)
     const desc = product.description ? ` (${product.description.slice(0, 80)})` : ""
-    lineas.push(`${codigo} ${product.name}${desc} | ${precio}${grupos.length ? ` | extras: ${grupos.join(", ")}` : ""}`)
+    // «grupos de extras» y no «extras»: con la etiqueta corta, el modelo a
+    // veces copiaba el código del grupo (g1) dentro de los extras.
+    lineas.push(`${codigo} ${product.name}${desc} | ${precio}${grupos.length ? ` | grupos de extras: ${grupos.join(", ")}` : ""}`)
   }
   if (cat.grupos.length > 0) {
     lineas.push("\n## Grupos de extras")
@@ -334,7 +336,11 @@ export function resolver(args: ArgsAgregar, cat: Catalogo): Resolucion {
   const grupos = product.modifierGroups ?? []
   const elegidos: ModifierOption[] = []
   const vistos = new Set<string>()
-  for (const codigo of args.extras ?? []) {
+  // Los códigos de GRUPO (g1) no son extras: el modelo a veces los manda junto
+  // con la opción («extras: [g1, e1]», visto en una prueba) y antes eso
+  // tumbaba el producto entero como «no encontré». Se ignoran.
+  const codigosDeGrupo = new Set(cat.grupos.map((g) => g.codigo))
+  for (const codigo of (args.extras ?? []).filter((c) => !codigosDeGrupo.has(String(c).trim().toLowerCase()))) {
     const opt = cat.extraPorCodigo.get(String(codigo).trim().toLowerCase())
     if (!opt) return { ok: false, mensaje: `No existe el extra «${codigo}». Usa solo los códigos del menú.`, product }
     if (!grupos.some((g) => g.options.some((o) => o.id === opt.id))) {
@@ -733,8 +739,14 @@ function propiedadesRenglon(cantidad: string) {
  * está a la vista, que corrija con el dedo»): el usuario lo probó, le dictó
  * «elimina el capuchino que no es deslactosado», y el bot, sin herramienta, lo
  * metió como «No encontré: … no es posible modificar…». Quitar y cambiar
- * cantidad por voz es parte de dictar. Vaciar el carrito entero NO: una frase
- * mal oída no puede borrar un pedido completo; eso es un toque al bote.
+ * cantidad por voz es parte de dictar.
+ *
+ * Vaciar el carrito entero al principio NO estaba, para que una frase mal oída
+ * no borrara un pedido completo. El usuario lo pidió («elimina todo lo del
+ * carrito» no hacía nada) y con Deshacer el riesgo ya es un toque: entra, pero
+ * solo con una orden clara, quitando renglón por renglón como los toques — sin
+ * tocar la cuenta abierta, el descuento ni el método de pago —, y siempre con
+ * Deshacer que lo regresa todo.
  */
 export const HERRAMIENTAS_AYUDANTE = [
   herramientaAgregar(
@@ -752,6 +764,13 @@ export const HERRAMIENTAS_AYUDANTE = [
     name: "cambiar_cantidad",
     description: "Deja un renglón del carrito con la cantidad FINAL que dice el cajero («que sean tres capuchinos», «nada más un mocha»). Con 0 quita el renglón entero («quita los capuchinos», «ya no van los mokas»).",
     parameters: { type: "object", properties: propiedadesRenglon("La cantidad final de ese renglón."), required: ["producto", "nombre", "cantidad"] },
+  },
+  {
+    type: "function",
+    name: "vaciar_carrito",
+    description:
+      "Quita TODO lo del carrito. Solo cuando el cajero lo pide claramente para el carrito entero («vacía el carrito», «elimina todo lo del carrito», «borra todo»). Si nombra productos, usa quitar_producto o cambiar_cantidad.",
+    parameters: { type: "object", properties: {} },
   },
   {
     type: "function",
@@ -812,6 +831,7 @@ export function instruccionesAyudante(cafe: string, menu: string): string {
 - Por cada producto que diga, llama a agregar_producto con los códigos del menú. Varios productos son varias llamadas, todas en la misma respuesta. «Dos capuchinos» es UNA llamada con cantidad 2.
 - Si pide quitar algo («quita», «elimina», «ya no»), llama a quitar_producto describiendo el renglón: producto, y si lo dijo, tamaño y extras que tiene (extras) o que NO tiene (sin_extras). «Quita uno de los capuchinos» es cantidad 1; sin cantidad se quita uno.
 - Si quita TODOS los de algo («quita los capuchinos», «ya no van los mokas»), llama a cambiar_cantidad con cantidad 0.
+- Si pide vaciar el carrito entero («vacía el carrito», «elimina todo lo del carrito», «borra todo»), llama a vaciar_carrito.
 - Si cambia cuántos quiere («que sean tres», «nada más uno»), llama a cambiar_cantidad con la cantidad final.
 - No converses: no saludes, no confirmes, no preguntes, no respondas con texto. Solo llamadas a herramientas.
 - Si no dijo el tamaño o un extra obligatorio, llama igual a agregar_producto sin ese dato: el cajero lo completa en pantalla.

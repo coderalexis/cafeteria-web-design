@@ -49,6 +49,9 @@ interface Sesion {
   cambios: number
   pendientes: number
   noEntendidos: number
+  /** Segundos que habló el cajero (para el costo de la transcripción). */
+  segundosDeVoz: number
+  vozDesde: number | null
 }
 
 /** Lo que la voz hizo en el carrito, con cómo deshacerlo si entendió mal. */
@@ -162,7 +165,7 @@ export function useDictado(opciones: {
         pendientes: s.pendientes,
         noEntendidos: s.noEntendidos,
         uso: s.uso,
-        costoUsd: costoEstimadoUsd(s.uso, s.modelo),
+        costoUsd: costoEstimadoUsd(s.uso, s.modelo, s.segundosDeVoz),
       })
       localStorage.setItem(CLAVE_MEDIDAS, JSON.stringify(lista.slice(0, SESIONES_GUARDADAS)))
     } catch {
@@ -223,6 +226,19 @@ export function useDictado(opciones: {
         }
         return { ok: true }
       }
+      if (nombre === "vaciar_carrito") {
+        // Renglón por renglón, como los toques: no toca la cuenta abierta, el
+        // descuento ni el método de pago. Y con Deshacer que regresa todo.
+        const todas = [...opcionesRef.current.lineas]
+        if (todas.length === 0) return { ok: true, sinCambio: true }
+        for (const l of todas) opcionesRef.current.alQuitarLinea(l.lineId)
+        s.cambios++
+        const piezas = todas.reduce((n, l) => n + l.quantity, 0)
+        avisar(`Vacié el carrito: ${piezas} ${piezas === 1 ? "artículo" : "artículos"}`, "quitado", () => {
+          for (const l of todas) opcionesRef.current.alAgregar(l.product, l.size, l.modifiers, l.quantity, l.notes)
+        })
+        return { ok: true }
+      }
       if (nombre !== "agregar_producto") return { ok: false, mensaje: `No existe la herramienta «${nombre}».` }
 
       const r = resolver(args as unknown as ArgsAgregar, s.catalogo)
@@ -244,8 +260,14 @@ export function useDictado(opciones: {
         return { ok: true, pendiente: true }
       }
       s.noEntendidos++
-      // El mensaje de `resolver` es para el modelo; al cajero, lo que pidió.
-      avisarNoEncontrado(`No encontré: «${String(args.nombre ?? args.producto ?? "").slice(0, 60)}»`)
+      // El mensaje de `resolver` es para el modelo; al cajero, lo que pidió. Si
+      // el producto SÍ existe, decir «no encontré» sería mentira: se dice que
+      // no se pudo agregar y por qué.
+      avisarNoEncontrado(
+        r.product
+          ? `No pude agregar ${r.product.name}: ${r.mensaje.replace(/ Usa solo los códigos del menú\.?/, "")}`
+          : `No encontré: «${String(args.nombre ?? args.producto ?? "").slice(0, 60)}»`,
+      )
       return { ok: false, mensaje: r.mensaje }
     },
     [avisar, avisarNoEncontrado, entregar],
@@ -258,10 +280,13 @@ export function useDictado(opciones: {
       switch (ev.type) {
         case "input_audio_buffer.speech_started":
           s.ultimaVoz = Date.now()
+          s.vozDesde = Date.now()
           setOyendo(true)
           break
         case "input_audio_buffer.speech_stopped":
           s.ultimaVoz = Date.now()
+          if (s.vozDesde) s.segundosDeVoz += (Date.now() - s.vozDesde) / 1000
+          s.vozDesde = null
           setOyendo(false)
           break
         case "conversation.item.input_audio_transcription.completed": {
@@ -356,6 +381,8 @@ export function useDictado(opciones: {
       cambios: 0,
       pendientes: 0,
       noEntendidos: 0,
+      segundosDeVoz: 0,
+      vozDesde: null,
       reloj: window.setInterval(() => {
         const t = Date.now()
         if (t - ahora > DURACION_MAX_MS || t - s.ultimaVoz > SILENCIO_MAX_MS) detener()

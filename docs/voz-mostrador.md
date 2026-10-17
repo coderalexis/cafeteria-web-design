@@ -44,8 +44,16 @@ encuentra sin números de renglón. Reglas que salieron de probar:
   sin cantidad y se fueron los dos. Quitar de menos se corrige mejor.
 - «Ya no van los capuchinos» es `cambiar_cantidad` con 0, y quita TODOS los
   renglones de ese producto (un deslactosado y uno normal son dos).
-- Vaciar el carrito entero NO existe por voz: una frase mal oída no puede
-  borrar un pedido; es un toque al bote.
+- Vaciar el carrito entero: al principio NO existía por voz (una frase mal
+  oída no puede borrar un pedido). El usuario lo pidió («elimina todo lo del
+  carrito» no hacía nada) y con Deshacer el riesgo es un toque, así que entró
+  `vaciar_carrito`: solo con orden clara para el carrito entero, renglón por
+  renglón como los toques (no toca cuenta abierta, descuento ni pago) y con
+  Deshacer que regresa todo.
+- El modelo a veces mandaba el código del GRUPO entre los extras
+  (`extras: [g1, e1]`) y el producto entero caía como «No encontré: Cappuccino»
+  — era la falla intermitente que parecía de nombres. Ahora los códigos de
+  grupo se ignoran y el menú dice «grupos de extras: g1».
 - Cada cambio de la voz trae **Deshacer** en la tarjeta.
 - Si el nombre empata («capuchino» a secas: el caliente y el frappé se
   llaman igual), gana el más sencillo; quien quiere el frappé dice «frappé».
@@ -177,6 +185,24 @@ revisar tu pedido»), lo que suma un turno de ~2 s.
 | `OPENAI_API_KEY` | Clave de la cuenta de OpenAI. Solo servidor. Sin ella, la voz está apagada. |
 | `VOZ_CAFES` | Slugs separados por coma donde se enciende, p. ej. `cafe-de-prueba`. |
 | `OPENAI_REALTIME_MODEL` | Opcional; por omisión `gpt-realtime-2.1-mini`. |
+
+## Cuánto cuesta (medido el 2026-10-14)
+
+Con el desglose exacto de OpenAI (`usage` por modalidad y caché) y las tarifas
+oficiales de `gpt-realtime-2.1-mini` (por 1M de tokens: texto $0.60 / caché
+$0.06 / salida $2.40; audio $10 / caché $0.30 / salida $20; transcripción
+~$0.003 por minuto de voz):
+
+| Modo | Costo real |
+|---|---|
+| Cajero (el cliente conversa, ~50 s) | ~US$0.02 por pedido (0.019–0.025) |
+| Ayudante (el cajero dicta) | ~US$0.0017 por orden dictada |
+
+Lo caro del cajero es la VOZ del bot (salida de audio, ~40 % del costo) y el
+texto de las instrucciones y el menú que se relee en cada respuesta (casi
+todo en caché). El ayudante no tiene salida de audio. El contador de la
+pantalla calcula así desde el 2026-10-14; antes lo cobraba todo a precio de
+audio y exageraba de 2 a 5 veces.
 
 ## Cómo se mide
 

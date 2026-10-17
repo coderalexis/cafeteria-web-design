@@ -75,6 +75,9 @@ interface Sesion {
   vocesAlLeer: number
   reloj: number
   despedida: number | null
+  /** Segundos que habló el cliente (para el costo de la transcripción). */
+  segundosDeVoz: number
+  vozDesde: number | null
 }
 
 function leerSesiones(): SesionMedida[] {
@@ -185,7 +188,7 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
           herramientas: s.herramientas,
           rechazos: s.rechazos,
           uso: s.uso,
-          costoUsd: costoEstimadoUsd(s.uso, s.modelo),
+          costoUsd: costoEstimadoUsd(s.uso, s.modelo, s.segundosDeVoz),
         }),
       )
 
@@ -292,10 +295,13 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       switch (ev.type) {
         case "input_audio_buffer.speech_started":
           s.ultimaVoz = Date.now()
+          s.vozDesde = Date.now()
           setOyendo(true)
           break
         case "input_audio_buffer.speech_stopped":
           s.ultimaVoz = Date.now()
+          if (s.vozDesde) s.segundosDeVoz += (Date.now() - s.vozDesde) / 1000
+          s.vozDesde = null
           s.vocesCliente++
           setOyendo(false)
           break
@@ -440,6 +446,8 @@ export function VozClient({ cafe, habilitada, modelo }: { cafe: string; habilita
       vocesCliente: 0,
       vocesAlLeer: 0,
       despedida: null,
+      segundosDeVoz: 0,
+      vozDesde: null,
       reloj: window.setInterval(() => {
         const t = Date.now()
         setSegundos(Math.round((t - ahora) / 1000))
@@ -626,7 +634,7 @@ function Medicion({ historial, modelo }: { historial: SesionMedida[]; modelo: st
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
         <dt>Duración promedio (con pedido)</dt>
         <dd className="text-right">{Math.round(promedio(confirmadas.map((s) => s.segundos)))} s</dd>
-        <dt>Costo promedio (tope estimado)</dt>
+        <dt>Costo promedio (estimado)</dt>
         <dd className="text-right">{costos.length ? `$${promedio(costos).toFixed(3)} USD` : "—"}</dd>
         <dt>Preguntas o correcciones por pedido</dt>
         <dd className="text-right">{promedio(confirmadas.map((s) => s.rechazos)).toFixed(1)}</dd>
