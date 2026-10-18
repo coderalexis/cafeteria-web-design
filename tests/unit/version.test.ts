@@ -5,6 +5,16 @@ describe("clasificarError — qué se cura recargando, qué es falta de señal",
   it("reconoce el módulo de otro build que el runtime viejo no tiene", () => {
     expect(clasificarError("Cannot read properties of undefined (reading 'call')")).toBe("version")
   })
+  it("lo reconoce también como lo escriben Safari (iPhone) y Firefox", () => {
+    // Tal cual llegó del iPhone de Gym Coffe el 2026-10-16.
+    expect(clasificarError("undefined is not an object (evaluating 'e[o].call')")).toBe("version")
+    expect(clasificarError("null is not an object (evaluating 't[n].call')")).toBe("version")
+    expect(clasificarError('can\x27t access property "call", e[o] is undefined')).toBe("version")
+    expect(esErrorDeVersion(new TypeError("undefined is not an object (evaluating 'e[o].call')"))).toBe(true)
+  })
+  it("pero no cualquier error de Safari: solo el de un módulo que falta (.call)", () => {
+    expect(clasificarError("undefined is not an object (evaluating 'orden.total')")).toBe("otro")
+  })
   it("reconoce trozos de código que ya no existen y server actions de otro build", () => {
     expect(clasificarError("ChunkLoadError: Loading chunk 1436 failed.")).toBe("version")
     expect(clasificarError("Failed to fetch dynamically imported module: https://x/_next/static/chunks/a.js")).toBe("version")
