@@ -28,8 +28,14 @@ export const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev"
 export type TipoDeError = "version" | "red" | "otro"
 
 const SINTOMAS_VERSION = [
-  // Módulo del build nuevo que el runtime viejo no tiene.
-  /reading 'call'/,
+  // Módulo del build nuevo que el runtime viejo no tiene. Cada motor lo dice
+  // distinto, y al principio solo se reconocía el de Chrome: el 2026-10-16 el
+  // iPhone de Gym Coffe (Safari) abrió el POS con una versión vieja, el error
+  // llegó como «undefined is not an object (evaluating 'e[o].call')», no se
+  // reconoció, y en vez de recargarse sola le enseñó «Algo salió mal».
+  /reading 'call'/, // Chrome: Cannot read properties of undefined (reading 'call')
+  /(undefined|null) is not an object \(evaluating '[^']*\.call'\)/, // Safari
+  /can't access property "call"/, // Firefox: can't access property "call", e[o] is undefined
   // Un trozo de código que ya no existe con ese nombre en el servidor.
   /ChunkLoadError|Loading chunk [\w-]+ failed|Failed to fetch dynamically imported module|Importing a module script failed/i,
   // Server action con id de otro build (Next: «Failed to find Server Action…

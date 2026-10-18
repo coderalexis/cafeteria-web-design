@@ -393,7 +393,10 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   los botones no se vayan con el desplazamiento.
 - **Deploy con pestañas abiertas**: una server action que revalida devuelve
   el árbol de la página del build nuevo y la pestaña vieja truena con
-  «reading 'call'»; y si Vercel no reutilizó la caché de build, la sal de las
+  «reading 'call'» (en iPhone/Safari: «undefined is not an object (evaluating
+  'e[o].call')», y en Firefox: «can't access property "call"»; hasta el
+  2026-10-16 solo se reconocía el de Chrome y al iPhone de Gym Coffe le salió
+  «Algo salió mal» en vez de recargarse solo); y si Vercel no reutilizó la caché de build, la sal de las
   acciones rota y TODAS dan 404 («Failed to find Server Action»). `lib/version.ts`
   cubre ambos; el sello del build tiene que ser determinista (commit), porque
   `next.config.mjs` se evalúa varias veces por build.
@@ -440,8 +443,8 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-10-14 y pendientes
 
-- Producción = `main` hasta el PR #80 (pedido por voz en dos modos, cajero y
-  ayudante, encendido solo en `cafe-de-prueba`); migraciones aplicadas hasta la **59**
+- Producción = `main` hasta el PR #83 (pedido por voz en dos modos, cajero y
+  ayudante, encendido solo en `cafe-de-prueba`; respaldos de 90 días); migraciones aplicadas hasta la **59**
   (`p45_insumos_ajustes`). Inventario Fase 1 vivo (insumos + reventa); cuentas
   abiertas con reconciliación de sellos; avisos silenciosos en el correo de
   la mañana; CI con la imagen `postgres-meta` en caché.
