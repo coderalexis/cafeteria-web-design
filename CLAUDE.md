@@ -400,6 +400,19 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   acciones rota y TODAS dan 404 («Failed to find Server Action»). `lib/version.ts`
   cubre ambos; el sello del build tiene que ser determinista (commit), porque
   `next.config.mjs` se evalúa varias veces por build.
+- **Las cookies que pone el middleware cuentan como cookies de la acción.** Si
+  el middleware renueva la sesión durante una server action y la pasa por la
+  vía normal de Next (`response.cookies.set`, que agrega
+  `x-middleware-set-cookie`), Next cree que la acción cambió cookies, vuelve a
+  armar la página entera y se la manda al cliente (`x-action-revalidated:
+  [[],0,1]` en la respuesta). Así tronaba el iPhone de Gym Coffe al abrir la
+  app tras un deploy (4 de 4 veces): la copia del service worker mandaba el
+  sondeo de cuentas con el token vencido y recibía la página del build nuevo.
+  `continuarConCookies` (`lib/supabase/middleware.ts`) manda el token nuevo a
+  la página por la PETICIÓN y al navegador por `Set-Cookie`, y quita
+  `x-middleware-set-cookie`. Se reproduce en local con
+  dos builds, un perfil de Chrome con la copia vieja guardada y el
+  `expires_at` de la cookie de sesión en el pasado.
 - **Un sondeo que sobreescribe estado puede deshacer una escritura ya
   confirmada** cuando la red va lenta: la respuesta del sondeo (vieja) llega
   DESPUÉS de la respuesta del guardado (nueva) y la pisa. En las cuentas
@@ -443,8 +456,9 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-10-14 y pendientes
 
-- Producción = `main` hasta el PR #83 (pedido por voz en dos modos, cajero y
-  ayudante, encendido solo en `cafe-de-prueba`; respaldos de 90 días); migraciones aplicadas hasta la **59**
+- Producción = `main` hasta el PR #84 (pedido por voz en dos modos, cajero y
+  ayudante, encendido solo en `cafe-de-prueba`; respaldos de 90 días; el error
+  de versión vieja se reconoce también en iPhone y Firefox); migraciones aplicadas hasta la **59**
   (`p45_insumos_ajustes`). Inventario Fase 1 vivo (insumos + reventa); cuentas
   abiertas con reconciliación de sellos; avisos silenciosos en el correo de
   la mañana; CI con la imagen `postgres-meta` en caché.
