@@ -80,7 +80,12 @@ versión; el POS las sondea cada 10 s (30 s en celular) y **reconcilia** la
 lista (`reconciliarLista`), nunca la pisa. Un choque de versión con contenido
 idéntico es falso y se reintenta; uno real guarda la ronda aparte como
 «Nombre (2)». «Separar la cuenta» reparte piezas en dos ventas (no hay pago
-mixto a propósito).
+mixto a propósito). Sin señal: una cuenta nueva vive en el aparato como
+`local-<uuid>` y se sube con ESE uuid (repetible: si la respuesta se perdió no
+se duplica); una cuenta borrada o cobrada queda anotada como borrada hasta que
+el servidor confirme, y el sondeo la esconde mientras tanto (antes revivía y se
+podía cobrar dos veces). Ambas listas en localStorage
+(`pos-cuentas-pendientes:` / `pos-cuentas-borradas:`).
 
 **Módulos por cafetería** (`businesses.settings`, saneado en `lib/settings.ts`):
 candado del POS por inactividad con PIN (`lock_minutes`), cuentas abiertas,

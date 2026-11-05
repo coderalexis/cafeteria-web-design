@@ -251,8 +251,79 @@ export function reconciliarLista(local: ParkedOrder[], servidor: ParkedOrder[]):
     }
     return s
   })
-  const provisionales = local.filter((o) => o.id.startsWith("local-"))
+  // Una provisional cuyo uuid ya trae el servidor sí llegó (aunque la
+  // respuesta se perdiera): manda la del servidor, no se muestra dos veces.
+  const enServidor = new Set(servidor.map((s) => s.id))
+  const provisionales = local.filter((o) => esProvisional(o.id) && !enServidor.has(idDeServidor(o.id)))
   return [...provisionales, ...delServidor]
+}
+
+/* ── Sin señal: cuentas que no han llegado y borrados pendientes ──── */
+
+/**
+ * Una cuenta recién guardada se ve al instante con id `local-<uuid>` y ese
+ * MISMO uuid es el que se manda al servidor. Así, reintentar un guardado cuya
+ * respuesta se perdió (la señal se cayó justo después de que el servidor la
+ * guardó) no la duplica: el servidor reconoce el id.
+ */
+const PREFIJO_PROVISIONAL = "local-"
+export const esProvisional = (id: string) => id.startsWith(PREFIJO_PROVISIONAL)
+export const idProvisional = (uuid: string) => PREFIJO_PROVISIONAL + uuid
+export const idDeServidor = (id: string) => (esProvisional(id) ? id.slice(PREFIJO_PROVISIONAL.length) : id)
+
+/**
+ * Una cuenta que este aparato ya borró (casi siempre: la cobró) pero que el
+ * servidor quizá todavía tiene, porque el borrado no llegó.
+ *
+ * Sin esto, cobrar una cuenta sin señal era peligroso: la venta se iba a la
+ * cola, el borrado fallaba en silencio y, al volver la señal, el siguiente
+ * sondeo traía la cuenta de regreso como abierta. Cobrable otra vez.
+ */
+export interface CuentaBorrada {
+  id: string
+  desde: number
+}
+
+/** Lo que vive una cuenta abierta: después de eso, el servidor ya la limpió. */
+export const BORRADA_VIGENCIA_MS = PARKED_MAX_AGE_MS
+
+export function borradasVigentes(lista: CuentaBorrada[], ahora: number): CuentaBorrada[] {
+  return lista.filter((b) => ahora - b.desde < BORRADA_VIGENCIA_MS)
+}
+
+/** La lista del servidor sin lo que este aparato ya borró. */
+export function sinBorradas(servidor: ParkedOrder[], borradas: CuentaBorrada[]): ParkedOrder[] {
+  if (borradas.length === 0) return servidor
+  const ids = new Set(borradas.map((b) => b.id))
+  return servidor.filter((o) => !ids.has(o.id))
+}
+
+/** Lee lo guardado en el aparato sin confiar en ello: lo ilegible se descarta. */
+export function leerBorradas(crudo: string | null): CuentaBorrada[] {
+  const lista = leerArreglo(crudo)
+  return lista.filter(
+    (b): b is CuentaBorrada =>
+      !!b && typeof b === "object" && typeof (b as CuentaBorrada).id === "string" && Number.isFinite((b as CuentaBorrada).desde),
+  )
+}
+
+export function leerPendientes(crudo: string | null): ParkedOrder[] {
+  const lista = leerArreglo(crudo)
+  return lista.filter((o): o is ParkedOrder => {
+    if (!o || typeof o !== "object") return false
+    const p = o as ParkedOrder
+    return typeof p.id === "string" && esProvisional(p.id) && typeof p.name === "string" && !!p.cart && Number.isFinite(p.savedAt)
+  })
+}
+
+function leerArreglo(crudo: string | null): unknown[] {
+  if (!crudo) return []
+  try {
+    const x: unknown = JSON.parse(crudo)
+    return Array.isArray(x) ? x : []
+  } catch {
+    return []
+  }
 }
 
 function ordenado(x: unknown): unknown {
