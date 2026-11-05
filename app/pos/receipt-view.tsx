@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import QRCode from "react-qr-code"
+import { QrDiferido } from "@/components/qr-diferido"
 import { toast } from "sonner"
 import { CheckCircle2, ChefHat, Printer, QrCode, Share2 } from "lucide-react"
 import { formatCurrency, formatDate, formatTime, PAYMENT_METHODS } from "@/lib/format"
@@ -266,7 +266,7 @@ export function ReceiptView({
         <div className="mt-4 w-full">
           {mostrarQr ? (
             <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white p-4">
-              <QRCode value={urlNota} size={148} bgColor="#ffffff" fgColor="#1c1917" />
+              <QrDiferido value={urlNota} size={148} bgColor="#ffffff" fgColor="#1c1917" />
               <p className="text-center text-xs text-stone-500">
                 Que lo escanee el cliente con su celular.
                 <br />
