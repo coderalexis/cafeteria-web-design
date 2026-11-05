@@ -1736,7 +1736,8 @@ export function AyudaClient({ ticket, corte }: Props) {
           <li>
             <strong>¿Le quedó mal el correo a alguien?</strong> {v.TocaSolo} a esa persona y corrige su{" "}
             <strong>correo de acceso</strong>: con el correo equivocado no puede entrar ni recibir el de recuperación,
-            así que no puede arreglarlo sola. Solo el dueño puede cambiar el correo de otro dueño.
+            así que no puede arreglarlo sola. Solo el dueño puede cambiar el correo de otro dueño, y nadie puede
+            cambiar el de una persona que también pertenece a otra cafetería: esa cuenta no es solo de tu café.
           </li>
           <li>
             Contraseñas: la de una cuenta de café la restableces desde Equipo; quien entra con correo la cambia en Mi
