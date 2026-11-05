@@ -17,6 +17,8 @@ import {
   mismoCarrito,
   reconciliarLista,
   sinBorradas,
+  borradasTrasSondeo,
+  conservarRecientes,
   type CuentaBorrada,
   type ParkedOrder,
 } from "./parked"
@@ -75,6 +77,8 @@ export function useParkedOrders(businessId: string) {
    */
   const pendientes = useRef<ParkedOrder[]>([])
   const borradas = useRef<CuentaBorrada[]>([])
+  /** Cuentas que el servidor confirmó hace poco (id → cuándo): ver conservarRecientes. */
+  const recientes = useRef(new Map<string, number>())
   const sincronizando = useRef(false)
   /** A qué pendientes ya se les avisó que el servidor no las acepta (un aviso, no uno por sondeo). */
   const avisadas = useRef(new Set<string>())
@@ -108,6 +112,7 @@ export function useParkedOrders(businessId: string) {
   /** La provisional ya llegó: desde ahora se usa su id de servidor y su sello. */
   const confirmar = useCallback(
     (provisionalId: string, id: string, updatedAt: string) => {
+      recientes.current.set(id, Date.now())
       aplicar(ref.current.map((o) => (o.id === provisionalId ? { ...o, id, updatedAt } : o)))
     },
     [aplicar],
@@ -123,12 +128,13 @@ export function useParkedOrders(businessId: string) {
     if (borradas.current.length === 0 && pendientes.current.length === 0) return
     sincronizando.current = true
     try {
-      for (const b of [...borradas.current]) {
+      for (const b of borradas.current.filter((x) => x.confirmada === undefined)) {
         try {
           const r = await removeParked(b.id)
-          // Solo con éxito se olvida: si el servidor dijo que no, la cuenta
-          // sigue escondida aquí (este aparato ya la cobró) y se reintenta.
-          if (r?.success) borradas.current = borradas.current.filter((x) => x.id !== b.id)
+          // Solo con éxito se marca confirmada: si el servidor dijo que no, la
+          // cuenta sigue escondida aquí (este aparato ya la cobró) y se reintenta.
+          // Y confirmada no es olvidada: ver borradasTrasSondeo.
+          if (r?.success) borradas.current = borradas.current.map((x) => (x.id === b.id ? { ...x, confirmada: Date.now() } : x))
         } catch {
           return // sin señal otra vez
         }
@@ -169,6 +175,9 @@ export function useParkedOrders(businessId: string) {
     }
     cargando.current = true
     cargandoDesde.current = Date.now()
+    // Cuándo SALIÓ este sondeo: lo que el servidor confirmó después, esta
+    // respuesta no lo puede saber (borradasTrasSondeo, conservarRecientes).
+    const enviado = Date.now()
     try {
       // `fetch` y no la server action: las acciones van en fila y un sondeo
       // lento hacía esperar al cobro (app/pos/datos/cuentas). Con tope: uno
@@ -205,7 +214,21 @@ export function useParkedOrders(businessId: string) {
         pendientes.current = pendientes.current.filter((p) => !ids.has(idDeServidor(p.id)))
         if (pendientes.current.length !== antes) persistir()
         // Lo que este aparato ya borró no vuelve, aunque el servidor aún no se entere.
-        aplicar(reconciliarLista(ref.current, sinBorradas(todas, borradas.current)))
+        aplicar(
+          conservarRecientes(
+            reconciliarLista(ref.current, sinBorradas(todas, borradas.current)),
+            ref.current,
+            recientes.current,
+            enviado,
+          ),
+        )
+        // Lo que este sondeo ya vio después de confirmarse deja de necesitar marca.
+        for (const [id, cuando] of recientes.current) if (cuando < enviado) recientes.current.delete(id)
+        const quedan = borradasTrasSondeo(borradas.current, enviado)
+        if (quedan.length !== borradas.current.length) {
+          borradas.current = quedan
+          persistir()
+        }
         setListo(true)
         // Contestó: hay señal, buen momento para lo que quedó pendiente.
         void sincronizar()
@@ -320,6 +343,10 @@ export function useParkedOrders(businessId: string) {
         try {
           r = await parkOrder({ id: uuid, name: provisional.name, cart: provisional.cart })
         } catch {
+          // La borraron (o la cobraron) mientras se guardaba: no se revive. La
+          // marca de borrada ya está, y si el guardado sí llegó, el borrado sale
+          // detrás de él.
+          if (borradas.current.some((b) => b.id === uuid) || !ref.current.some((o) => o.id === provisional.id)) return
           // Sin señal (o un deploy a medias). Antes la cuenta se quedaba solo
           // en memoria: parecía guardada y una recarga se la llevaba. Ahora
           // vive en el aparato y se sube sola con el mismo uuid, así que si sí
@@ -451,7 +478,9 @@ export function useParkedOrders(businessId: string) {
         try {
           const r = await removeParked(real)
           if (r?.success) {
-            borradas.current = borradas.current.filter((b) => b.id !== real)
+            // Confirmada, no olvidada: un sondeo que salió antes de esto y llega
+            // tarde la traería de vuelta, cobrable otra vez (borradasTrasSondeo).
+            borradas.current = borradas.current.map((b) => (b.id === real ? { ...b, confirmada: Date.now() } : b))
             persistir()
           } else if (r?.error) {
             toast.error(r.error)

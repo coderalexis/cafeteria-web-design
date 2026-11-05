@@ -299,7 +299,9 @@ export default function POSClient({
   )
   /** Solo lo del menú, que es lo que se pinta en las tarjetas. */
   const porVarianteMapa = useMemo(() => porVariante(existencias), [existencias])
-  const cola = useOfflineQueue(businessId, aplicarExistencias)
+  // Una venta cobrada sin señal no sumó al cobrarse; suma cuando sube.
+  const sumarSubida = useCallback((total: number) => setTotalSales((prev) => prev + total), [])
+  const cola = useOfflineQueue(businessId, aplicarExistencias, sumarSubida)
   const [showQueueReview, setShowQueueReview] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   // Se avisa UNA vez por cierre, no en cada recarga, y solo mientras no haya

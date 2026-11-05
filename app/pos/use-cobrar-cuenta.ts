@@ -10,7 +10,7 @@ import { avisarEncolada, avisarVersionNueva } from "./avisos-cobro"
 import { cartSubtotal, linesToItems, rehydrateCart, type Product } from "./cart"
 import type { OpenSession } from "./cash-session-dialog"
 import { ventaCompletada, ventaParaLaCola } from "./cobro"
-import { PARKED_MAX_AGE_MS, type ParkedOrder } from "./parked"
+import { mismaCuenta, PARKED_MAX_AGE_MS, type ParkedOrder } from "./parked"
 import { vibra } from "./pos-utils"
 import { QUEUE_MAX } from "./queue"
 import type { CompletedSale } from "./receipt-view"
@@ -87,7 +87,7 @@ export function useCobrarCuenta({
         }
         aplicarExistencias(result.stock)
         parked.remove(o.id)
-        if (openAccount?.id === o.id) {
+        if (mismaCuenta(openAccount?.id, o.id)) {
           // También estaba en el carrito: ya se cobró, no hay ronda que guardar.
           setOpenAccount(null)
           clearCart()

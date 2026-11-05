@@ -3,6 +3,9 @@ import type { CartLine, PersistedCart, Product } from "@/app/pos/cart"
 import type { ParkedOrder } from "@/app/pos/parked"
 import {
   applyCartDelta,
+  borradasTrasSondeo,
+  conservarRecientes,
+  mismaCuenta,
   PARKED_VIEJA_MS,
   autoName,
   avisoRecuperada,
@@ -516,5 +519,58 @@ describe("reconciliarLista", () => {
     const b = JSON.parse(JSON.stringify({ lines: a.lines, v: a.v, ticketNotes: "x", savedAt: 999, saleRef: "r", paymentMethod: "efectivo", cashReceivedInput: "", discount: null }))
     expect(mismoCarrito(a, b)).toBe(true)
     expect(mismoCarrito(carrito("x", [["p", 1]]), carrito("x", []))).toBe(false)
+  })
+})
+
+/* ── Sondeo tardío: lo que el servidor confirmó después de que salió ── */
+// Desde que el sondeo va por `fetch` (#89) ya no hace fila detrás del cobro:
+// una respuesta que salió antes de cobrar puede llegar después. Revisión del
+// 2026-11-05.
+
+describe("una cuenta cobrada no revive con un sondeo que salió antes", () => {
+  const mesa = (id: string): ParkedOrder => ({
+    id,
+    name: "Mesa 1",
+    savedAt: 1,
+    cart: { v: 1, savedAt: 1, lines: [] } as unknown as PersistedCart,
+    updatedAt: "2026-11-05T10:00:00Z",
+    owedSince: null,
+    owedContact: null,
+  })
+
+  it("la marca confirmada se queda mientras el sondeo sea de antes de confirmar", () => {
+    const marcas = [{ id: "a", desde: 100, confirmada: 200 }]
+    // Sondeo enviado a las 150 (antes de que el servidor confirmara a las 200): la cuenta sigue escondida.
+    expect(borradasTrasSondeo(marcas, 150)).toEqual(marcas)
+    expect(sinBorradas([mesa("a"), mesa("b")], borradasTrasSondeo(marcas, 150)).map((o) => o.id)).toEqual(["b"])
+    // Sondeo enviado a las 250: ya leyó la base sin ella; la marca se olvida.
+    expect(borradasTrasSondeo(marcas, 250)).toEqual([])
+  })
+
+  it("una marca sin confirmar no se olvida con ningún sondeo", () => {
+    expect(borradasTrasSondeo([{ id: "a", desde: 100 }], 9_999)).toEqual([{ id: "a", desde: 100 }])
+  })
+
+  it("una cuenta recién guardada no desaparece con un sondeo que salió antes de guardarla", () => {
+    const local = [mesa("nueva"), mesa("vieja")]
+    const recientes = new Map([["nueva", 200]])
+    const delSondeo = [mesa("vieja")] // salió a las 150: aún no la conocía
+    expect(conservarRecientes(delSondeo, local, recientes, 150).map((o) => o.id)).toEqual(["nueva", "vieja"])
+    // Un sondeo que salió después y no la trae sí manda: la cobraron en otro aparato.
+    expect(conservarRecientes(delSondeo, local, recientes, 250).map((o) => o.id)).toEqual(["vieja"])
+  })
+
+  it("no la muestra dos veces si el sondeo sí la trae", () => {
+    const recientes = new Map([["nueva", 200]])
+    expect(conservarRecientes([mesa("nueva")], [mesa("nueva")], recientes, 150).map((o) => o.id)).toEqual(["nueva"])
+  })
+
+  it("una cuenta guardada sin señal es la misma antes y después de subir", () => {
+    expect(mismaCuenta("local-abc", "abc")).toBe(true)
+    expect(mismaCuenta("abc", "local-abc")).toBe(true)
+    expect(mismaCuenta("abc", "abc")).toBe(true)
+    expect(mismaCuenta("abc", "xyz")).toBe(false)
+    expect(mismaCuenta(null, "abc")).toBe(false)
+    expect(mismaCuenta(undefined, undefined)).toBe(false)
   })
 })

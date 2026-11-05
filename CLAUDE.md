@@ -83,8 +83,12 @@ idéntico es falso y se reintenta; uno real guarda la ronda aparte como
 mixto a propósito). Sin señal: una cuenta nueva vive en el aparato como
 `local-<uuid>` y se sube con ESE uuid (repetible: si la respuesta se perdió no
 se duplica); una cuenta borrada o cobrada queda anotada como borrada hasta que
-el servidor confirme, y el sondeo la esconde mientras tanto (antes revivía y se
-podía cobrar dos veces). Ambas listas en localStorage
+el servidor confirme Y conteste un sondeo enviado DESPUÉS de esa confirmación
+(`borradasTrasSondeo`), y el sondeo la esconde mientras tanto (antes revivía y
+se podía cobrar dos veces). Lo mismo al revés: una recién confirmada no se
+pierde con un sondeo que salió antes (`conservarRecientes`). Y la cuenta
+abierta en el carrito se compara con `mismaCuenta` (`local-<uuid>` y `<uuid>`
+son la misma). Ambas listas en localStorage
 (`pos-cuentas-pendientes:` / `pos-cuentas-borradas:`).
 
 **Módulos por cafetería** (`businesses.settings`, saneado en `lib/settings.ts`):
@@ -441,6 +445,11 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   sondeo se RECONCILIA por versión (`reconciliarLista`), nunca se aplica a
   ciegas; y un choque cuyo contenido en el servidor es idéntico al local es un
   choque FALSO que se reintenta con el sello del servidor (`mismoCarrito`).
+  Y desde que el sondeo va por `fetch` (#89) ya NO hace fila detrás del cobro:
+  una respuesta que salió antes de cobrar puede llegar después. Lo que el
+  servidor confirmó (un borrado, una cuenta nueva) se respeta hasta que conteste
+  un sondeo enviado después de la confirmación (#101; se reproduce reteniendo la
+  respuesta de `/pos/datos/cuentas` por CDP).
 - **Una server action dentro de `startTransition(async …)` que rechaza (sin
   señal, deploy a medias) tumba la pantalla ENTERA al error boundary**: React 19
   trata ese rechazo como error de render. En el POS eso es quedarse sin caja a
@@ -491,7 +500,7 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-11-04 y pendientes
 
-- Producción = `main` hasta el PR #100; migraciones aplicadas hasta la **61**
+- Producción = `main` hasta el PR #101; migraciones aplicadas hasta la **61**
   (`p47_invitaciones`). Lo último, de la revisión general del 2026-11-04: el token
   renovado no viaja como cookie de la acción (#85), una cafetería no puede
   cambiarle el correo a una cuenta ajena (#86), cuentas y cola sin señal

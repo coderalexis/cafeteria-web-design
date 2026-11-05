@@ -71,7 +71,12 @@ export function puedeSalirConCola(businessId: string | undefined): boolean {
  * que la esquina «quedan 3» del POS no se quede vieja después de una racha
  * sin internet. Va por ref: cambiar el callback no reinicia el trabajador.
  */
-export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioExistencia[]) => void) {
+export function useOfflineQueue(
+  businessId: string,
+  onStock?: (cambios: CambioExistencia[]) => void,
+  /** Una venta de la cola ya subió con este total: «Vendido hoy» la suma. */
+  onSubida?: (total: number) => void,
+) {
   const [state, setState] = useState<QueueState>(() => readQueue(null))
   const [subiendo, setSubiendo] = useState<{ hecho: number; total: number } | null>(null)
   const [hidratada, setHidratada] = useState(false)
@@ -86,6 +91,8 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
   estadoRef.current = state
   const onStockRef = useRef(onStock)
   onStockRef.current = onStock
+  const onSubidaRef = useRef(onSubida)
+  onSubidaRef.current = onSubida
 
   const key = queueKey(businessId)
 
@@ -191,6 +198,9 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
           actualizar((q) => markUploaded(q, venta.clientRef, r.folio, r.total))
           setAtorada(null)
           onStockRef.current?.(r.stock)
+          // Antes la sumaba la página al revalidarse; desde que el POS no se
+          // revalida en cada cobro (#89), lo hace quien la subió.
+          onSubidaRef.current?.(r.total)
           // Que quede cuánto esperó: una racha de ventas que subieron tarde es
           // un día de mala señal, y se ve en el correo de la mañana.
           const minutos = Math.round((Date.now() - venta.capturedAt) / 60_000)
