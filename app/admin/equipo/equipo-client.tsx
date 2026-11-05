@@ -40,6 +40,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /* ────────────────────────────────────────────────────── Types */
 
@@ -136,7 +137,7 @@ export default function EquipoClient({ members }: Props) {
   }
 
   function run(fn: () => Promise<{ error?: string; success?: boolean }>, okMessage: string, close = true) {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await fn()
       if (result.error) {
         toast.error(result.error)
@@ -145,7 +146,7 @@ export default function EquipoClient({ members }: Props) {
       toast.success(okMessage)
       if (close) setSheetOpen(false)
       router.refresh()
-    })
+    }))
   }
 
   function handleCreateCafe(formData: FormData) {
@@ -154,7 +155,7 @@ export default function EquipoClient({ members }: Props) {
 
   function handleAddByEmail(formData: FormData) {
     const email = String(formData.get("email") ?? "")
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await addMemberByEmail(formData)
       if (!result.success) {
         toast.error(result.error)
@@ -167,7 +168,7 @@ export default function EquipoClient({ members }: Props) {
       } else {
         toast.success("Persona agregada al equipo")
       }
-    })
+    }))
   }
 
   function handleUpdate(formData: FormData) {

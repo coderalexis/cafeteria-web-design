@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 export function LealtadClient({
   customers,
@@ -33,7 +34,7 @@ export function LealtadClient({
   function aplicarAjuste() {
     if (!ajustando) return
     const n = Number(delta)
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await adjustLoyalty({
         customerId: ajustando.id,
         delta: n,
@@ -49,7 +50,7 @@ export function LealtadClient({
       setDelta("1")
       setReason("")
       router.refresh()
-    })
+    }))
   }
 
   return (

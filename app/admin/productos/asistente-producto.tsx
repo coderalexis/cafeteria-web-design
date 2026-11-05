@@ -25,6 +25,7 @@ import {
   type PreguntaNueva,
 } from "@/lib/producto-guiado"
 import type { ModifierGroupOption } from "./productos-client"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /**
  * «Nuevo producto», de la mano.
@@ -89,7 +90,8 @@ export function AsistenteProducto({
         return
       }
     }
-    startTransition(async () => {
+    // Si la llamada ni llegó, se dice en el mismo aviso que el resto del asistente.
+    startTransition(sinTumbar(async () => {
       const r = await createProductGuided(armarPayload(e))
       if ("error" in r) {
         setAviso(r.error)
@@ -98,7 +100,7 @@ export function AsistenteProducto({
       toast.success(`«${e.nombre.trim()}» ya está en el POS.`)
       router.refresh()
       onClose()
-    })
+    }, setAviso))
   }
 
   // ── Preguntas nuevas: ayudas de edición ──

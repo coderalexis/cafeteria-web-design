@@ -39,6 +39,7 @@ import { LogoCard } from "./logo-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 const OTHER = "__other__"
 
@@ -106,7 +107,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
 
   function handleSubmit(formData: FormData) {
     formData.set("timezone", timezone)
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await updateBusinessSettings(formData)
       if (result?.error) {
         toast.error(result.error)
@@ -114,7 +115,7 @@ export default function NegocioClient({ business }: { business: BusinessInfo }) 
       }
       toast.success("Ajustes guardados")
       router.refresh()
-    })
+    }))
   }
 
   return (

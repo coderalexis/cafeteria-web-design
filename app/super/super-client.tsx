@@ -41,6 +41,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 interface Props {
   businesses: PlatformBusiness[]
@@ -85,7 +86,7 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
   const nuevas = real.filter(esNueva).length
 
   function run(fn: () => Promise<{ error?: string; success?: boolean }>, ok: string) {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await fn()
       if (result.error) {
         toast.error(result.error)
@@ -93,13 +94,13 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
       }
       toast.success(ok)
       router.refresh()
-    })
+    }))
   }
 
   function handleCreate(formData: FormData) {
     const email = String(formData.get("owner_email") ?? "")
     const bizName = String(formData.get("name") ?? "")
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await createBusiness(formData)
       if (!result.success) {
         toast.error(result.error)
@@ -118,7 +119,7 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
       if (result.ownerCreated && result.tempPassword) {
         setCredentials({ email, password: result.tempPassword, business: bizName })
       }
-    })
+    }))
   }
 
   function fd(pairs: Record<string, string>) {
@@ -212,7 +213,7 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
               disabled={isPending}
               className="gap-1.5"
               onClick={() =>
-                startTransition(async () => {
+                startTransition(sinTumbar(async () => {
                   const result = await enterBusiness(fd({ business_id: b.id }))
                   if (!result.success) {
                     toast.error(result.error)
@@ -220,7 +221,7 @@ export default function SuperClient({ businesses, loadError, memberOf }: Props) 
                   }
                   router.push(result.redirectTo)
                   router.refresh()
-                })
+                }))
               }
             >
               <LogIn className="h-4 w-4" />

@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import type { ResultadoPromos } from "./page"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 type Borrador = Partial<Promocion>
 
@@ -52,7 +53,7 @@ export function PromocionesClient({
   const conVentas = new Map((resultado?.by_promotion ?? []).map((r) => [r.id, r]))
 
   function guardar(datos: Borrador) {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const r = await savePromotion({
         id: datos.id,
         name: datos.name ?? "",
@@ -72,7 +73,7 @@ export function PromocionesClient({
       setEditando(null)
       toast.success(datos.id ? "Promoción actualizada." : `«${datos.name}» ya está corriendo.`)
       router.refresh()
-    })
+    }))
   }
 
   return (
@@ -141,14 +142,14 @@ export function PromocionesClient({
                       disabled={isPending}
                       aria-label={p.isActive ? `Apagar ${p.name}` : `Encender ${p.name}`}
                       onCheckedChange={(v) =>
-                        startTransition(async () => {
+                        startTransition(sinTumbar(async () => {
                           const res = await togglePromotion(p.id, v)
                           if (!res.success) {
                             toast.error(res.error)
                             return
                           }
                           router.refresh()
-                        })
+                        }))
                       }
                     />
                     <Button variant="ghost" size="icon" onClick={() => setEditando(p)} aria-label={`Editar ${p.name}`}>
@@ -159,7 +160,7 @@ export function PromocionesClient({
                       size="icon"
                       aria-label={`Borrar ${p.name}`}
                       onClick={() =>
-                        startTransition(async () => {
+                        startTransition(sinTumbar(async () => {
                           const res = await deletePromotion(p.id)
                           if (!res.success) {
                             toast.error(res.error)
@@ -167,7 +168,7 @@ export function PromocionesClient({
                           }
                           toast.success("Promoción borrada.")
                           router.refresh()
-                        })
+                        }))
                       }
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
