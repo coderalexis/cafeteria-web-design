@@ -5,8 +5,21 @@ import { toast } from "sonner"
 import { serializeCart, type CartState } from "./cart"
 // (serializeCart se usa en `park`; `update` ya recibe el carrito serializado)
 import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
-import { PARKED_MAX, mismoCarrito, reconciliarLista, type ParkedOrder } from "./parked"
-import { BUILD_ID, esErrorDeVersion, hayVersionNueva } from "@/lib/version"
+import {
+  PARKED_MAX,
+  borradasVigentes,
+  esProvisional,
+  idDeServidor,
+  idProvisional,
+  leerBorradas,
+  leerPendientes,
+  mismoCarrito,
+  reconciliarLista,
+  sinBorradas,
+  type CuentaBorrada,
+  type ParkedOrder,
+} from "./parked"
+import { BUILD_ID, esErrorDeVersion, hayVersionNueva, mensajeDeFallo } from "@/lib/version"
 import { reportClientError } from "@/app/actions/errors"
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. */
@@ -53,6 +66,92 @@ export function useParkedOrders(businessId: string) {
     setOrders(next)
   }, [])
 
+  /*
+   * Sin señal. Dos listas que viven también en el aparato, para sobrevivir a
+   * una recarga o a que iOS cierre la app: las cuentas guardadas que todavía
+   * no llegan al servidor, y las borradas (casi siempre: cobradas) cuyo
+   * borrado quizá no llegó. Se ponen al día tras cada sondeo que contesta.
+   */
+  const pendientes = useRef<ParkedOrder[]>([])
+  const borradas = useRef<CuentaBorrada[]>([])
+  const sincronizando = useRef(false)
+  /** A qué pendientes ya se les avisó que el servidor no las acepta (un aviso, no uno por sondeo). */
+  const avisadas = useRef(new Set<string>())
+  const claveP = `pos-cuentas-pendientes:${businessId}`
+  const claveB = `pos-cuentas-borradas:${businessId}`
+
+  const persistir = useCallback(() => {
+    try {
+      window.localStorage.setItem(claveP, JSON.stringify(pendientes.current))
+      window.localStorage.setItem(claveB, JSON.stringify(borradas.current))
+    } catch {
+      // Sin almacenamiento (modo privado, sin espacio): sigue en memoria.
+    }
+  }, [claveP, claveB])
+
+  // Antes que el primer sondeo (los efectos corren en orden): lo que quedó en
+  // el aparato de la última vez, a la vista desde el principio.
+  useEffect(() => {
+    try {
+      pendientes.current = leerPendientes(window.localStorage.getItem(claveP))
+      borradas.current = borradasVigentes(leerBorradas(window.localStorage.getItem(claveB)), Date.now())
+    } catch {
+      pendientes.current = []
+      borradas.current = []
+    }
+    if (pendientes.current.length > 0) {
+      aplicar([...pendientes.current, ...ref.current.filter((o) => !esProvisional(o.id))])
+    }
+  }, [claveP, claveB, aplicar])
+
+  /** La provisional ya llegó: desde ahora se usa su id de servidor y su sello. */
+  const confirmar = useCallback(
+    (provisionalId: string, id: string, updatedAt: string) => {
+      aplicar(ref.current.map((o) => (o.id === provisionalId ? { ...o, id, updatedAt } : o)))
+    },
+    [aplicar],
+  )
+
+  /**
+   * Borra en el servidor lo que aquí ya se borró y sube lo que se guardó sin
+   * señal. En orden y de uno en uno: si la señal se vuelve a caer a la mitad,
+   * lo que falta espera al siguiente sondeo.
+   */
+  const sincronizar = useCallback(async () => {
+    if (sincronizando.current) return
+    if (borradas.current.length === 0 && pendientes.current.length === 0) return
+    sincronizando.current = true
+    try {
+      for (const b of [...borradas.current]) {
+        try {
+          const r = await removeParked(b.id)
+          // Solo con éxito se olvida: si el servidor dijo que no, la cuenta
+          // sigue escondida aquí (este aparato ya la cobró) y se reintenta.
+          if (r?.success) borradas.current = borradas.current.filter((x) => x.id !== b.id)
+        } catch {
+          return // sin señal otra vez
+        }
+      }
+      for (const p of [...pendientes.current]) {
+        try {
+          const r = await parkOrder({ id: idDeServidor(p.id), name: p.name, cart: p.cart })
+          if (r?.success) {
+            pendientes.current = pendientes.current.filter((x) => x.id !== p.id)
+            confirmar(p.id, r.id, r.updatedAt)
+          } else if (!avisadas.current.has(p.id)) {
+            avisadas.current.add(p.id)
+            toast.error(`La cuenta «${p.name}» no se pudo subir: ${r?.error ?? "error desconocido"}. Sigue en este aparato.`)
+          }
+        } catch {
+          return
+        }
+      }
+    } finally {
+      sincronizando.current = false
+      persistir()
+    }
+  }, [confirmar, persistir])
+
   const refrescar = useCallback(async () => {
     // Un sondeo que no contesta (señal a medias) no puede bloquear a los que
     // siguen para siempre: pasado un rato se deja pasar al siguiente, y si el
@@ -76,7 +175,7 @@ export function useParkedOrders(businessId: string) {
         // Más reciente primero: es el que más probablemente se retoma. Y
         // reconciliado con lo que este aparato ya sabe: una respuesta que llega
         // tarde no puede regresar el sello de una cuenta recién guardada.
-        const servidor = r.orders
+        const todas: ParkedOrder[] = r.orders
           .map((o) => ({
             id: o.id,
             name: o.name,
@@ -87,8 +186,16 @@ export function useParkedOrders(businessId: string) {
             owedContact: o.owedContact,
           }))
           .reverse()
-        aplicar(reconciliarLista(ref.current, servidor))
+        // Pendientes que en realidad sí llegaron (se perdió la respuesta).
+        const ids = new Set(todas.map((o) => o.id))
+        const antes = pendientes.current.length
+        pendientes.current = pendientes.current.filter((p) => !ids.has(idDeServidor(p.id)))
+        if (pendientes.current.length !== antes) persistir()
+        // Lo que este aparato ya borró no vuelve, aunque el servidor aún no se entere.
+        aplicar(reconciliarLista(ref.current, sinBorradas(todas, borradas.current)))
         setListo(true)
+        // Contestó: hay señal, buen momento para lo que quedó pendiente.
+        void sincronizar()
       }
     } catch (e) {
       // Tras un deploy que rotó la sal de las acciones, el servidor ya no
@@ -98,7 +205,7 @@ export function useParkedOrders(businessId: string) {
     } finally {
       cargando.current = false
     }
-  }, [aplicar])
+  }, [aplicar, persistir, sincronizar])
 
   /**
    * Rescate por única vez de los pedidos que quedaron en el navegador.
@@ -184,8 +291,9 @@ export function useParkedOrders(businessId: string) {
     (state: CartState, name: string): boolean => {
       if (ref.current.length >= PARKED_MAX) return false
 
+      const uuid = crypto.randomUUID()
       const provisional: ParkedOrder = {
-        id: `local-${crypto.randomUUID()}`,
+        id: idProvisional(uuid),
         name: name.trim().slice(0, 40),
         savedAt: Date.now(),
         cart: serializeCart(state, Date.now()),
@@ -195,15 +303,23 @@ export function useParkedOrders(businessId: string) {
       }
       aplicar([provisional, ...ref.current])
       ;(async () => {
-        const r = await parkOrder({ name: provisional.name, cart: provisional.cart })
+        let r: Awaited<ReturnType<typeof parkOrder>>
+        try {
+          r = await parkOrder({ id: uuid, name: provisional.name, cart: provisional.cart })
+        } catch {
+          // Sin señal (o un deploy a medias). Antes la cuenta se quedaba solo
+          // en memoria: parecía guardada y una recarga se la llevaba. Ahora
+          // vive en el aparato y se sube sola con el mismo uuid, así que si sí
+          // había llegado no se duplica.
+          pendientes.current = [...pendientes.current, provisional]
+          persistir()
+          toast.warning(`Sin conexión: «${provisional.name}» quedó guardada en este aparato y se sube sola al volver la señal.`)
+          return
+        }
         if (r?.success) {
           // Le ponemos el id de verdad: con el provisional, descartarla después
           // no borraría nada en el servidor y la cuenta reaparecería sola.
-          aplicar(
-            ref.current.map((o) =>
-              o.id === provisional.id ? { ...o, id: r.id, updatedAt: r.updatedAt } : o,
-            ),
-          )
+          confirmar(provisional.id, r.id, r.updatedAt)
           return
         }
         aplicar(ref.current.filter((o) => o.id !== provisional.id))
@@ -211,7 +327,7 @@ export function useParkedOrders(businessId: string) {
       })()
       return true
     },
-    [aplicar],
+    [aplicar, confirmar, persistir],
   )
 
   /**
@@ -232,7 +348,27 @@ export function useParkedOrders(businessId: string) {
       /** Al chocar: lo que sí está en el servidor (null si la cuenta ya no existe). */
       current: { cart: ParkedOrder["cart"]; updatedAt: string } | null
     } | null> => {
-      let r = await updateParked({ id, cart, expectedUpdatedAt })
+      // Guardada sin señal y todavía sin subir: la ronda se suma ahí mismo y
+      // viaja junto con la cuenta cuando vuelva la señal.
+      if (pendientes.current.some((p) => p.id === id)) {
+        pendientes.current = pendientes.current.map((p) => (p.id === id ? { ...p, cart } : p))
+        persistir()
+        aplicar(ref.current.map((o) => (o.id === id ? { ...o, cart } : o)))
+        return { saved: true, updatedAt: "", current: null }
+      }
+      // Una provisional que ya subió: quien la tiene abierta guarda el id viejo.
+      if (esProvisional(id)) {
+        id = idDeServidor(id)
+        if (!expectedUpdatedAt) expectedUpdatedAt = ref.current.find((o) => o.id === id)?.updatedAt ?? ""
+      }
+      let r: Awaited<ReturnType<typeof updateParked>>
+      try {
+        r = await updateParked({ id, cart, expectedUpdatedAt })
+      } catch (e) {
+        // Sin señal: el carrito se queda donde está (quien llama no lo toca con null).
+        toast.error(mensajeDeFallo(e))
+        return null
+      }
       if (!r?.success) {
         toast.error(r?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
         return null
@@ -245,7 +381,13 @@ export function useParkedOrders(businessId: string) {
       if (!r.saved && r.current) {
         const mia = ref.current.find((o) => o.id === id)
         if (mia && mismoCarrito(mia.cart, r.current.cart)) {
-          const otra = await updateParked({ id, cart, expectedUpdatedAt: r.current.updatedAt })
+          let otra: Awaited<ReturnType<typeof updateParked>>
+          try {
+            otra = await updateParked({ id, cart, expectedUpdatedAt: r.current.updatedAt })
+          } catch (e) {
+            toast.error(mensajeDeFallo(e))
+            return null
+          }
           if (!otra?.success) {
             toast.error(otra?.error ?? "No se pudo guardar la cuenta. Vuelve a intentar.")
             return null
@@ -274,22 +416,39 @@ export function useParkedOrders(businessId: string) {
         current: r.current ? { cart: r.current.cart as ParkedOrder["cart"], updatedAt: r.current.updatedAt } : null,
       }
     },
-    [aplicar, refrescar],
+    [aplicar, refrescar, persistir],
   )
 
+  /**
+   * Quita una cuenta (casi siempre porque se acaba de cobrar).
+   *
+   * Queda anotada como borrada HASTA que el servidor confirme. Antes, si no
+   * había señal, el borrado fallaba en silencio y el siguiente sondeo traía
+   * la cuenta de regreso, cobrable otra vez. También se anota la provisional
+   * (por su uuid): si su guardado sí llegó, el servidor la tiene.
+   */
   const remove = useCallback(
     (id: string) => {
-      aplicar(ref.current.filter((o) => o.id !== id))
-      if (id.startsWith("local-")) return // nunca llegó al servidor
+      const real = idDeServidor(id)
+      aplicar(ref.current.filter((o) => o.id !== id && o.id !== real))
+      pendientes.current = pendientes.current.filter((p) => p.id !== id)
+      borradas.current = [...borradas.current.filter((b) => b.id !== real), { id: real, desde: Date.now() }]
+      persistir()
       void (async () => {
-        const r = await removeParked(id)
-        if (r?.error) {
-          toast.error(r.error)
-          void refrescar() // la verdad la tiene el servidor
+        try {
+          const r = await removeParked(real)
+          if (r?.success) {
+            borradas.current = borradas.current.filter((b) => b.id !== real)
+            persistir()
+          } else if (r?.error) {
+            toast.error(r.error)
+          }
+        } catch {
+          // Sin señal: sigue anotada y se reintenta tras el próximo sondeo que conteste.
         }
       })()
     },
-    [aplicar, refrescar],
+    [aplicar, persistir],
   )
 
   /**
@@ -298,14 +457,25 @@ export function useParkedOrders(businessId: string) {
    */
   const fiar = useCallback(
     async (id: string, contact: string | undefined): Promise<boolean> => {
-      const r = await markOwed({ id, contact })
+      if (pendientes.current.some((p) => p.id === id)) {
+        toast.error("Esta cuenta se guardó sin señal y todavía no sube. Márcala como fiado cuando vuelva la conexión.")
+        return false
+      }
+      const real = idDeServidor(id)
+      let r: Awaited<ReturnType<typeof markOwed>>
+      try {
+        r = await markOwed({ id: real, contact })
+      } catch (e) {
+        toast.error(mensajeDeFallo(e))
+        return false
+      }
       if (!r?.success) {
         toast.error(r?.error ?? "No se pudo marcar como fiado.")
         return false
       }
       aplicar(
         ref.current.map((o) =>
-          o.id === id ? { ...o, owedSince: r.owedSince, owedContact: contact ?? null } : o,
+          o.id === id || o.id === real ? { ...o, owedSince: r.owedSince, owedContact: contact ?? null } : o,
         ),
       )
       return true

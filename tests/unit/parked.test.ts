@@ -18,6 +18,14 @@ import {
   waitingLabel,
   repartirCuenta,
   cambiosPendientes,
+  BORRADA_VIGENCIA_MS,
+  borradasVigentes,
+  esProvisional,
+  idDeServidor,
+  idProvisional,
+  leerBorradas,
+  leerPendientes,
+  sinBorradas,
 } from "@/app/pos/parked"
 
 const MIN = 60_000
@@ -461,6 +469,45 @@ describe("reconciliarLista", () => {
     const local = [cuenta("local-x", ""), cuenta("borrada-alla", "2026-09-14T15:00:00+00:00")]
     const servidor = [cuenta("b", "2026-09-14T15:10:00+00:00")]
     expect(reconciliarLista(local, servidor).map((o) => o.id)).toEqual(["local-x", "b"])
+  })
+
+  it("una provisional cuyo uuid ya trae el servidor no se muestra dos veces", () => {
+    // Se guardó sin señal… pero sí había llegado: se perdió la respuesta.
+    const local = [cuenta(idProvisional("u-1"), "", "mesa"), cuenta(idProvisional("u-2"), "")]
+    const servidor = [cuenta("u-1", "2026-11-04T19:00:00+00:00", "mesa")]
+    expect(reconciliarLista(local, servidor).map((o) => o.id)).toEqual([idProvisional("u-2"), "u-1"])
+  })
+
+  describe("sin señal", () => {
+    it("lo que este aparato ya borró (cobró) no vuelve con el sondeo", () => {
+      // Cobrada sin red: la venta fue a la cola y el borrado no llegó. Antes el
+      // siguiente sondeo la traía de regreso, cobrable otra vez.
+      const servidor = [cuenta("cobrada", "s1"), cuenta("otra", "s2")]
+      expect(sinBorradas(servidor, [{ id: "cobrada", desde: 0 }]).map((o) => o.id)).toEqual(["otra"])
+      expect(sinBorradas(servidor, [])).toBe(servidor)
+    })
+
+    it("un borrado anotado se olvida cuando la cuenta ya habría caducado en el servidor", () => {
+      const ahora = 10 * BORRADA_VIGENCIA_MS
+      const lista = [{ id: "vieja", desde: ahora - BORRADA_VIGENCIA_MS - 1 }, { id: "nueva", desde: ahora - HORA }]
+      expect(borradasVigentes(lista, ahora).map((b) => b.id)).toEqual(["nueva"])
+    })
+
+    it("el id provisional lleva el mismo uuid que viaja al servidor", () => {
+      expect(idDeServidor(idProvisional("abc"))).toBe("abc")
+      expect(idDeServidor("abc")).toBe("abc")
+      expect(esProvisional(idProvisional("abc"))).toBe(true)
+      expect(esProvisional("abc")).toBe(false)
+    })
+
+    it("lo guardado en el aparato se lee sin confiar en ello", () => {
+      expect(leerBorradas(null)).toEqual([])
+      expect(leerBorradas("{roto")).toEqual([])
+      expect(leerBorradas(JSON.stringify([{ id: "a", desde: 5 }, { id: 3 }, null, { id: "b" }]))).toEqual([{ id: "a", desde: 5 }])
+      const buena = cuenta(idProvisional("u"), "")
+      const deServidor = cuenta("u", "s")
+      expect(leerPendientes(JSON.stringify([buena, deServidor, { id: "local-x" }]))).toEqual([buena])
+    })
   })
 
   it("mismoCarrito compara por contenido, sin importar el orden de las llaves ni savedAt", () => {

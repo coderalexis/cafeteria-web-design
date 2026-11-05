@@ -496,6 +496,12 @@ export function AyudaClient({ ticket, corte }: Props) {
               momento de recuperar la señal (mover la tablet, prender el celular como módem).
             </li>
             <li>
+              <strong>Las cuentas abiertas también aguantan sin señal.</strong> Una cuenta que abres sin conexión se
+              queda guardada en el aparato y se sube sola al volver la señal; y una que cobras o eliminas sin
+              conexión ya no reaparece cuando vuelve: el aparato recuerda que ya no existe hasta que el servidor se
+              entera.
+            </li>
+            <li>
               <strong>Lo que NO se puede sin internet</strong>: abrir o cerrar la caja, cancelar una venta, canjear un
               premio de lealtad, ni entrar al panel de administración. Y si <em>cierras la app</em> sin señal, no se
               podrá abrir de nuevo hasta que vuelva (las ventas ya guardadas no se pierden: siguen ahí esperando).

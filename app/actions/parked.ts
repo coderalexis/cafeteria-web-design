@@ -105,6 +105,12 @@ export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[
 }
 
 const guardarSchema = z.object({
+  /**
+   * El uuid que el aparato ya le puso a la cuenta. Hace el guardado
+   * repetible: si la señal se cayó después de que la cuenta llegó, el
+   * reintento la reconoce en vez de abrir otra igual.
+   */
+  id: z.string().uuid().optional(),
   name: z.string().trim().max(40),
   cart: z.unknown(),
 })
@@ -123,6 +129,7 @@ export async function parkOrder(
   const { data, error } = await supabase
     .from("parked_orders")
     .insert({
+      ...(parsed.data.id ? { id: parsed.data.id } : {}),
       name: parsed.data.name,
       cart: parsed.data.cart as never,
       created_by: ctx.userId,
@@ -130,6 +137,16 @@ export async function parkOrder(
     .select("id, created_at, updated_at")
     .single()
 
+  // Ya existía con ese id: es un reintento de un guardado que sí llegó. Se
+  // devuelve la que está (RLS: un id de otro café no se encuentra y queda en error).
+  if (error?.code === "23505" && parsed.data.id) {
+    const { data: ya } = await supabase
+      .from("parked_orders")
+      .select("id, created_at, updated_at")
+      .eq("id", parsed.data.id)
+      .maybeSingle()
+    if (ya) return { success: true, id: ya.id, savedAt: new Date(ya.created_at).getTime(), updatedAt: ya.updated_at }
+  }
   if (error) return { error: dbErrorMessage(error) }
   return {
     success: true,
