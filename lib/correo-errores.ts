@@ -2,6 +2,8 @@ import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { escapeHtml, sendWithResend } from "@/lib/email"
+import { reservarEnvio } from "@/lib/cron"
+import { dateStringInTz } from "@/lib/dates"
 
 /*
  * Vivía en app/actions/errors.ts, un archivo «use server»: todo lo que exporta
@@ -47,6 +49,10 @@ export async function sendErrorDigest(options: { dryRun: boolean }): Promise<{
   if (!destino || !apiKey) return { sent: false, count: filas.length, error: "Falta OPERATOR_EMAIL o RESEND_API_KEY." }
   if (options.dryRun) return { sent: false, count: filas.length }
 
+  // Un correo por día (de CDMX, donde vive el operador), aunque el cron corra dos veces.
+  const reserva = await reservarEnvio("correo-errores", dateStringInTz("America/Mexico_City", new Date()))
+  if (!reserva.primera) return { sent: false, count: filas.length, error: "Ya se mandó el de hoy." }
+
   const text = lista.map((g) => `${g.n}× · ${g.biz} · ${g.route}\n   ${g.message}`).join("\n\n")
   const html = `<p>Errores y avisos de las últimas 24 horas en Cafecito POS (${filas.length} en total, ${lista.length} distintos):</p>
 <table style="border-collapse:collapse;font:14px system-ui">
@@ -68,5 +74,9 @@ ${lista
     html,
     text,
   })
-  return fallo ? { sent: false, count: filas.length, error: fallo } : { sent: true, count: filas.length }
+  if (fallo) {
+    await reserva.liberar()
+    return { sent: false, count: filas.length, error: fallo }
+  }
+  return { sent: true, count: filas.length }
 }
