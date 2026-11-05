@@ -10,26 +10,16 @@ import {
 import { formatCurrency, paymentLabel, formatDate } from "@/lib/format"
 import { accountChips, DEFAULT_SETTINGS } from "@/lib/settings"
 import { type AccountData } from "@/lib/receipt"
-import { LazyMotion, m } from "framer-motion"
+import { LazyMotion } from "framer-motion"
 import cargarAnimaciones from "./motion-features"
-import {
-  Coffee,
-  ShoppingBag,
-  Plus,
-  Search,
-  Lock,
-  ChevronUp,
-  Star, PauseCircle, ChevronRight, RotateCcw, Sparkles } from "lucide-react"
 import { useAppContext } from "@/components/business-provider"
 import { OfflineBanner, PosLockScreen } from "./lock-screen"
 import { PracticeBanner } from "./practice-banner"
 import { RecorridoTarjeta } from "./recorrido-tarjeta"
 import { useRecorrido } from "./use-recorrido"
 import { AprenderDialog } from "./aprender-dialog"
-import { ArranqueCard } from "./arranque-card"
 import { useInstallPrompt } from "./use-install-prompt"
 import { TrialBanner } from "@/components/trial-banner"
-import { colorClasses } from "@/lib/category-colors"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -39,7 +29,6 @@ import { useRouter } from "next/navigation"
 import type { CreditAccount } from "@/app/actions/credit"
 import { CreditAccountsDialog, CreditPickerDialog, type CuentaFiado } from "./credit-dialogs"
 import { CustomItemDialog, type CustomRecent } from "./custom-item-dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -91,7 +80,8 @@ import { QueueReviewDialog } from "./queue-review-dialog"
 import { QUEUE_MAX, serializeLines } from "./queue"
 import { CartPanel } from "./cart-panel"
 import { PosHeader } from "./pos-header"
-import { ProductCard } from "./product-card"
+import { BarraMovil } from "./barra-movil"
+import { RejillaProductos } from "./rejilla-productos"
 import { ReceiptView, type CompletedSale } from "./receipt-view"
 import { FlyLayer, useCartFeedback } from "./use-cart-feedback"
 import { usePromoPreview } from "./use-promo-preview"
@@ -105,7 +95,6 @@ import {
   findVariant,
   rehydrateCart,
   serializeCart,
-  getDisplayPrice,
   getLineLabel,
   getLinePrice,
   needsModifierPrompt,
@@ -116,7 +105,7 @@ import {
   type SizeOption, type PersistedCart, CART_STORAGE_VERSION, customProduct, linesToItems } from "./cart"
 // Re-export de tipos para los componentes hermanos (modifier-sheet, discount-dialog)
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
-import { aplicarCambios, esquinaExistencia, esquinaProducto, porVariante, type CambioExistencia, type ItemExistencia } from "@/lib/existencias"
+import { aplicarCambios, esquinaProducto, porVariante, type CambioExistencia, type ItemExistencia } from "@/lib/existencias"
 import { ExistenciasPosDialog } from "./existencias-dialog"
 import { reportClientError } from "@/app/actions/errors"
 
@@ -1989,142 +1978,32 @@ export default function POSClient({
         />
 
         {/* Product grid */}
-        <ScrollArea ref={gridScrollRef} className="flex-1 min-h-0">
-          <div className={`p-4 space-y-6 ${isMobile ? (cuentasActivas && (openAccount || chipsCuentas.length > 0) ? "pb-40" : "pb-24") : ""}`}>
-            {/* Los dos pasos de una venta, solo la primera vez en un celular. */}
-            <ArranqueCard
-              mostrar={isMobile === true && products.length > 0}
-              tieneFavoritos={favorites.length > 0}
-              onRecorrido={empezarRecorrido}
-              instalar={instalar}
-            />
-            {products.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-stone-400">
-                <Coffee className="h-12 w-12 mb-3 opacity-40" />
-                <p className="text-base font-medium">No hay productos en el menú</p>
-                <p className="text-sm">Agrega productos desde el panel de administración</p>
-              </div>
-            )}
-            {products.length > 0 && filtered.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-stone-400">
-                <Search className="h-10 w-10 mb-3 opacity-40" />
-                <p className="text-sm">Sin resultados para «{searchQuery}»</p>
-                {/* Lo buscado no existe en la carta: se vende fuera de menú con
-                    lo que se escribió, sin volver a teclearlo. */}
-                {customItemsEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => setFueraDeMenu({ open: true, name: searchQuery.trim() })}
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-amber-400 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
-                    data-fuera-buscar
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Vender «{searchQuery.trim()}» fuera de menú
-                  </button>
-                )}
-              </div>
-            )}
-            {/* Más vendidos: un toque para los productos de siempre */}
-            {(favorites.length > 0 || customItemsEnabled) && !searchLower && activeCategory === "todos" && (
-              <div>
-                <h3 className="compacto-si-bajo text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1 flex items-center gap-1.5">
-                  <Star className="h-3.5 w-3.5 text-amber-500" />
-                  Más vendidos
-                </h3>
-                {/* En celular son tiles grandes a dos columnas: en la hora pico
-                    la pantalla útil son estos ocho productos, no la carta entera. */}
-                {/* Dos columnas grandes son lo correcto en un celular. En una
-                    tablet de pie (600 px de ancho) esa misma rejilla ocupaba
-                    202 px donde una fila que envuelve ocupa ~90. */}
-                <div
-                  className={`una-fila-si-bajo ${isMobile ? "grid grid-cols-2 gap-2 min-[500px]:flex min-[500px]:flex-wrap" : "flex flex-wrap gap-2"}`}
-                  data-favoritos
-                >
-                  {favorites.map(({ product, size }) => {
-                    const e = size ? porVarianteMapa[size.variantId] : undefined
-                    const esquina = size ? (e ? esquinaExistencia(e.qty, e.minQty) : null) : esquinaDe(product)
-                    return (
-                    <m.button
-                      key={size?.variantId ?? product.id}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={(e) => {
-                        markFlyOrigin(e)
-                        chooseProduct(product, size)
-                      }}
-                      className={`rounded-xl border border-amber-200 bg-amber-50 text-left hover:border-amber-400 hover:bg-amber-100 transition-colors ${isMobile ? "px-3 py-3" : "px-3 py-2"}`}
-                    >
-                      <span className={`block font-semibold text-stone-800 leading-tight ${isMobile ? "text-base" : "text-sm"}`}>
-                        {product.name}
-                        {size ? <span className="text-stone-500 font-normal"> · {size.label}</span> : null}
-                      </span>
-                      <span className="block text-xs font-bold text-amber-700">
-                        {size ? formatCurrency(size.price) : getDisplayPrice(product)}
-                      </span>
-                      {esquina && (
-                        <span
-                          className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
-                            esquina === "Agotado" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          {esquina}
-                        </span>
-                      )}
-                    </m.button>
-                    )
-                  })}
-                  {/* Lo que no está en la carta, al alcance del pulgar: un
-                      tile más al final de los de siempre. */}
-                  {customItemsEnabled && (
-                    <m.button
-                      key="fuera-de-menu"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setFueraDeMenu({ open: true, name: "" })}
-                      className={`rounded-xl border border-dashed border-amber-400 bg-white text-left hover:bg-amber-50 transition-colors ${isMobile ? "px-3 py-3" : "px-3 py-2"}`}
-                      data-fuera-tile
-                    >
-                      <span className={`flex items-center gap-1.5 font-semibold text-amber-800 leading-tight ${isMobile ? "text-base" : "text-sm"}`}>
-                        <Sparkles className="h-4 w-4 shrink-0" />
-                        Fuera de menú
-                      </span>
-                      <span className="block text-xs text-stone-500">precio al vuelo</span>
-                    </m.button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {Object.entries(grouped).map(([subcategory, items], gi) => (
-              <div key={subcategory}>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-3 px-1">
-                  {subcategory}
-                </h3>
-                {/* Columnas por el ancho REAL del panel, no por el de la ventana.
-                    El mínimo es 9rem tras medirlo: a 7rem entraban 5 columnas en
-                    la tablet pero NO se veía ni un producto más (los títulos de
-                    categoría mandan) y se cortaban 9 nombres en vez de 2. En
-                    pantallas grandes sí caben 6 columnas, donde antes el
-                    grid-cols-4 fijo desperdiciaba el ancho. */}
-                <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(9rem,1fr))]">
-                  {items.map((product, pi) => (
-                    <ProductCard
-                      key={product.id}
-                      marcado={gi === 0 && pi === 0}
-                      product={product}
-                      accent={colorClasses(categoryColor[product.category])?.accent}
-                      subcategory={subcategory}
-                      abierto={sizePickerFor === product.id}
-                      onInfo={setInfoProduct}
-                      onMarcarOrigen={markFlyOrigin}
-                      onElegir={handleProductClick}
-                      onElegirTamano={chooseProduct}
-                      esquina={esquinaDe(product)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+        <RejillaProductos
+          gridScrollRef={gridScrollRef}
+          isMobile={isMobile}
+          cuentasActivas={cuentasActivas}
+          openAccount={openAccount}
+          chipsCuentas={chipsCuentas}
+          products={products}
+          favorites={favorites}
+          filtered={filtered}
+          grouped={grouped}
+          empezarRecorrido={empezarRecorrido}
+          instalar={instalar}
+          searchQuery={searchQuery}
+          searchLower={searchLower}
+          activeCategory={activeCategory}
+          customItemsEnabled={customItemsEnabled}
+          setFueraDeMenu={setFueraDeMenu}
+          porVarianteMapa={porVarianteMapa}
+          esquinaDe={esquinaDe}
+          markFlyOrigin={markFlyOrigin}
+          chooseProduct={chooseProduct}
+          handleProductClick={handleProductClick}
+          sizePickerFor={sizePickerFor}
+          setInfoProduct={setInfoProduct}
+          categoryColor={categoryColor}
+        />
       </div>
 
       {/* ───── RIGHT PANEL (Cart) — escritorio ───── */}
@@ -2139,173 +2018,36 @@ export default function POSClient({
       {/* ───── Barra inferior + hoja del carrito — móvil ───── */}
       {isMobile && (
         <>
-          <m.div
-            animate={barDip}
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
-          >
-            {/* Cuentas abiertas junto al pulgar, siempre a la vista. Tocar el
-                nombre la abre en el carrito; «Cobrar» la cobra directo en
-                efectivo sin tocar el carrito, con un segundo toque de
-                confirmación. En el encabezado se perdían al desplazarse. */}
-            {cuentasActivas && (openAccount || chipsCuentas.length > 0) && (
-              <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-hide" data-cuentas-barra>
-                {openAccount && (
-                  <button
-                    type="button"
-                    onClick={() => setCartOpen(true)}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border border-amber-600 bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white"
-                    title={`«${openAccount.name}» está en el carrito`}
-                  >
-                    <PauseCircle className="h-3.5 w-3.5" />
-                    {openAccount.name}
-                    <span className="opacity-80">· en el carrito</span>
-                  </button>
-                )}
-                {chipsCuentas.map(({ o, total, vieja }) => (
-                  <div
-                    key={o.id}
-                    className={`flex shrink-0 overflow-hidden rounded-full border ${vieja ? "border-amber-400" : "border-stone-200"}`}
-                  >
-                    <button
-                      type="button"
-                      onClick={(e) => void resumeParked(o, e)}
-                      className={`flex items-center gap-1.5 py-1.5 pl-3 pr-2 text-sm font-semibold ${vieja ? "bg-amber-50 text-amber-800" : "bg-white text-stone-700"}`}
-                      title={`Abrir «${o.name}» para agregarle`}
-                    >
-                      <PauseCircle className={`h-3.5 w-3.5 ${vieja ? "text-amber-600" : "text-amber-500"}`} />
-                      {o.name}
-                      <span className={vieja ? "text-amber-700" : "text-stone-400"}>{formatCurrency(total)}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => tocarCobro(o)}
-                      disabled={cobrandoCuenta !== null || !openSession}
-                      aria-label={`Cobrar «${o.name}» en efectivo`}
-                      title={openSession ? `Cobrar «${o.name}» en efectivo` : "Abre la caja para cobrar"}
-                      className={`border-l px-2.5 py-1.5 text-sm font-bold text-white disabled:opacity-40 ${
-                        confirmarCobro === o.id ? "border-green-700 bg-green-700" : "border-green-600 bg-green-600"
-                      }`}
-                    >
-                      {cobrandoCuenta === o.id ? "…" : confirmarCobro === o.id ? `¿${formatCurrency(total)}? Sí` : "Cobrar"}
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setShowTray(true)}
-                  className="shrink-0 rounded-full border border-stone-200 bg-white p-1.5 text-stone-400"
-                  aria-label="Ver todas las cuentas"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-            {lines.length === 0 ? (
-              <div className="flex gap-2">
-                <Button
-                  className="h-12 min-w-0 flex-1 rounded-xl text-base font-bold justify-between px-4 bg-stone-100 text-stone-500 hover:bg-stone-200"
-                  onClick={() => setCartOpen(true)}
-                >
-                  <span className="flex items-center gap-2">
-                    <ShoppingBag className="h-5 w-5" />
-                    Carrito vacío
-                  </span>
-                  <ChevronUp className="h-4 w-4 opacity-70" />
-                </Button>
-                {/* Después de una clase se venden cinco lattes iguales seguidos:
-                    la última venta, de vuelta al carrito en un toque. */}
-                {lastSale && ultimaTotal !== null && (
-                  <Button
-                    variant="outline"
-                    className="h-12 shrink-0 gap-1.5 rounded-xl border-amber-300 px-3 text-base font-bold text-amber-800 hover:bg-amber-50"
-                    onClick={repetirUltimaVenta}
-                    title={`Repetir la última venta (#${lastSale.folio})`}
-                    data-otra-vez
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Otra vez · {formatCurrency(ultimaTotal)}
-                  </Button>
-                )}
-              </div>
-            ) : (
-              /* Con artículos, la barra se parte: ver el carrito a la
-                 izquierda, Cobrar directo a la derecha. La venta común es "2
-                 cosas y ya" — abrir la hoja solo para tocar Cobrar era un
-                 viaje de más. Mismo finalizeSale y mismo color por método que
-                 el botón de la hoja: verde efectivo, violeta transferencia. */
-              <div className="flex gap-2">
-                <Button
-                  ref={barTargetRef}
-                  data-recorrido="carrito-barra"
-                  className="h-12 flex-1 min-w-0 rounded-xl border border-stone-200 bg-white text-base font-bold text-stone-800 hover:bg-stone-50 justify-between px-4"
-                  onClick={() => setCartOpen(true)}
-                >
-                  {lastAdded ? (
-                    <span key={lastAdded.key} className="flex min-w-0 items-center gap-1.5 text-amber-700">
-                      <Plus className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate">{lastAdded.label}</span>
-                      <span className="shrink-0 text-sm">{formatCurrency(lastAdded.price)}</span>
-                    </span>
-                  ) : (
-                    <span className="flex min-w-0 items-center gap-2">
-                      <ShoppingBag className="h-5 w-5 shrink-0" />
-                      <span className="truncate">
-                        {itemCount} artículo{itemCount === 1 ? "" : "s"} · {formatCurrency(total)}
-                      </span>
-                    </span>
-                  )}
-                  <ChevronUp className="h-4 w-4 shrink-0 opacity-70" />
-                </Button>
-                {/* La bifurcación real de una cafetería con mesas: tomado el
-                    pedido, o se cobra o se va a una cuenta. Las dos salidas al
-                    alcance del pulgar, en la misma ranura.
-
-                    Abrir la cuenta obligaba antes a abrir la hoja del carrito
-                    primero — dos toques para algo que pasa una vez por mesa.
-                    Cobrar sigue siendo el botón grande y a la derecha porque
-                    es, de lejos, lo más frecuente: degradarlo para acelerar lo
-                    ocasional saldría carísimo. */}
-                {cuentasActivas && (
-                  <Button
-                    className="h-12 shrink-0 rounded-xl bg-amber-600 px-3 text-base font-bold text-white hover:bg-amber-700"
-                    onClick={() => (openAccount ? void saveToOpenAccount() : setShowPark(true))}
-                    title={
-                      openAccount
-                        ? `Guardar esta ronda en «${openAccount.name}»`
-                        : "Abrir una cuenta con esto para cobrarla al final"
-                    }
-                  >
-                    {openAccount ? "Guardar" : "Cuenta"}
-                  </Button>
-                )}
-                {openSession || practica ? (
-                  <Button
-                    className={`h-12 shrink-0 rounded-xl px-4 text-base font-bold text-white ${
-                      paymentMethod === "efectivo"
-                        ? "bg-green-600 hover:bg-green-700"
-                        : paymentMethod === "transferencia"
-                        ? "bg-violet-600 hover:bg-violet-700"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                    disabled={!canCharge}
-                    onClick={finalizeSale}
-                    title={`Cobrar · ${paymentLabel(paymentMethod)}`}
-                    data-recorrido="cobrar"
-                  >
-                    {isProcessing ? "Procesando…" : `${practica ? "Práctica · " : ""}Cobrar ${formatCurrency(due)}`}
-                  </Button>
-                ) : (
-                  <Button
-                    className="h-12 shrink-0 gap-1.5 rounded-xl bg-red-600 px-4 text-base font-bold text-white hover:bg-red-700"
-                    onClick={() => setShowCashDialog(true)}
-                  >
-                    <Lock className="h-4 w-4" />
-                    Abrir caja
-                  </Button>
-                )}
-              </div>
-            )}
-          </m.div>
+          <BarraMovil
+            barDip={barDip}
+            barTargetRef={barTargetRef}
+            lastAdded={lastAdded}
+            cuentasActivas={cuentasActivas}
+            openAccount={openAccount}
+            chipsCuentas={chipsCuentas}
+            setCartOpen={setCartOpen}
+            resumeParked={resumeParked}
+            tocarCobro={tocarCobro}
+            cobrandoCuenta={cobrandoCuenta}
+            confirmarCobro={confirmarCobro}
+            openSession={openSession}
+            setShowTray={setShowTray}
+            lines={lines}
+            lastSale={lastSale}
+            ultimaTotal={ultimaTotal}
+            repetirUltimaVenta={repetirUltimaVenta}
+            itemCount={itemCount}
+            total={total}
+            due={due}
+            saveToOpenAccount={saveToOpenAccount}
+            setShowPark={setShowPark}
+            practica={practica}
+            paymentMethod={paymentMethod}
+            canCharge={canCharge}
+            finalizeSale={finalizeSale}
+            isProcessing={isProcessing}
+            setShowCashDialog={setShowCashDialog}
+          />
           <Sheet open={cartOpen} onOpenChange={setCartOpen}>
             {/* El hueco de arriba es deliberado y se decidió DOS veces: se
                 probó a pantalla completa y el usuario lo regresó — la rendija
