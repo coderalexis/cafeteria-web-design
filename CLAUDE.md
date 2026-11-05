@@ -476,14 +476,23 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   pone el CI en rojo hasta que `tests/sql/00_supabase_shim.sql` finja ese esquema.
   Ya finge `auth` (users, uid/role/jwt) y `storage` (buckets, objects, foldername).
 
-## Estado al 2026-10-14 y pendientes
+## Estado al 2026-11-04 y pendientes
 
-- Producción = `main` hasta el PR #84 (pedido por voz en dos modos, cajero y
-  ayudante, encendido solo en `cafe-de-prueba`; respaldos de 90 días; el error
-  de versión vieja se reconoce también en iPhone y Firefox); migraciones aplicadas hasta la **59**
-  (`p45_insumos_ajustes`). Inventario Fase 1 vivo (insumos + reventa); cuentas
-  abiertas con reconciliación de sellos; avisos silenciosos en el correo de
-  la mañana; CI con la imagen `postgres-meta` en caché.
+- Producción = `main` hasta el PR #91; migraciones aplicadas hasta la **60**
+  (`p46_operacion`). Lo último, de la revisión general del 2026-11-04: el token
+  renovado no viaja como cookie de la acción (#85), una cafetería no puede
+  cambiarle el correo a una cuenta ajena (#86), cuentas y cola sin señal
+  (#87, #88), un cobro ya no descarga el POS entero (#89), crons con rastro y
+  correo de errores siempre (#90), errores con cubetas y crons sin correos
+  repetidos (#91). Antes: pedido por voz en dos modos (solo `cafe-de-prueba`),
+  respaldos de 90 días, inventario Fase 1, cuentas con reconciliación de
+  sellos, avisos silenciosos en el correo de la mañana.
+- Pendiente de la revisión (en este orden): partir `pos-client.tsx` y quitar
+  duplicados (Resend, zona horaria fija), pruebas de `trialState` y
+  `force_close_cash_session`, los ~25 `startTransition(async` del panel sin
+  try/catch, invitación con aceptación en `addMemberByEmail`, la hora del
+  servidor para la cola (reloj del teléfono adelantado), y cargar bajo demanda
+  la voz y el recibo con QR cuidando que el service worker guarde esos trozos.
 - Siguiente, cuando el usuario lo pida: inventario Fase 2 (conteo en una
   pantalla, «se está acabando» en Resumen y correo semanal, «agotado» en el
   menú público) y Fase 3 (lista de compras, «lo pagué de la caja», mermas en
