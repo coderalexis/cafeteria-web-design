@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { buildTicketLines } from "@/lib/receipt"
 import { TRIAL_DAYS } from "@/lib/signup"
+import { DEFAULT_TIMEZONE } from "@/lib/dates"
 
 /**
  * Página pública de cafecitopos.com para quien todavía no tiene cuenta.
@@ -62,7 +63,7 @@ const TICKET_MUESTRA = buildTicketLines(
   },
   {
     name: "Café de ejemplo",
-    timezone: "America/Mexico_City",
+    timezone: DEFAULT_TIMEZONE,
     address: "Av. Juárez 123, Centro",
     receiptFooter: "¡Gracias por tu visita!",
   },

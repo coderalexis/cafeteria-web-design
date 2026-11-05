@@ -7,7 +7,7 @@ import { runWeeklySummaries, type WeeklySendResult } from "@/lib/weekly-summary"
 import { createClient } from "@/lib/supabase/server"
 import { requireSuperAdmin } from "@/lib/context"
 import { generateTempPassword, isSyntheticEmail, normalizeSlug, slugify, SLUG_PATTERN } from "@/lib/accounts"
-import { isValidTimeZone } from "@/lib/dates"
+import { DEFAULT_TIMEZONE, isValidTimeZone } from "@/lib/dates"
 import { presetByKey } from "@/lib/presets"
 import { serializeBusinessSettings, DEFAULT_SETTINGS } from "@/lib/settings"
 import type { ActionResult } from "./types"
@@ -84,7 +84,7 @@ export async function createBusiness(
   const parsed = createSchema.safeParse({
     name: rawName,
     slug: String(formData.get("slug") ?? "") || slugify(rawName),
-    timezone: String(formData.get("timezone") ?? "America/Mexico_City"),
+    timezone: String(formData.get("timezone") ?? DEFAULT_TIMEZONE),
     cloneTemplate: String(formData.get("clone_template") ?? "") === "on",
     preset: String(formData.get("preset") ?? ""),
     ownerEmail: String(formData.get("owner_email") ?? ""),

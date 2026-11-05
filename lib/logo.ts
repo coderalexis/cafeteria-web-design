@@ -9,8 +9,6 @@
 
 export type RanuraLogo = "menu" | "ticket"
 
-export const RANURAS_LOGO: readonly RanuraLogo[] = ["menu", "ticket"] as const
-
 /** Lo que acepta el bucket; el mismo límite vive en la migración 54. */
 export const LOGO_MAX_BYTES = 1024 * 1024
 export const LOGO_TIPOS: readonly string[] = ["image/png", "image/jpeg", "image/webp"] as const

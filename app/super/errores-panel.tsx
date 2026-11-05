@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react"
 import { getRecentErrors } from "@/app/actions/errors"
 import { ERRORES_DIAS } from "@/lib/errores"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DEFAULT_TIMEZONE } from "@/lib/dates"
 
 /**
  * Lo primero que ve el operador al entrar a /super: qué tronó en los últimos
@@ -45,7 +46,7 @@ export async function ErroresPanel() {
                 <p className="truncate font-medium text-stone-800">{e.message}</p>
                 <p className="text-xs text-stone-500">
                   {e.businessName ?? "sin sesión"} · <code>{e.route}</code> · última{" "}
-                  {new Date(e.lastAt).toLocaleString("es-MX", { timeZone: "America/Mexico_City" })}
+                  {new Date(e.lastAt).toLocaleString("es-MX", { timeZone: DEFAULT_TIMEZONE })}
                   {e.digest && <> · ref {e.digest}</>}
                 </p>
               </div>

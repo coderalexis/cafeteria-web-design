@@ -84,14 +84,6 @@ export const MOTIVOS_MERMA = [
 
 export type MotivoMerma = (typeof MOTIVOS_MERMA)[number]["id"]
 
-export const KIND_LABEL: Record<KindMovimiento, string> = {
-  entrada: "Entrada",
-  venta: "Venta",
-  cancelacion: "Cancelación",
-  merma: "Merma",
-  conteo: "Conteo",
-}
-
 export type EstadoExistencia = "ok" | "bajo" | "agotado" | "negativo"
 
 /**

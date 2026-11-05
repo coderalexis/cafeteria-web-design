@@ -103,7 +103,7 @@ function paymentColor(method: string): string {
   }
 }
 
-function formatDate(dateStr: string, timeZone: string): string {
+function fechaCorta(dateStr: string, timeZone: string): string {
   return new Date(dateStr).toLocaleDateString("es-MX", {
     weekday: "short",
     day: "numeric",
@@ -113,7 +113,7 @@ function formatDate(dateStr: string, timeZone: string): string {
   })
 }
 
-function formatDateTime(dateStr: string, timeZone: string): string {
+function fechaHoraLarga(dateStr: string, timeZone: string): string {
   return new Date(dateStr).toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
@@ -498,7 +498,7 @@ export default function VentasClient({
                           {formatTime(ticket.createdAt, timezone)}
                         </div>
                         <p className="text-xs text-stone-400 mt-0.5">
-                          {formatDate(ticket.createdAt, timezone)}
+                          {fechaCorta(ticket.createdAt, timezone)}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-stone-700">
@@ -565,7 +565,7 @@ export default function VentasClient({
                 <div className="space-y-1.5 mt-2">
                   <div className="flex items-center gap-2 text-sm text-stone-500">
                     <Calendar className="h-3.5 w-3.5" />
-                    {formatDateTime(selectedTicket.createdAt, timezone)}
+                    {fechaHoraLarga(selectedTicket.createdAt, timezone)}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-stone-500">
                     <User className="h-3.5 w-3.5" />
@@ -580,7 +580,7 @@ export default function VentasClient({
                     {selectedTicket.cancelReason && <p>Motivo: {selectedTicket.cancelReason}</p>}
                     <p className="text-xs text-red-600/80">
                       {selectedTicket.cancelledByName ? `Por ${selectedTicket.cancelledByName}` : ""}
-                      {selectedTicket.cancelledAt ? ` · ${formatDateTime(selectedTicket.cancelledAt, timezone)}` : ""}
+                      {selectedTicket.cancelledAt ? ` · ${fechaHoraLarga(selectedTicket.cancelledAt, timezone)}` : ""}
                     </p>
                   </div>
                 )}
