@@ -14,7 +14,7 @@ import type { Database } from "@/lib/supabase/database.types"
  *
  * Van por el mismo canal a propósito: una tabla, una pantalla y un correo que
  * ya existen. `digest` lleva la CLASE del aviso (`cuenta-choque`,
- * `cuenta-copia`, `cola-revision`, `sondeo-lento`…) para agruparlos, y
+ * `cuenta-copia`, `cola-revision`, `sondeo-lento`, `reloj-desfasado`…) para agruparlos, y
  * `stack` el detalle en texto para leerlo en /super. El RPC ya tiene freno
  * anti-tormenta (300 por hora), así que un aviso repetido no puede tirar nada.
  */

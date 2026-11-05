@@ -138,6 +138,15 @@ Casi nada — esa es la gracia:
   por horas y el día de operación lo agradecen. Validado: no futuro, no más
   de 24 h atrás, dentro del turno de la caja abierta. Default null =
   compatible con todo lo existente.
+- **La hora va en el reloj del SERVIDOR** (2026-11-05). La hora de captura
+  es la del teléfono, y con el reloj mal puesto esos candados fallaban sin
+  remedio: adelantado más de 2 min → «en el futuro» y a «revisar» (y
+  «Reintentar» mandaba la misma hora); atrasado → «turno anterior». Ahora el
+  POS mide su desviación contra `/pos/datos/hora` (al abrir, al volver la
+  señal y antes de subir; `app/pos/hora-servidor.ts`), cada venta encolada
+  guarda la desviación conocida AL COBRAR (`desfase`) y al subir la hora se
+  traduce al reloj del servidor, nunca después de su «ahora». Una desviación
+  de 2 min o más deja el aviso `reloj-desfasado` en el correo de la mañana.
 
 ## Plan de verificación (cuando se implemente)
 
