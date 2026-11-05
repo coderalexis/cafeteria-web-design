@@ -16,7 +16,7 @@ y los ids, fechas y estado del momento viven en la memoria del asistente.
 
 | Necesito… | Leer |
 |---|---|
-| Esquema, lista de migraciones 01–60, cómo escribe la app, pruebas SQL, correo y respaldos | `docs/supabase/README.md` |
+| Esquema, lista de migraciones 01–61, cómo escribe la app, pruebas SQL, correo y respaldos | `docs/supabase/README.md` |
 | Qué hace cada pantalla y cada regla, en palabras del usuario | `app/ayuda/ayuda-client.tsx` (guía `/ayuda`; es la fuente de verdad funcional) |
 | Qué puede hacer cada rol (reglas reales del servidor) | `app/admin/equipo/role-legend.tsx` |
 | Índice del buscador del panel (Ctrl+K) | `lib/admin-search.ts` |

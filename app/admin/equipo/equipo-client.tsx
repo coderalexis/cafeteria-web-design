@@ -13,7 +13,7 @@ import {
   Calendar,
   Mail,
   AtSign,
-  Copy,
+  RotateCw,
   Loader2,
   Power,
   Trash2,
@@ -21,8 +21,11 @@ import {
   LockKeyhole,
 } from "lucide-react"
 import {
-  addMemberByEmail,
   createCashierAccount,
+  inviteMemberByEmail,
+  resendInvitation,
+  revokeInvitation,
+  type InvitacionPendiente,
   removeMember,
   changeMemberEmail,
   resetMemberPassword,
@@ -39,7 +42,6 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { sinTumbar } from "@/lib/sin-tumbar"
 
 /* ────────────────────────────────────────────────────── Types */
@@ -59,6 +61,8 @@ export interface TeamMember {
 
 interface Props {
   members: TeamMember[]
+  /** Invitaciones por correo que nadie ha contestado (ver migración 61). */
+  invitaciones: InvitacionPendiente[]
 }
 
 const ROLE_STYLES: Record<BusinessRole, string> = {
@@ -106,7 +110,7 @@ function RoleSelect({
 
 /* ────────────────────────────────────────────────────── Component */
 
-export default function EquipoClient({ members }: Props) {
+export default function EquipoClient({ members, invitaciones }: Props) {
   const router = useRouter()
   const ctx = useAppContext()
   const callerRole: BusinessRole = ctx.role ?? "cajero"
@@ -116,7 +120,6 @@ export default function EquipoClient({ members }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createMode, setCreateMode] = useState<"usuario" | "correo">("usuario")
-  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const active = members.filter((m) => m.isActive)
@@ -153,22 +156,44 @@ export default function EquipoClient({ members }: Props) {
     run(() => createCashierAccount(formData), "Cuenta creada")
   }
 
-  function handleAddByEmail(formData: FormData) {
-    const email = String(formData.get("email") ?? "")
+  function handleInvite(formData: FormData) {
     startTransition(sinTumbar(async () => {
-      const result = await addMemberByEmail(formData)
+      const result = await inviteMemberByEmail(formData)
       if (!result.success) {
         toast.error(result.error)
         return
       }
       setSheetOpen(false)
       router.refresh()
-      if (result.created && result.tempPassword) {
-        setTempPassword({ email, password: result.tempPassword })
-      } else {
-        toast.success("Persona agregada al equipo")
-      }
+      avisarEnvio(result.email, result.correoEnviado)
     }))
+  }
+
+  function avisarEnvio(email: string, salio: boolean) {
+    if (salio) {
+      toast.success(`Invitación enviada a ${email}. Aparecerá en el equipo cuando la acepte.`, { duration: 8000 })
+    } else {
+      toast.warning(`La invitación quedó lista, pero el correo a ${email} no salió. Toca «Reenviar» en un momento.`, {
+        duration: 10000,
+      })
+    }
+  }
+
+  function handleResend(inv: InvitacionPendiente) {
+    startTransition(sinTumbar(async () => {
+      const result = await resendInvitation(inv.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      router.refresh()
+      avisarEnvio(inv.email, result.correoEnviado)
+    }))
+  }
+
+  function handleRevoke(inv: InvitacionPendiente) {
+    if (!window.confirm(`¿Cancelar la invitación a ${inv.email}? El enlace que le llegó dejará de servir.`)) return
+    run(() => revokeInvitation(inv.id), "Invitación cancelada", false)
   }
 
   function handleUpdate(formData: FormData) {
@@ -317,6 +342,63 @@ export default function EquipoClient({ members }: Props) {
         </CardContent>
       </Card>
 
+      {invitaciones.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Invitaciones sin contestar</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-stone-100">
+              {invitaciones.map((inv) => {
+                const bloqueada = inv.role === "owner" && !callerIsOwner
+                return (
+                  <div key={inv.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-6 py-3">
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 bg-stone-100 text-stone-400">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-stone-800 truncate">{inv.fullName || inv.email}</p>
+                      <p className="text-xs text-stone-400 mt-0.5 truncate">
+                        {inv.fullName ? `${inv.email} · ` : ""}
+                        {inv.vencida
+                          ? "venció sin contestar"
+                          : `enviada el ${new Date(inv.sentAt).toLocaleDateString("es-MX")}`}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className={`text-xs ${ROLE_STYLES[inv.role]}`}>
+                      <Shield className="h-3 w-3 mr-1" />
+                      {ROLE_LABELS[inv.role]}
+                    </Badge>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="blanco-comodo gap-1.5"
+                        disabled={isPending || bloqueada}
+                        onClick={() => handleResend(inv)}
+                      >
+                        <RotateCw className="h-3.5 w-3.5" />
+                        Reenviar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="blanco-comodo text-red-600 hover:text-red-700"
+                        disabled={isPending || bloqueada}
+                        aria-label={`Cancelar la invitación a ${inv.email}`}
+                        onClick={() => handleRevoke(inv)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sheet: crear / detalle */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
@@ -402,20 +484,20 @@ export default function EquipoClient({ members }: Props) {
                   </Button>
                 </form>
               ) : (
-                <form action={handleAddByEmail} className="mt-5 space-y-4">
+                <form action={handleInvite} className="mt-5 space-y-4">
                   <div className="space-y-1.5">
                     <label htmlFor="add-email" className="text-sm font-medium text-stone-700">
                       Correo
                     </label>
                     <Input id="add-email" name="email" type="email" placeholder="persona@correo.com" required />
                     <p className="text-xs text-stone-400">
-                      Si ya tiene cuenta en el sistema, solo se le da acceso. Si no, se crea con una contraseña
-                      temporal que verás una sola vez.
+                      Le llega un correo con un enlace para aceptar. Si ya tiene cuenta, entra con ella; si no, la
+                      crea con su propia contraseña. Nadie entra al equipo sin aceptar.
                     </p>
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="add-fullname" className="text-sm font-medium text-stone-700">
-                      Nombre (si es cuenta nueva)
+                      Nombre (opcional)
                     </label>
                     <Input id="add-fullname" name="full_name" placeholder="Nombre completo" maxLength={80} />
                   </div>
@@ -428,7 +510,7 @@ export default function EquipoClient({ members }: Props) {
                   </div>
                   <Button type="submit" disabled={isPending} className="w-full bg-indigo-600 hover:bg-indigo-700">
                     {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Dar acceso
+                    Enviar invitación
                   </Button>
                 </form>
               )}
@@ -644,46 +726,6 @@ export default function EquipoClient({ members }: Props) {
         </SheetContent>
       </Sheet>
 
-      {/* Contraseña temporal (una sola vez) */}
-      <Dialog open={!!tempPassword} onOpenChange={(open) => !open && setTempPassword(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cuenta creada</DialogTitle>
-            <DialogDescription>
-              Comparte estos datos con la persona. La contraseña temporal <strong>no se volverá a mostrar</strong>;
-              podrá cambiarla en «Mi cuenta».
-            </DialogDescription>
-          </DialogHeader>
-          {tempPassword && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm">
-                <p className="text-stone-500">Correo</p>
-                <p className="font-medium text-stone-800 break-all">{tempPassword.email}</p>
-                <p className="text-stone-500 mt-2">Contraseña temporal</p>
-                <p className="font-mono text-lg font-semibold tracking-wide text-stone-800">{tempPassword.password}</p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(
-                      `Acceso a ${ctx.business?.name}\nCorreo: ${tempPassword.email}\nContraseña temporal: ${tempPassword.password}`,
-                    )
-                    toast.success("Copiado al portapapeles")
-                  } catch {
-                    toast.error("No se pudo copiar; anótala manualmente.")
-                  }
-                }}
-              >
-                <Copy className="h-4 w-4" />
-                Copiar datos
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -1719,14 +1719,16 @@ export function AyudaClient({ ticket, corte }: Props) {
       grupo: "admin",
       icon: Users,
       titulo: "Equipo y accesos",
-      palabras: "cajero usuario correo contrasena restablecer pin roles dueno administrador desactivar actividad bitacora",
+      palabras: "cajero usuario correo invitar invitacion reenviar contrasena restablecer pin roles dueno administrador desactivar actividad bitacora",
       acciones: [{ etiqueta: "Equipo", href: "/admin/equipo", admin: true }, { etiqueta: "¿Qué puede hacer cada rol?", href: "/admin/equipo#roles", admin: true }, { etiqueta: "Mi cuenta", href: "/cuenta" }],
       nodo: (
         <ul className="space-y-2 text-sm text-stone-600">
           <li>
             <strong>Usuario de café</strong>: creas una cuenta con usuario y contraseña (entra escribiendo solo su usuario),
-            ideal para cajeros — no necesita correo. <strong>Por correo</strong>: das acceso con su correo; si no tiene
-            cuenta, se crea con una contraseña temporal que verás una sola vez.
+            ideal para cajeros — no necesita correo. <strong>Por correo</strong>: le mandas una invitación; le llega un
+            enlace que dura 7 días y, al abrirlo, entra con su cuenta o crea la suya con su propia contraseña. Nadie entra
+            a tu equipo sin aceptar. Mientras no conteste, aparece en «Invitaciones sin contestar», donde puedes
+            reenviarla o cancelarla.
           </li>
           <li>
             <strong>Roles.</strong> La tabla completa está en Equipo, bajo «¿Qué puede hacer cada rol?», y son reglas
