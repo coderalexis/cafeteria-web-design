@@ -10,6 +10,11 @@
  * y la pestaña vieja truena con «Cannot read properties of undefined (reading
  * 'call')». Pasó tres veces en una semana (Gym Coffe y El Cafecito), siempre
  * la mañana siguiente a un deploy, con el POS abierto desde el día anterior.
+ * Next cuenta como «revalida» también la sesión que el middleware renovó en
+ * esa misma petición, y así le pasaba al teléfono que abría la copia guardada
+ * por el service worker: su primer sondeo llegaba con el token vencido. Eso
+ * ya no ocurre (`continuarConCookies`, lib/supabase/middleware.ts); lo de
+ * abajo cubre las acciones que sí revalidan.
  *
  * Dos defensas, en este orden:
  * 1. El sondeo de cuentas abiertas trae el sello del servidor; si difiere del

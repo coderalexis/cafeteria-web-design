@@ -13,10 +13,11 @@ import { updateSession } from "@/lib/supabase/middleware"
  * que tumbó producción con un 504.
  *
  * Ahora:
- *   · `getClaims()` verifica la FIRMA del token contra el JWKS del proyecto
- *     —que se cachea—, sin preguntarle a nadie, y refresca el token si venció.
- *     Funciona así porque el proyecto firma con llave asimétrica (ES256); con
- *     llave simétrica volvería a viajar y no habría ganancia.
+ *   · `getClaims()` (en `updateSession`) verifica la FIRMA del token contra el
+ *     JWKS del proyecto —que se cachea—, sin preguntarle a nadie, y refresca el
+ *     token si venció. Funciona así porque el proyecto firma con llave
+ *     asimétrica (ES256); con llave simétrica volvería a viajar y no habría
+ *     ganancia. Cómo viaja el token renovado importa: ver `continuarConCookies`.
  *   · Las reglas de ROL las aplica cada zona en su propio layout, que es donde
  *     deben vivir: `/admin` exige dueño o administrador y negocio vigente,
  *     `/super` exige operador de plataforma, `/pos` exige negocio activo que no
@@ -32,10 +33,7 @@ import { updateSession } from "@/lib/supabase/middleware"
  */
 
 export async function middleware(request: NextRequest) {
-  const { supabase, response } = await updateSession(request)
-
-  const { data } = await supabase.auth.getClaims()
-  const haySesion = typeof data?.claims?.sub === "string"
+  const { haySesion, response } = await updateSession(request)
 
   if (haySesion) return response
 
