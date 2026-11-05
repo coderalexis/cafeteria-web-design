@@ -32,6 +32,7 @@ Van por el mismo canal que los errores, con `digest` = la clase, para que
 | `sondeo-lento` | El sondeo de cuentas lleva más de 15 s sin contestar | POS (`use-parked-orders.ts`) |
 | `cola-subida` | Una venta guardada sin internet subió, y cuántos minutos esperó | POS (`use-offline-queue.ts`) |
 | `cola-revision` | Una venta en cola que el servidor rechazó (lo grave) | POS (`use-offline-queue.ts`) |
+| `reloj-desfasado` | El reloj del teléfono va 2 min o más adelantado/atrasado; la cola sube con la hora del servidor | POS (`use-offline-queue.ts`) |
 
 Cómo se leería el 14 de septiembre con esto puesto: el correo de esa mañana
 habría dicho «26× · Gym Coffe · Cuenta «Mesa 2»: el sello iba viejo (1938 s

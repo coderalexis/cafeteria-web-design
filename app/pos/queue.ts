@@ -36,8 +36,14 @@ export interface QueuedSale {
   clientRef: string
   /** Folio provisional para el ticket impreso sin conexión (P-1, P-2…). */
   provisional: string
-  /** Cuándo se cobró de verdad (epoch ms), no cuándo se sube. */
+  /** Cuándo se cobró de verdad (epoch ms, reloj DEL TELÉFONO), no cuándo se sube. */
   capturedAt: number
+  /**
+   * Cuánto se desviaba el reloj del teléfono del del servidor al cobrar (ms;
+   * servidor − teléfono). Con esto la hora sube en el reloj del servidor: ver
+   * hora-servidor.ts. Falta en las ventas encoladas antes de que existiera.
+   */
+  desfase?: number | null
   items: QueuedItem[]
   paymentMethod: PaymentMethod
   notes?: string

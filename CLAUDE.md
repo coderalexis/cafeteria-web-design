@@ -118,7 +118,7 @@ crons responden 503: `CRON_SECRET` solo existe en Vercel.
 cron los manda por correo. Por el mismo canal van los **avisos** que no
 revientan pero delatan algo (`lib/avisos.ts`: `cuenta-choque`,
 `cuenta-choque-falso`, `cuenta-copia`, `sondeo-lento`, `cola-subida`,
-`cola-revision`). `audit_events` es la bitácora de negocio (menú, equipo,
+`cola-revision`, `reloj-desfasado`). `audit_events` es la bitácora de negocio (menú, equipo,
 caja, cancelaciones) que ve `/admin/actividad`. Para reconstruir un incidente,
 `docs/registros.md`.
 
@@ -482,7 +482,7 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-11-04 y pendientes
 
-- Producción = `main` hasta el PR #98; migraciones aplicadas hasta la **61**
+- Producción = `main` hasta el PR #99; migraciones aplicadas hasta la **61**
   (`p47_invitaciones`). Lo último, de la revisión general del 2026-11-04: el token
   renovado no viaja como cookie de la acción (#85), una cafetería no puede
   cambiarle el correo a una cuenta ajena (#86), cuentas y cola sin señal
@@ -492,12 +492,12 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   que suspende y cierra cajas (#93); `pos-client.tsx` partido en barra, rejilla,
   cobro y cuenta abierta (#94–#96); ninguna transición del panel tumba la
   pantalla sin señal (`sinTumbar`, #97); agregar por correo INVITA y la persona
-  acepta en `/invitacion/<token>` (`team_invitations`, #98). Antes: pedido por voz en dos modos
+  acepta en `/invitacion/<token>` (`team_invitations`, #98); la cola sin señal
+  sube con la hora del servidor aunque el reloj del teléfono esté mal (#99). Antes: pedido por voz en dos modos
   (solo `cafe-de-prueba`), respaldos de 90 días, inventario Fase 1, cuentas con
   reconciliación de sellos, avisos silenciosos en el correo de la mañana.
-- Pendiente de la revisión (en este orden): la hora del servidor para la cola
-  (reloj del teléfono adelantado), y cargar bajo demanda la voz y el recibo con
-  QR cuidando que el service worker guarde esos trozos.
+- Pendiente de la revisión: cargar bajo demanda la voz y el recibo con QR
+  cuidando que el service worker guarde esos trozos.
 - Siguiente, cuando el usuario lo pida: inventario Fase 2 (conteo en una
   pantalla, «se está acabando» en Resumen y correo semanal, «agotado» en el
   menú público) y Fase 3 (lista de compras, «lo pagué de la caja», mermas en

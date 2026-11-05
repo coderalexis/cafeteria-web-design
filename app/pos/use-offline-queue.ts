@@ -22,6 +22,7 @@ import {
   type QueuedSale,
   type QueueState,
 } from "./queue"
+import { DESFASE_PARA_AVISAR_MS, desfaseGuardado, horaParaElServidor, medirHoraDelServidor } from "./hora-servidor"
 
 /** Lo guardado en el aparato, o null si no se puede leer. */
 function leerDisco(key: string): QueueState | null {
@@ -137,7 +138,8 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
     (sale: Omit<QueuedSale, "provisional" | "status" | "attempts">): { provisional: string; guardada: boolean } | null => {
       const base = leerDisco(key) ?? estadoRef.current
       if (!canEnqueue(base)) return null
-      const { next, guardada } = actualizar(() => enqueue(base, sale))
+      // La desviación del reloj que se conocía AL COBRAR viaja con la venta.
+      const { next, guardada } = actualizar(() => enqueue(base, { ...sale, desfase: sale.desfase ?? desfaseGuardado() }))
       return { provisional: next.sales[next.sales.length - 1].provisional, guardada }
     },
     [actualizar, key],
@@ -152,6 +154,18 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
     const pendientes = (leerDisco(key) ?? estadoRef.current).sales.filter((s) => s.status === "pendiente")
     if (pendientes.length === 0) return
     setSubiendo({ hecho: 0, total: pendientes.length })
+
+    // Antes de subir, cuánto se desvía HOY el reloj del teléfono: con eso la
+    // hora de cada venta va en el reloj del servidor y nunca «en el futuro».
+    const desfaseAhora = (await medirHoraDelServidor()) ?? desfaseGuardado()
+    if (desfaseAhora !== null && Math.abs(desfaseAhora) >= DESFASE_PARA_AVISAR_MS) {
+      const min = Math.round(Math.abs(desfaseAhora) / 60_000)
+      void reportClientError({
+        route: "/pos",
+        message: `El reloj del teléfono va ${min} min ${desfaseAhora < 0 ? "adelantado" : "atrasado"}: la cola sube con la hora del servidor`,
+        digest: "reloj-desfasado",
+      })
+    }
 
     let hecho = 0
     let fallo = false
@@ -170,7 +184,7 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
           takeout: venta.takeout,
           loyaltyCustomerId: venta.loyaltyCustomerId,
           loyaltyRedeem: venta.loyaltyRedeem,
-          capturedAt: new Date(venta.capturedAt).toISOString(),
+          capturedAt: new Date(horaParaElServidor(venta.capturedAt, venta.desfase, desfaseAhora, Date.now())).toISOString(),
           items: venta.items,
         })
         if (r.success) {
@@ -252,6 +266,16 @@ export function useOfflineQueue(businessId: string, onStock?: (cambios: CambioEx
       document.removeEventListener("visibilitychange", alVolver)
     }
   }, [hidratada, subir])
+
+  // La desviación del reloj se mide al abrir y al volver la señal, no solo al
+  // subir: así la primera venta sin señal ya lleva la suya, aunque nunca haya
+  // habido cola. Es una petición mínima que no toca la base.
+  useEffect(() => {
+    const medir = () => void medirHoraDelServidor()
+    if (navigator.onLine) medir()
+    window.addEventListener("online", medir)
+    return () => window.removeEventListener("online", medir)
+  }, [])
 
   // Y sola, cada vez más espaciado mientras quede algo: con señal débil el
   // evento `online` nunca llega.
