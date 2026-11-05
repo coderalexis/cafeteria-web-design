@@ -77,10 +77,13 @@ import { usePosCart } from "./use-pos-cart"
 import { useOfflineQueue } from "./use-offline-queue"
 import { QueueBanner } from "./queue-banner"
 import { QueueReviewDialog } from "./queue-review-dialog"
-import { QUEUE_MAX, serializeLines } from "./queue"
+import { QUEUE_MAX } from "./queue"
 import { CartPanel } from "./cart-panel"
 import { PosHeader } from "./pos-header"
 import { BarraMovil } from "./barra-movil"
+import { avisarEncolada, avisarVersionNueva } from "./avisos-cobro"
+import { ventaCompletada, ventaParaLaCola } from "./cobro"
+import { useCobrarCuenta } from "./use-cobrar-cuenta"
 import { RejillaProductos } from "./rejilla-productos"
 import { ReceiptView, type CompletedSale } from "./receipt-view"
 import { FlyLayer, useCartFeedback } from "./use-cart-feedback"
@@ -95,8 +98,6 @@ import {
   findVariant,
   rehydrateCart,
   serializeCart,
-  getLineLabel,
-  getLinePrice,
   needsModifierPrompt,
   parseCash,
   type CartLine,
@@ -168,41 +169,10 @@ interface POSClientProps {
   vozEnMostrador?: boolean
 }
 
-/**
- * Un cobro que no llegó porque hay un deploy más nuevo que esta pestaña:
- * la venta NO se registró (el servidor no reconoció la acción), el carrito
- * sigue guardado con su clientRef, y lo que toca es recargar y volver a
- * cobrar con el código nuevo. Ver lib/version.ts.
- */
-/**
- * Lo que se le dice a quien cobró sin señal. Si el aparato no pudo guardar la
- * venta (modo privado, sin espacio), NO es «guardada»: vive solo en memoria y
- * cerrar la app se la llevaría. Antes decía «guardada» igual.
- */
-function avisarEncolada(encolada: { provisional: string; guardada: boolean }, id?: string | number) {
-  if (encolada.guardada) {
-    toast.success(`Venta guardada sin conexión · ${encolada.provisional}. Se subirá sola al volver el internet.`, { id })
-  } else {
-    toast.warning(
-      `Venta ${encolada.provisional} cobrada SIN conexión y este aparato no pudo guardarla: no cierres ni recargues la app hasta que suba.`,
-      { id, duration: 20000 },
-    )
-  }
-}
 
 /** Segundos de calma antes de recargar por versión nueva: que un aviso de venta alcance a leerse. */
 const CALMA_ANTES_DE_RECARGAR_MS = 8_000
 
-function avisarVersionNueva(id?: string | number) {
-  const recarga = marcarRecargaPorVersion()
-  toast.info(
-    recarga
-      ? "Hay una versión nueva del sistema. Se recarga y vuelves a cobrar."
-      : "Hay una versión nueva del sistema. Recarga la página y vuelve a cobrar.",
-    { id, duration: 6000 },
-  )
-  if (recarga) window.setTimeout(() => window.location.reload(), 900)
-}
 
 export default function POSClient({
   categories,
@@ -1400,26 +1370,12 @@ export default function POSClient({
 
       if (result.success) {
         aplicarExistencias(result.stock)
-        const completada: CompletedSale = {
-          ticketId: result.ticketId,
-          folio: result.folio,
+        const completada = ventaCompletada(result, {
           lines: venta.lines,
-          subtotal: result.subtotal,
-          discountTotal: result.discountTotal,
-          discountReason: venta.discount?.reason ?? null,
-          total: result.total,
-          takeoutFee: result.takeoutFee,
-          tip: result.tip,
           paymentMethod: venta.paymentMethod,
-          date: new Date(),
-          notes: venta.ticketNotes || undefined,
-          cashReceived: result.cashReceived,
-          changeDue: result.changeDue,
-          loyalty: result.loyalty
-            ? { stamps: result.loyalty.stamps, target: result.loyalty.target, redeemed: result.loyalty.redeemed }
-            : null,
-          credit: result.credit ? { name: result.credit.name, balance: result.credit.balance } : null,
-        }
+          notes: venta.ticketNotes,
+          discountReason: venta.discount?.reason ?? null,
+        })
         if (result.credit) {
           toast.success(`Fiado a ${result.credit.name} · ahora debe ${formatCurrency(result.credit.balance)}`, { duration: 8000 })
           // Las cuentas del selector traen el saldo: que se vea el nuevo.
@@ -1513,9 +1469,8 @@ export default function POSClient({
       // la venta se guarda en la cola con SU MISMO clientRef y se sube sola
       // al volver la señal. La idempotencia de create_ticket hace que
       // reenviarla sea inofensivo aunque en realidad sí hubiera entrado.
-      const encolada = cola.encolar({
+      const encolada = cola.encolar(ventaParaLaCola({
         clientRef: venta.saleRef,
-        capturedAt: Date.now(),
         items,
         paymentMethod: venta.paymentMethod,
         notes: venta.ticketNotes || undefined,
@@ -1528,8 +1483,8 @@ export default function POSClient({
         // El total de la VENTA, sin propina: es lo que el servidor
         // recalcula y devuelve como `total`.
         chargedTotal: venta.total,
-        lines: serializeLines(venta.lines, getLinePrice, getLineLabel),
-      })
+        lines: venta.lines,
+      }))
       if (encolada) {
         avisarEncolada(encolada, avisoId)
         // La cuenta se cierra igual: la venta ya está capturada y va en la
@@ -1699,118 +1654,11 @@ export default function POSClient({
     return estado && estado.lines.length > 0 ? cartSubtotal(estado.lines) : null
   }, [lastSale, products])
 
-  // ── Cobrar una cuenta directo desde la barra ──
-  // Un socio vuelve a pagar mientras se está tomando otro pedido: la cuenta
-  // se cobra sin tocar el carrito. En efectivo, sin propina ni descuento; si
-  // hace falta algo de eso, se abre la cuenta y se cobra como siempre. Dos
-  // toques en el mismo lugar («Cobrar» → «¿$85? Sí») para que un roce no
-  // cobre nada.
-  const [cobrandoCuenta, setCobrandoCuenta] = useState<string | null>(null)
-  const [confirmarCobro, setConfirmarCobro] = useState<string | null>(null)
-  const cobrarCuenta = useCallback(
-    async (o: ParkedOrder) => {
-      if (cobrandoCuenta || !openSession) return
-      const estado = rehydrateCart(o.cart, products, Date.now(), PARKED_MAX_AGE_MS)
-      if (!estado || estado.lines.length === 0) {
-        toast.error("Esta cuenta no se puede cobrar: sus productos ya no están en el menú. Reactívalos en Menú → Productos.", {
-          duration: 10000,
-        })
-        return
-      }
-      if (o.cart.lines.length > estado.lines.length) {
-        // Cobrar de menos sin decirlo sería peor que no cobrar: que la abra y lo vea.
-        toast.error("Algún artículo de esta cuenta ya no está en el menú. Ábrela para revisarla antes de cobrar.")
-        return
-      }
-      setCobrandoCuenta(o.id)
-      const clientRef = crypto.randomUUID()
-      const items = linesToItems(estado.lines)
-      const notas = estado.ticketNotes.trim() || undefined
-      try {
-        const result = await createTicket({
-          clientRef,
-          expectedBusinessId: businessId,
-          paymentMethod: "efectivo",
-          notes: notas,
-          items,
-        })
-        if (!result.success) {
-          toast.error(result.error || "Error al registrar la venta")
-          return
-        }
-        aplicarExistencias(result.stock)
-        parked.remove(o.id)
-        if (openAccount?.id === o.id) {
-          // También estaba en el carrito: ya se cobró, no hay ronda que guardar.
-          setOpenAccount(null)
-          clearCart()
-        }
-        const venta: CompletedSale = {
-          ticketId: result.ticketId,
-          folio: result.folio,
-          lines: estado.lines,
-          subtotal: result.subtotal,
-          discountTotal: result.discountTotal,
-          discountReason: null,
-          total: result.total,
-          takeoutFee: result.takeoutFee,
-          tip: result.tip,
-          paymentMethod: "efectivo",
-          date: new Date(),
-          notes: notas,
-          cashReceived: result.cashReceived,
-          changeDue: result.changeDue,
-          loyalty: null,
-          credit: null,
-        }
-        toast.success(`Venta #${result.folio} · ${formatCurrency(result.total)} · Efectivo · «${o.name}»`, {
-          duration: 5000,
-          action: { label: "Ver ticket", onClick: () => setCompletedSale(venta) },
-        })
-        setTotalSales((prev) => prev + result.total)
-        vibra(30)
-      } catch (e) {
-        if (esErrorDeVersion(e)) {
-          // Deploy nuevo: la cuenta sigue abierta y se cobra tras recargar.
-          avisarVersionNueva()
-          return
-        }
-        // Sin señal: a la cola, como cualquier venta. La cuenta se cierra
-        // igual porque la venta ya está capturada.
-        const encolada = cola.encolar({
-          clientRef,
-          capturedAt: Date.now(),
-          items,
-          paymentMethod: "efectivo",
-          notes: notas,
-          chargedTotal: cartSubtotal(estado.lines),
-          lines: serializeLines(estado.lines, getLinePrice, getLineLabel),
-        })
-        if (encolada) {
-          parked.remove(o.id)
-          avisarEncolada(encolada)
-          vibra(30)
-        } else {
-          toast.error(`Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`)
-        }
-      } finally {
-        setCobrandoCuenta(null)
-        setConfirmarCobro(null)
-      }
-    },
-    [cobrandoCuenta, openSession, products, businessId, parked, openAccount, clearCart, cola, aplicarExistencias],
-  )
-  const tocarCobro = useCallback(
-    (o: ParkedOrder) => {
-      if (confirmarCobro === o.id) {
-        void cobrarCuenta(o)
-        return
-      }
-      setConfirmarCobro(o.id)
-      window.setTimeout(() => setConfirmarCobro((c) => (c === o.id ? null : c)), 4000)
-    },
-    [confirmarCobro, cobrarCuenta],
-  )
+
+  const { cobrandoCuenta, confirmarCobro, tocarCobro } = useCobrarCuenta({
+    products, openSession, businessId, parked, openAccount, setOpenAccount, clearCart, cola, aplicarExistencias,
+    setCompletedSale, setTotalSales,
+  })
 
   const cartPanel = (
     <CartPanel
