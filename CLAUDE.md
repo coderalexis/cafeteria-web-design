@@ -200,7 +200,7 @@ levantan con `preview_start`, nunca con Bash. **Nunca `pnpm build` con
 `next dev` levantado** (los dos escriben `.next/`).
 
 **CI (`.github/workflows/ci.yml`)**, dos jobs: `check` (tsc, lint, Vitest,
-build con claves dummy) y `sql` (Postgres 17 recién nacido + shim + las 59
+build con claves dummy) y `sql` (Postgres 17 recién nacido + shim + todas las
 migraciones en orden + `tests/sql/t_*.sql`, y después el paso **«Tipos al
 día»**, que genera `database.types.ts` contra esa base y exige igualdad byte
 a byte). Ese último paso depende de bajar la imagen `postgres-meta`: va en
@@ -482,8 +482,8 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-11-04 y pendientes
 
-- Producción = `main` hasta el PR #97; migraciones aplicadas hasta la **60**
-  (`p46_operacion`). Lo último, de la revisión general del 2026-11-04: el token
+- Producción = `main` hasta el PR #98; migraciones aplicadas hasta la **61**
+  (`p47_invitaciones`). Lo último, de la revisión general del 2026-11-04: el token
   renovado no viaja como cookie de la acción (#85), una cafetería no puede
   cambiarle el correo a una cuenta ajena (#86), cuentas y cola sin señal
   (#87, #88), un cobro ya no descarga el POS entero (#89), crons con rastro y
@@ -491,13 +491,13 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   repetidos (#91); sin duplicados de correo y zona horaria, con pruebas de lo
   que suspende y cierra cajas (#93); `pos-client.tsx` partido en barra, rejilla,
   cobro y cuenta abierta (#94–#96); ninguna transición del panel tumba la
-  pantalla sin señal (`sinTumbar`, #97). Antes: pedido por voz en dos modos
+  pantalla sin señal (`sinTumbar`, #97); agregar por correo INVITA y la persona
+  acepta en `/invitacion/<token>` (`team_invitations`, #98). Antes: pedido por voz en dos modos
   (solo `cafe-de-prueba`), respaldos de 90 días, inventario Fase 1, cuentas con
   reconciliación de sellos, avisos silenciosos en el correo de la mañana.
-- Pendiente de la revisión (en este orden): invitación con aceptación en
-  `addMemberByEmail`, la hora del servidor para la cola (reloj del teléfono
-  adelantado), y cargar bajo demanda la voz y el recibo con QR cuidando que el
-  service worker guarde esos trozos.
+- Pendiente de la revisión (en este orden): la hora del servidor para la cola
+  (reloj del teléfono adelantado), y cargar bajo demanda la voz y el recibo con
+  QR cuidando que el service worker guarde esos trozos.
 - Siguiente, cuando el usuario lo pida: inventario Fase 2 (conteo en una
   pantalla, «se está acabando» en Resumen y correo semanal, «agotado» en el
   menú público) y Fase 3 (lista de compras, «lo pagué de la caja», mermas en
