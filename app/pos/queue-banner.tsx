@@ -14,6 +14,8 @@ export function QueueBanner({
   pendientes,
   porRevisar,
   subiendo,
+  soloEnMemoria = false,
+  atorada = null,
   onSubir,
   onRevisar,
   onCerrarDiferencias,
@@ -22,6 +24,10 @@ export function QueueBanner({
   pendientes: number
   porRevisar: number
   subiendo: { hecho: number; total: number } | null
+  /** El aparato no pudo guardar la cola: cerrar la app se la llevaría. */
+  soloEnMemoria?: boolean
+  /** Por qué no puede subir ahora (sesión vencida, café suspendido…). */
+  atorada?: string | null
   onSubir: () => void
   onRevisar: () => void
   onCerrarDiferencias: () => void
@@ -56,6 +62,20 @@ export function QueueBanner({
               </Button>
             </>
           )}
+        </div>
+      )}
+
+      {pendientes > 0 && (soloEnMemoria || atorada) && (
+        <div className="flex items-start gap-2 bg-amber-100 px-3 py-1.5 text-xs text-amber-950" data-cola-aviso>
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0">
+            {soloEnMemoria && (
+              <span className="block">
+                Este aparato no pudo guardarlas: <strong>no cierres ni recargues la app</strong> hasta que suban.
+              </span>
+            )}
+            {atorada && <span className="block">No pueden subir todavía: {atorada}</span>}
+          </span>
         </div>
       )}
 

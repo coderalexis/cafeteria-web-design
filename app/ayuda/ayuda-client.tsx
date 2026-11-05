@@ -473,7 +473,8 @@ export function AyudaClient({ ticket, corte }: Props) {
             <Step n={3} title="Al volver la señal, se suben solas">
               En orden, una por una, y cada venta queda con la <strong>hora en que la cobraste</strong>, no la de la
               subida — así tus reportes por hora siguen siendo verdad. Ya con su folio real, la puedes reimprimir desde
-              Tickets.
+              Tickets. Con señal débil no hace falta que hagas nada: lo vuelve a intentar sola, cada vez más espaciado
+              (hasta cada 5 minutos), y en cuanto cobras algo con señal, sube lo que esperaba.
             </Step>
           </ol>
           <ul className="mt-4 space-y-2 text-sm text-stone-600">
@@ -489,7 +490,16 @@ export function AyudaClient({ ticket, corte }: Props) {
             <li>
               <strong>Si un producto se desactivó</strong> mientras la venta esperaba, esa venta queda marcada
               «necesita tu revisión» —con lo que cobraste, para no perder el dato— y <em>no</em> detiene a las demás.
-              La cobras de nuevo desde el POS y la quitas de la lista.
+              Si ya se arregló lo que la detuvo (reactivaste el producto, abriste la caja), toca{" "}
+              <strong>Reintentar</strong>; si no, la cobras de nuevo desde el POS y la quitas de la lista.
+            </li>
+            <li>
+              <strong>Si tu sesión venció</strong> mientras no había señal, las ventas no van a revisión: siguen
+              esperando y el aviso de arriba te dice que hay que volver a entrar.
+            </li>
+            <li>
+              <strong>Antes de cerrar sesión con ventas sin subir</strong>, el POS te pregunta: si sales, las subiría
+              quien entre después y quedarían a su nombre.
             </li>
             <li>
               <strong>Tope de 30 ventas.</strong> Después de eso el POS se niega a seguir capturando a ciegas: es

@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { logout } from "@/app/actions/auth"
+import { puedeSalirConCola } from "./use-offline-queue"
 import { POS_LOCK_EVENT } from "./lock-screen"
 import type { useInstallPrompt } from "./use-install-prompt"
 import type { OpenSession } from "./cash-session-dialog"
@@ -369,7 +370,12 @@ export function PosHeader(p: PosHeaderProps) {
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => logout()} className="text-red-600 focus:text-red-700">
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        if (puedeSalirConCola(appCtx.business?.id)) void logout()
+                      }}
+                      className="text-red-600 focus:text-red-700"
+                    >
                       <LogOut className="h-4 w-4 mr-2" /> Cerrar sesión
                     </DropdownMenuItem>
                   </DropdownMenuContent>

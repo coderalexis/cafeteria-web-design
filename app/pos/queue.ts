@@ -46,6 +46,8 @@ export interface QueuedSale {
   cashReceived?: number
   takeout?: boolean
   loyaltyCustomerId?: string
+  /** Canjeó la recompensa al cobrar. Sin esto, el premio se perdía al subir. */
+  loyaltyRedeem?: boolean
   /** Lo que el cajero cobró, con los precios que el POS tenía entonces. */
   chargedTotal: number
   /** Copia de las líneas para reimprimir y para rehidratar si hay que revisar. */
@@ -174,6 +176,18 @@ export function markRetry(state: QueueState, clientRef: string): QueueState {
   }
 }
 
+/**
+ * Devolver a la fila una venta en revisión. Lo que la mandó ahí puede haberse
+ * arreglado (se reactivó el producto, se corrigió la hora del teléfono): sin
+ * esto, la única salida era quitarla y recapturarla a mano.
+ */
+export function reintentarVenta(state: QueueState, clientRef: string): QueueState {
+  return {
+    ...state,
+    sales: state.sales.map((s) => (s.clientRef === clientRef ? { ...s, status: "pendiente" as const, error: undefined } : s)),
+  }
+}
+
 /** Quitar una venta en revisión (el cajero ya la recobró a mano). */
 export function dropSale(state: QueueState, clientRef: string): QueueState {
   return { ...state, sales: state.sales.filter((s) => s.clientRef !== clientRef) }
@@ -201,6 +215,47 @@ export function isNetworkError(message: string): boolean {
     m.includes("conexión") ||
     m.includes("conexion")
   )
+}
+
+/**
+ * Qué hacer con una venta que el servidor no aceptó.
+ *
+ * - «red»: no llegó; sigue en la fila.
+ * - «sesion»: llegó, pero quien sube no puede subir AHORA (sesión vencida tras
+ *   horas sin señal, cambió de cafetería en otra pestaña, café suspendido).
+ *   La venta está bien: sigue en la fila y se avisa qué hace falta. Antes se
+ *   iba a «revisar» para siempre, con «Quitar» como única salida.
+ * - «contenido»: la venta misma no se puede registrar así; a revisión.
+ */
+export type Rechazo = "red" | "sesion" | "contenido"
+
+const SINTOMAS_SESION = [
+  "sesión inválida",
+  "sesion invalida",
+  "no tienes un negocio activo",
+  "cambiaste de cafetería",
+  "cambiaste de cafeteria",
+  "este negocio está suspendido",
+  "este negocio esta suspendido",
+]
+
+export function clasificarRechazo(message: string): Rechazo {
+  if (isNetworkError(message)) return "red"
+  const m = message.toLowerCase()
+  return SINTOMAS_SESION.some((s) => m.includes(s)) ? "sesion" : "contenido"
+}
+
+/**
+ * Cuánto esperar antes de volver a intentar, según cuántos intentos seguidos
+ * han fallado. Antes solo se reintentaba con el evento `online`, que con
+ * señal débil nunca llega (el teléfono cree que SÍ tiene red): las ventas se
+ * quedaban esperando a que alguien tocara «Reintentar».
+ */
+export const ESPERAS_REINTENTO_MS = [15_000, 30_000, 60_000, 120_000, 300_000]
+
+export function esperaParaReintentar(fallosSeguidos: number): number {
+  const i = Math.min(Math.max(0, fallosSeguidos), ESPERAS_REINTENTO_MS.length - 1)
+  return ESPERAS_REINTENTO_MS[i]
 }
 
 /** Líneas del carrito → copia plana para reimprimir sin el menú vivo. */
