@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import { ArrowRight, Coffee, Loader2, MailCheck } from "lucide-react"
 import { startRegistration } from "@/app/actions/signup"
 import { PRESETS } from "@/lib/presets"
-import { MEXICO_TIMEZONES } from "@/lib/dates"
+import { DEFAULT_TIMEZONE, MEXICO_TIMEZONES } from "@/lib/dates"
 import { TRIAL_DAYS } from "@/lib/signup"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -94,7 +94,7 @@ export function RegistroForm() {
           <select
             id="timezone"
             name="timezone"
-            defaultValue="America/Mexico_City"
+            defaultValue={DEFAULT_TIMEZONE}
             className="h-10 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
           >
             {MEXICO_TIMEZONES.map((t) => (

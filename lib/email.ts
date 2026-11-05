@@ -1,5 +1,8 @@
 import "server-only"
 
+import { createAdminClient } from "@/lib/supabase/admin"
+import { isSyntheticEmail } from "@/lib/accounts"
+
 /**
  * Envío de correo por Resend, en un solo lugar.
  *
@@ -42,6 +45,29 @@ export async function sendWithResend(args: {
     return `Resend ${response.status}: ${body.slice(0, 200)}`
   }
   return null
+}
+
+/**
+ * Correos reales de los dueños y administradores activos de una cafetería
+ * (las cuentas de café, con correo sintético, no reciben). Lo usan el aviso
+ * de fin de prueba y el resumen semanal; antes cada uno tenía su copia.
+ */
+export async function correosDeDuenos(businessId: string): Promise<{ emails: string[]; error?: string }> {
+  const admin = createAdminClient()
+  const { data: members, error } = await admin
+    .from("business_members")
+    .select("user_id")
+    .eq("business_id", businessId)
+    .eq("is_active", true)
+    .in("role", ["owner", "admin"])
+  if (error) return { emails: [], error: error.message }
+  const emails: string[] = []
+  for (const member of members ?? []) {
+    const { data } = await admin.auth.admin.getUserById(member.user_id)
+    const email = data?.user?.email
+    if (email && !isSyntheticEmail(email) && !emails.includes(email)) emails.push(email)
+  }
+  return { emails }
 }
 
 /** Escapa lo mínimo para meter texto ajeno en un HTML de correo. */

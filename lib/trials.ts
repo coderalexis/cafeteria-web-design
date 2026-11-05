@@ -1,11 +1,10 @@
 import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isSyntheticEmail } from "@/lib/accounts"
 import { formatDateString, dateStringInTz, type DateString } from "@/lib/dates"
 import { trialState } from "@/lib/signup"
 import { closeStaleSessions } from "@/lib/stale-cash"
-import { escapeHtml, sendWithResend } from "@/lib/email"
+import { correosDeDuenos, escapeHtml, sendWithResend } from "@/lib/email"
 import { reservarEnvio } from "@/lib/cron"
 
 /**
@@ -62,24 +61,6 @@ export function trialEmail(args: {
 
   const text = `${args.businessName}\n\n${cuerpo}\n\n${nota}\n\nCafecito POS · cafecitopos.com`
   return { subject, html, text }
-}
-
-/** Correos reales de dueños/administradores activos (los sintéticos no reciben). */
-async function ownerEmails(businessId: string): Promise<string[]> {
-  const admin = createAdminClient()
-  const { data: members } = await admin
-    .from("business_members")
-    .select("user_id")
-    .eq("business_id", businessId)
-    .eq("is_active", true)
-    .in("role", ["owner", "admin"])
-  const emails: string[] = []
-  for (const member of members ?? []) {
-    const { data } = await admin.auth.admin.getUserById(member.user_id)
-    const email = data?.user?.email
-    if (email && !isSyntheticEmail(email) && !emails.includes(email)) emails.push(email)
-  }
-  return emails
 }
 
 export async function runTrialCheck(options: {
@@ -157,7 +138,7 @@ export async function runTrialCheck(options: {
       }
 
       // El cron corre una vez al día, así que cada estado toca a lo más una vez.
-      const emails = await ownerEmails(biz.id)
+      const { emails } = await correosDeDuenos(biz.id)
       if (emails.length === 0) {
         results.push({ ...base, action: "sin-cambios", detail: "Sin correo real a quién avisar." })
         continue

@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getContext } from "@/lib/context"
 import { isSyntheticEmail, slugify, validatePassword } from "@/lib/accounts"
-import { isValidTimeZone } from "@/lib/dates"
+import { DEFAULT_TIMEZONE, isValidTimeZone } from "@/lib/dates"
+import { escapeHtml, sendWithResend } from "@/lib/email"
 import { presetByKey, PRESETS } from "@/lib/presets"
 import { serializeBusinessSettings, DEFAULT_SETTINGS } from "@/lib/settings"
 import { MAX_SELF_SIGNUPS_PER_DAY, pickSlug, trialEndsAt, TRIAL_DAYS } from "@/lib/signup"
@@ -36,7 +37,7 @@ export async function startRegistration(formData: FormData): Promise<ActionResul
     ownerName: formData.get("owner_name") ?? "",
     email: formData.get("email") ?? "",
     password: formData.get("password") ?? "",
-    timezone: formData.get("timezone") ?? "America/Mexico_City",
+    timezone: formData.get("timezone") ?? DEFAULT_TIMEZONE,
     preset: formData.get("preset") ?? "",
   })
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revisa los datos." }
@@ -152,7 +153,7 @@ export async function finishRegistration(): Promise<ActionResult<{ redirectTo: s
     .insert({
       name: pend.name.slice(0, 80),
       slug,
-      timezone: isValidTimeZone(pend.timezone ?? "") ? pend.timezone! : "America/Mexico_City",
+      timezone: isValidTimeZone(pend.timezone ?? "") ? pend.timezone! : DEFAULT_TIMEZONE,
       created_by: ctx.userId,
       signup_source: "self",
       trial_ends_at: trialEndsAt(ahora).toISOString(),
@@ -215,26 +216,23 @@ async function notifyOperator(name: string, slug: string, email: string, ownerNa
   const apiKey = process.env.RESEND_API_KEY
   const destino = process.env.OPERATOR_EMAIL
   if (!apiKey || !destino) return
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: "Cafecito POS <registro@cafecitopos.com>",
-        to: [destino],
-        subject: `Nueva cafetería: ${name}`,
-        text: [
-          `${name} (${slug}) se registró sola y ya está usando el sistema.`,
-          `Dueño: ${ownerName} · ${email}`,
-          `Prueba de ${TRIAL_DAYS} días.`,
-          "",
-          "Revísala en https://cafecitopos.com/super",
-        ].join("\n"),
-      }),
-    })
-  } catch {
-    /* que no falle el registro por no poder avisar */
-  }
+  const lineas = [
+    `${name} (${slug}) se registró sola y ya está usando el sistema.`,
+    `Dueño: ${ownerName} · ${email}`,
+    `Prueba de ${TRIAL_DAYS} días.`,
+    "",
+    "Revísala en https://cafecitopos.com/super",
+  ]
+  // Con el envío de todos (tope de tiempo incluido); si falla, el registro sigue.
+  await sendWithResend({
+    apiKey,
+    fromName: "Cafecito POS",
+    fromAddress: "registro@cafecitopos.com",
+    to: [destino],
+    subject: `Nueva cafetería: ${name}`,
+    html: lineas.map((l) => escapeHtml(l)).join("<br>"),
+    text: lineas.join("\n"),
+  })
 }
 
 /**

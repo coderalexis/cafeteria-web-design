@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { buildCorteLines, buildTicketLines } from "@/lib/receipt"
 import { AyudaClient } from "./ayuda-client"
+import { DEFAULT_TIMEZONE } from "@/lib/dates"
 
 export const metadata: Metadata = {
   title: "Guía de uso — Cafecito POS",
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 
 const NEGOCIO = {
   name: "Tu cafetería",
-  timezone: "America/Mexico_City",
+  timezone: DEFAULT_TIMEZONE,
   receiptFooter: "¡Gracias por tu compra!",
 }
 

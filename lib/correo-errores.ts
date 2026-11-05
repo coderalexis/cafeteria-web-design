@@ -3,7 +3,7 @@ import "server-only"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { escapeHtml, sendWithResend } from "@/lib/email"
 import { reservarEnvio } from "@/lib/cron"
-import { dateStringInTz } from "@/lib/dates"
+import { DEFAULT_TIMEZONE, dateStringInTz } from "@/lib/dates"
 
 /*
  * Vivía en app/actions/errors.ts, un archivo «use server»: todo lo que exporta
@@ -49,8 +49,8 @@ export async function sendErrorDigest(options: { dryRun: boolean }): Promise<{
   if (!destino || !apiKey) return { sent: false, count: filas.length, error: "Falta OPERATOR_EMAIL o RESEND_API_KEY." }
   if (options.dryRun) return { sent: false, count: filas.length }
 
-  // Un correo por día (de CDMX, donde vive el operador), aunque el cron corra dos veces.
-  const reserva = await reservarEnvio("correo-errores", dateStringInTz("America/Mexico_City", new Date()))
+  // Un correo por día (en la zona del operador), aunque el cron corra dos veces.
+  const reserva = await reservarEnvio("correo-errores", dateStringInTz(DEFAULT_TIMEZONE, new Date()))
   if (!reserva.primera) return { sent: false, count: filas.length, error: "Ya se mandó el de hoy." }
 
   const text = lista.map((g) => `${g.n}× · ${g.biz} · ${g.route}\n   ${g.message}`).join("\n\n")

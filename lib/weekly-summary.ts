@@ -1,9 +1,8 @@
 import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { sendWithResend } from "@/lib/email"
+import { correosDeDuenos, sendWithResend } from "@/lib/email"
 import { reservarEnvio } from "@/lib/cron"
-import { isSyntheticEmail } from "@/lib/accounts"
 import { addDays, dateStringInTz, formatDateString, type DateString } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
 import { parseBusinessSettings } from "@/lib/settings"
@@ -187,21 +186,10 @@ export async function runWeeklySummaries(options: {
       }
 
       // Destinatarios: dueños/administradores activos con correo real.
-      const { data: members, error: membersError } = await admin
-        .from("business_members")
-        .select("user_id, role")
-        .eq("business_id", biz.id)
-        .eq("is_active", true)
-        .in("role", ["owner", "admin"])
+      const { emails, error: membersError } = await correosDeDuenos(biz.id)
       if (membersError) {
-        results.push({ ...base, status: "error", detail: membersError.message })
+        results.push({ ...base, status: "error", detail: membersError })
         continue
-      }
-      const emails: string[] = []
-      for (const member of members ?? []) {
-        const { data: userData } = await admin.auth.admin.getUserById(member.user_id)
-        const email = userData?.user?.email
-        if (email && !isSyntheticEmail(email) && !emails.includes(email)) emails.push(email)
       }
       if (emails.length === 0) {
         results.push({ ...base, status: "omitido", detail: "Ningún dueño/admin tiene correo real." })

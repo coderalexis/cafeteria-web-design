@@ -29,7 +29,7 @@ import {
   setBusinessTrial,
   type PlatformBusiness,
 } from "@/app/actions/super"
-import { MEXICO_TIMEZONES } from "@/lib/dates"
+import { DEFAULT_TIMEZONE, MEXICO_TIMEZONES } from "@/lib/dates"
 import { PRESETS } from "@/lib/presets"
 import { trialState } from "@/lib/signup"
 import { WeeklySummaryCard } from "./weekly-card"
@@ -434,7 +434,7 @@ Deja el campo vacío para quitarle la prueba (se queda para siempre).`,
               <select
                 id="biz-tz"
                 name="timezone"
-                defaultValue="America/Mexico_City"
+                defaultValue={DEFAULT_TIMEZONE}
                 className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
               >
                 {MEXICO_TIMEZONES.map((t) => (

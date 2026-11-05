@@ -4,6 +4,8 @@
  * (vía BusinessProvider), por eso no importa nada de servidor.
  */
 
+import { DEFAULT_TIMEZONE } from "./dates"
+
 export type BusinessRole = "owner" | "admin" | "cajero"
 export type BusinessStatus = "active" | "suspended"
 
@@ -84,7 +86,7 @@ function parseBusiness(v: unknown): BusinessInfo | null {
     id: b.id,
     name: str(b.name),
     slug: str(b.slug),
-    timezone: str(b.timezone) || "America/Mexico_City",
+    timezone: str(b.timezone) || DEFAULT_TIMEZONE,
     currency: str(b.currency) || "MXN",
     locale: str(b.locale) || "es-MX",
     status: asStatus(b.status),
