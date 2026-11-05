@@ -185,6 +185,22 @@ interface POSClientProps {
  * sigue guardado con su clientRef, y lo que toca es recargar y volver a
  * cobrar con el código nuevo. Ver lib/version.ts.
  */
+/**
+ * Lo que se le dice a quien cobró sin señal. Si el aparato no pudo guardar la
+ * venta (modo privado, sin espacio), NO es «guardada»: vive solo en memoria y
+ * cerrar la app se la llevaría. Antes decía «guardada» igual.
+ */
+function avisarEncolada(encolada: { provisional: string; guardada: boolean }, id?: string | number) {
+  if (encolada.guardada) {
+    toast.success(`Venta guardada sin conexión · ${encolada.provisional}. Se subirá sola al volver el internet.`, { id })
+  } else {
+    toast.warning(
+      `Venta ${encolada.provisional} cobrada SIN conexión y este aparato no pudo guardarla: no cierres ni recargues la app hasta que suba.`,
+      { id, duration: 20000 },
+    )
+  }
+}
+
 /** Segundos de calma antes de recargar por versión nueva: que un aviso de venta alcance a leerse. */
 const CALMA_ANTES_DE_RECARGAR_MS = 8_000
 
@@ -1451,6 +1467,8 @@ export default function POSClient({
         // El total del día son ventas: la propina no suma aquí. Si se
         // corrigió una venta, la original ya no cuenta.
         setTotalSales((prev) => prev + result.total - (corrigiendo ? corrigiendo.total : 0))
+        // Acaba de llegar una venta: hay señal. Lo que esperaba en la cola, que suba ya.
+        if (cola.pendientes > 0) void cola.subir()
         if (corrigiendo) {
           toast.success(`Venta #${corrigiendo.folio} corregida · ahora es el ticket #${result.folio}`, { duration: 7000 })
           setCorrigiendo(null)
@@ -1506,7 +1524,7 @@ export default function POSClient({
       // la venta se guarda en la cola con SU MISMO clientRef y se sube sola
       // al volver la señal. La idempotencia de create_ticket hace que
       // reenviarla sea inofensivo aunque en realidad sí hubiera entrado.
-      const provisional = cola.encolar({
+      const encolada = cola.encolar({
         clientRef: venta.saleRef,
         capturedAt: Date.now(),
         items,
@@ -1517,13 +1535,14 @@ export default function POSClient({
         cashReceived: venta.cashReceived ?? undefined,
         takeout: venta.esParaLlevar || undefined,
         loyaltyCustomerId: loyaltyCustomer?.id,
+        loyaltyRedeem: loyaltyRedeem || undefined,
         // El total de la VENTA, sin propina: es lo que el servidor
         // recalcula y devuelve como `total`.
         chargedTotal: venta.total,
         lines: serializeLines(venta.lines, getLinePrice, getLineLabel),
       })
-      if (provisional) {
-        toast.success(`Venta guardada sin conexión · ${provisional}. Se subirá sola al volver el internet.`, { id: avisoId })
+      if (encolada) {
+        avisarEncolada(encolada, avisoId)
         // La cuenta se cierra igual: la venta ya está capturada y va en la
         // cola. Dejarla abierta invitaría a cobrarla dos veces.
         if (!optimista) cerrarVenta()
@@ -1769,7 +1788,7 @@ export default function POSClient({
         }
         // Sin señal: a la cola, como cualquier venta. La cuenta se cierra
         // igual porque la venta ya está capturada.
-        const provisional = cola.encolar({
+        const encolada = cola.encolar({
           clientRef,
           capturedAt: Date.now(),
           items,
@@ -1778,9 +1797,9 @@ export default function POSClient({
           chargedTotal: cartSubtotal(estado.lines),
           lines: serializeLines(estado.lines, getLinePrice, getLineLabel),
         })
-        if (provisional) {
+        if (encolada) {
           parked.remove(o.id)
-          toast.success(`Venta guardada sin conexión · ${provisional}. Se subirá sola al volver el internet.`)
+          avisarEncolada(encolada)
           vibra(30)
         } else {
           toast.error(`Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`)
@@ -1909,6 +1928,8 @@ export default function POSClient({
         pendientes={cola.pendientes}
         porRevisar={cola.porRevisar}
         subiendo={cola.subiendo}
+        soloEnMemoria={cola.soloEnMemoria}
+        atorada={cola.atorada}
         onSubir={() => void cola.subir()}
         onRevisar={() => setShowQueueReview(true)}
         onCerrarDiferencias={cola.limpiarDiferencias}
@@ -2319,6 +2340,7 @@ export default function POSClient({
         onOpenChange={setShowQueueReview}
         state={cola.state}
         onQuitar={cola.quitar}
+        onReintentar={cola.reintentar}
       />
       <AprenderDialog
         open={showAprender}

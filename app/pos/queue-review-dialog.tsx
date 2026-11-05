@@ -20,11 +20,14 @@ export function QueueReviewDialog({
   onOpenChange,
   state,
   onQuitar,
+  onReintentar,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   state: QueueState
   onQuitar: (clientRef: string) => void
+  /** Volver a mandarla tal cual: lo que la detuvo pudo haberse arreglado. */
+  onReintentar: (clientRef: string) => void
 }) {
   const revisar = state.sales.filter((s) => s.status === "revisar")
   // La hora de captura se muestra en la zona de la CAFETERÍA: es la hora a la
@@ -37,7 +40,8 @@ export function QueueReviewDialog({
         <DialogHeader>
           <DialogTitle>Ventas que necesitan tu revisión</DialogTitle>
           <DialogDescription>
-            El sistema no pudo registrarlas tal como se capturaron. Cóbralas de nuevo desde el POS y quítalas de aquí.
+            El sistema no pudo registrarlas tal como se capturaron. Si ya se arregló lo que las detuvo, «Reintentar»;
+            si no, cóbralas de nuevo desde el POS y quítalas de aquí.
           </DialogDescription>
         </DialogHeader>
 
@@ -63,14 +67,25 @@ export function QueueReviewDialog({
                 </ul>
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-red-200 pt-2">
                   <span className="text-sm font-bold text-stone-800">Cobraste {formatCurrency(s.chargedTotal)}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 shrink-0 text-xs"
-                    onClick={() => onQuitar(s.clientRef)}
-                  >
-                    Ya la recobré
-                  </Button>
+                  <div className="flex shrink-0 gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => onReintentar(s.clientRef)}
+                      title="Si ya se arregló lo que la detuvo (por ejemplo, se reactivó el producto)"
+                    >
+                      Reintentar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => onQuitar(s.clientRef)}
+                    >
+                      Ya la recobré
+                    </Button>
+                  </div>
                 </div>
                 {s.error && <p className="mt-1.5 text-xs text-red-700">{s.error}</p>}
               </div>

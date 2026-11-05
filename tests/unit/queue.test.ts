@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest"
 import {
   QUEUE_MAX,
+  ESPERAS_REINTENTO_MS,
   canEnqueue,
+  clasificarRechazo,
+  esperaParaReintentar,
+  reintentarVenta,
   clearDiffs,
   dropSale,
   enqueue,
@@ -125,5 +129,42 @@ describe("isNetworkError", () => {
     expect(isNetworkError("Load failed")).toBe(true)
     expect(isNetworkError("Sin conexión")).toBe(true)
     expect(isNetworkError("La caja está cerrada. Abre la caja antes de cobrar.")).toBe(false)
+  })
+})
+
+describe("cuando el servidor no acepta una venta de la cola", () => {
+  it("separa red, sesión y contenido: solo el contenido va a revisión", () => {
+    expect(clasificarRechazo("Failed to fetch")).toBe("red")
+    // Horas sin señal: la sesión venció. La venta está bien; solo hay que volver a entrar.
+    expect(clasificarRechazo("Sesión inválida.")).toBe("sesion")
+    expect(clasificarRechazo("Cambiaste de cafetería en otra pestaña. Recarga la página para continuar.")).toBe("sesion")
+    expect(clasificarRechazo("Este negocio está suspendido.")).toBe("sesion")
+    expect(clasificarRechazo("Un producto de la venta ya no está disponible.")).toBe("contenido")
+  })
+
+  it("una venta en revisión puede volver a la fila tal cual", () => {
+    let q = enqueue(vacia(), venta("a"))
+    q = markNeedsReview(q, "a", "producto desactivado")
+    expect(reviewCount(q)).toBe(1)
+    q = reintentarVenta(q, "a")
+    expect(pendingCount(q)).toBe(1)
+    expect(q.sales[0].error).toBeUndefined()
+    expect(q.sales[0].provisional).toBe("P-1") // conserva su número
+  })
+
+  it("el canje de lealtad viaja con la venta encolada", () => {
+    const q = enqueue(vacia(), { ...venta("a"), loyaltyCustomerId: "c1", loyaltyRedeem: true })
+    expect(q.sales[0].loyaltyRedeem).toBe(true)
+  })
+})
+
+describe("reintentos sin que nadie toque nada", () => {
+  it("cada vez más espaciados, hasta 5 minutos", () => {
+    expect(esperaParaReintentar(0)).toBe(15_000)
+    expect(esperaParaReintentar(1)).toBe(30_000)
+    expect(esperaParaReintentar(4)).toBe(300_000)
+    expect(esperaParaReintentar(40)).toBe(300_000)
+    expect(esperaParaReintentar(-3)).toBe(15_000)
+    expect(ESPERAS_REINTENTO_MS.every((ms, i, a) => i === 0 || ms > a[i - 1])).toBe(true)
   })
 })

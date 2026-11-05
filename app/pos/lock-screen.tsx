@@ -5,6 +5,8 @@ import { toast } from "sonner"
 import { Coffee, Delete, LockKeyhole, Loader2 } from "lucide-react"
 import { setMyPin, verifyMyPin } from "@/app/actions/security"
 import { logout } from "@/app/actions/auth"
+import { useAppContext } from "@/components/business-provider"
+import { puedeSalirConCola } from "./use-offline-queue"
 import { Button } from "@/components/ui/button"
 
 const CHECK_EVERY_MS = 10_000
@@ -30,6 +32,7 @@ export function PosLockScreen({
   businessName: string
   userName: string
 }) {
+  const appCtx = useAppContext()
   const [locked, setLocked] = useState(false)
   const [mode, setMode] = useState<Mode>(initialHasPin ? "verify" : "setup")
   const [pin, setPin] = useState("")
@@ -205,7 +208,12 @@ export function PosLockScreen({
           })}
         </div>
 
-        <form action={logout}>
+        <form
+          action={logout}
+          onSubmit={(e) => {
+            if (!puedeSalirConCola(appCtx.business?.id)) e.preventDefault()
+          }}
+        >
           <Button type="submit" variant="ghost" className="text-stone-400 hover:text-white hover:bg-stone-800">
             Cambiar de usuario (cerrar sesión)
           </Button>

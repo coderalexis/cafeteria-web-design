@@ -56,7 +56,14 @@ reimpresión con folio queda disponible tras subir.
 
 **Subida.** Un solo trabajador (no uno por venta): al detectar `online` —el
 listener ya existe— sube la cola **en orden de captura**, una por una, con
-reintentos exponenciales. Éxito → sale de la cola y se guarda
+reintentos exponenciales. (Los reintentos tardaron en existir: hasta noviembre
+de 2026 solo se intentaba con `online`, al abrir o a mano, y con señal débil
+`online` nunca llega. Ahora `esperaParaReintentar`: 15 s, 30 s, 1, 2 y 5 min;
+también al volver a la app y tras un cobro en línea. Cada cambio se aplica
+sobre lo guardado —no sobre la copia en memoria— para que dos pestañas no se
+borren la cola, y `navigator.locks` deja subir a una sola. Un rechazo por
+sesión vencida o café suspendido NO manda la venta a revisión
+(`clasificarRechazo`), y la revisión tiene «Reintentar».) Éxito → sale de la cola y se guarda
 `{provisional → folio}` para reimprimir. El peor caso (subió pero la
 respuesta se perdió) es inofensivo: el reenvío devuelve `duplicate: true` con
 el mismo folio.
