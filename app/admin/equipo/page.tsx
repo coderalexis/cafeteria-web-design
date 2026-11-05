@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getMemberDirectory } from "@/lib/team"
-import { getMemberEmails } from "@/app/actions/team"
+import { getMemberEmails, listPendingInvitations } from "@/app/actions/team"
 import EquipoClient, { type TeamMember } from "./equipo-client"
 
 export const dynamic = "force-dynamic"
@@ -9,9 +9,10 @@ export default async function EquipoPage() {
   // Cliente de sesión: el RLS limita al negocio activo (miembros + perfiles).
   const supabase = await createClient()
 
-  const [members, { data: ticketRows }] = await Promise.all([
+  const [members, { data: ticketRows }, invitacionesResult] = await Promise.all([
     getMemberDirectory(supabase),
     supabase.from("tickets").select("cashier_id"),
+    listPendingInvitations(),
   ])
 
   const countMap: Record<string, number> = {}
@@ -34,5 +35,10 @@ export default async function EquipoPage() {
     ticketCount: countMap[m.id] || 0,
   }))
 
-  return <EquipoClient members={serialized} />
+  return (
+    <EquipoClient
+      members={serialized}
+      invitaciones={invitacionesResult.success ? invitacionesResult.invitaciones : []}
+    />
+  )
 }

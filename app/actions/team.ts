@@ -9,7 +9,6 @@ import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActiveContext } from "@/lib/context"
 import type { BusinessRole } from "@/lib/context-shape"
 import {
-  generateTempPassword,
   isSyntheticEmail,
   motivoParaNoTocarLaCuenta,
   normalizeUsername,
@@ -17,6 +16,8 @@ import {
   USERNAME_PATTERN,
   validatePassword,
 } from "@/lib/accounts"
+import { estadoInvitacion, hashDelToken, nuevoToken, TOPE_POR_DIA, VIGENCIA_DIAS } from "@/lib/invitaciones"
+import { mandarInvitacion } from "@/lib/invitaciones-servidor"
 import type { ActionResult } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -172,10 +173,21 @@ export async function createCashierAccount(formData: FormData): Promise<ActionRe
   return { success: true }
 }
 
-/* ── Agregar por correo (cuenta existente o nueva con contraseña temporal) ── */
-export async function addMemberByEmail(
+/* ── Invitar por correo (la persona acepta; migración 61) ──────────── */
+/**
+ * Agregar por correo ya no agrega: INVITA. Antes la membresía se creaba sin
+ * preguntarle a nadie —cualquier admin podía meter a cualquier cuenta del
+ * sistema a su café— y, si el correo no tenía cuenta, el admin le creaba una
+ * con una contraseña que él conocía. Ahora sale un correo con un enlace; la
+ * persona entra con su cuenta o crea la suya, y decide.
+ *
+ * La respuesta es la MISMA tenga o no cuenta ese correo: antes «solo se le dio
+ * acceso» contra «se creó con contraseña temporal» le contaba a cualquier
+ * café quién usa el sistema. Lo único que se dice es si ya está en TU equipo.
+ */
+export async function inviteMemberByEmail(
   formData: FormData,
-): Promise<ActionResult<{ created: boolean; tempPassword?: string }>> {
+): Promise<ActionResult<{ email: string; correoEnviado: boolean }>> {
   const { ctx, error: authError } = await requireAdmin()
   if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
 
@@ -183,69 +195,185 @@ export async function addMemberByEmail(
   const fullName = String(formData.get("full_name") ?? "").trim()
   const role = parseRole(String(formData.get("role") ?? "admin"))
 
-  if (!z.string().email().safeParse(email).success) {
+  if (!z.string().email().safeParse(email).success || email.length > 254) {
     return { error: "Indica un correo válido." }
   }
   if (isSyntheticEmail(email)) {
     return { error: "Ese correo pertenece a una cuenta de café; agrégala como usuario." }
   }
+  if (fullName.length > 80) return { error: "El nombre es demasiado largo (máximo 80 caracteres)." }
   if (!role) return { error: "Rol inválido." }
   if (!canAssignRole(ctx.role, role)) {
-    return { error: "Solo el dueño puede otorgar el rol de dueño." }
+    return { error: "Solo el dueño puede invitar a otro dueño." }
   }
 
   const admin = createAdminClient()
   const { data: existingId } = await admin.rpc("find_user_id_by_email", { p_email: email })
-
   if (existingId) {
     const membership = await getMembership(admin, ctx.business.id, existingId)
-    if (membership?.is_active) {
-      return { error: "Esa persona ya forma parte del equipo." }
-    }
-    if (membership) {
-      const { error } = await admin
-        .from("business_members")
-        .update({ is_active: true, role })
-        .eq("business_id", ctx.business.id)
-        .eq("user_id", existingId)
-      if (error) return { error: dbErrorMessage(error) }
-    } else {
-      const { error } = await admin.from("business_members").insert({
-        business_id: ctx.business.id,
-        user_id: existingId,
-        role,
-        username: null,
-      })
-      if (error) return { error: dbErrorMessage(error) }
-    }
-    // Si no tenía negocio activo, este será el suyo
-    await admin
-      .from("profiles")
-      .update({ active_business_id: ctx.business.id })
-      .eq("id", existingId)
-      .is("active_business_id", null)
-
-    await logAudit("miembro.agregado", email, { rol: role })
-    revalidateTeam()
-    return { success: true, created: false }
+    if (membership?.is_active) return { error: "Esa persona ya forma parte del equipo." }
   }
 
-  if (!fullName) {
-    return { error: "Indica el nombre de la persona (se creará su cuenta)." }
-  }
-  const tempPassword = generateTempPassword()
-  const result = await createAccountWithMembership(admin, ctx, {
-    email,
-    password: tempPassword,
-    fullName,
+  const topeError = await revisarTope(admin, ctx.business.id)
+  if (topeError) return { error: topeError }
+
+  // Una sola invitación viva por correo: si ya había una, se renueva esa
+  // (token nuevo; el enlace anterior deja de servir).
+  const token = nuevoToken()
+  const { data: viva } = await admin
+    .from("team_invitations")
+    .select("id")
+    .eq("business_id", ctx.business.id)
+    .eq("email", email)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .maybeSingle()
+  const datos = {
+    token_hash: hashDelToken(token),
     role,
-    username: null,
-  })
-  if ("error" in result) return { error: result.error }
+    full_name: fullName,
+    invited_by: ctx.userId,
+    invited_by_name: ctx.fullName,
+    ...vigenciaDesdeAhora(),
+  }
+  const { error } = viva
+    ? await admin.from("team_invitations").update(datos).eq("id", viva.id)
+    : await admin.from("team_invitations").insert({ ...datos, business_id: ctx.business.id, email })
+  if (error) return { error: dbErrorMessage(error) }
 
-  await logAudit("miembro.agregado", `${fullName} <${email}>`, { rol: role, cuenta_nueva: true })
+  const fallo = await mandarInvitacion({ email, token, cafe: ctx.business.name, quienInvita: ctx.fullName, rol: role })
+  await logAudit("miembro.invitado", email, { rol: role, ...(fallo ? { correo: "no salió" } : {}) })
   revalidateTeam()
-  return { success: true, created: true, tempPassword }
+  return { success: true, email, correoEnviado: !fallo }
+}
+
+/** Vence en VIGENCIA_DIAS a partir de este envío. */
+function vigenciaDesdeAhora() {
+  const ahora = Date.now()
+  return {
+    sent_at: new Date(ahora).toISOString(),
+    expires_at: new Date(ahora + VIGENCIA_DIAS * 24 * 60 * 60 * 1000).toISOString(),
+  }
+}
+
+/** Tope de envíos por café en 24 h (ver TOPE_POR_DIA). */
+async function revisarTope(admin: ReturnType<typeof createAdminClient>, businessId: string): Promise<string | null> {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count } = await admin
+    .from("team_invitations")
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .gte("sent_at", desde)
+  return (count ?? 0) >= TOPE_POR_DIA
+    ? `Ya se mandaron ${TOPE_POR_DIA} invitaciones en las últimas 24 horas. Vuelve a intentar mañana.`
+    : null
+}
+
+/** Una invitación viva de ESTE café, o el motivo por el que no se puede tocar. */
+async function invitacionDelCafe(
+  admin: ReturnType<typeof createAdminClient>,
+  ctx: ActiveContext,
+  id: string,
+): Promise<{ inv: { id: string; email: string; role: BusinessRole } } | { error: string }> {
+  if (!uuid.safeParse(id).success) return { error: "Invitación inválida." }
+  const { data: inv } = await admin
+    .from("team_invitations")
+    .select("id, email, role, accepted_at, revoked_at")
+    .eq("id", id)
+    .eq("business_id", ctx.business.id)
+    .maybeSingle()
+  if (!inv) return { error: "Esa invitación no es de esta cafetería." }
+  if (inv.accepted_at) return { error: "Esa invitación ya se aceptó." }
+  if (inv.revoked_at) return { error: "Esa invitación ya se canceló." }
+  if (!canAssignRole(ctx.role, inv.role)) return { error: "Solo el dueño puede tocar la invitación de otro dueño." }
+  return { inv }
+}
+
+/** Reenviar: token nuevo y 7 días más. El enlace anterior deja de servir. */
+export async function resendInvitation(id: string): Promise<ActionResult<{ correoEnviado: boolean }>> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+  const admin = createAdminClient()
+  const r = await invitacionDelCafe(admin, ctx, id)
+  if ("error" in r) return { error: r.error }
+
+  const topeError = await revisarTope(admin, ctx.business.id)
+  if (topeError) return { error: topeError }
+
+  const token = nuevoToken()
+  const { error } = await admin
+    .from("team_invitations")
+    .update({ token_hash: hashDelToken(token), invited_by: ctx.userId, invited_by_name: ctx.fullName, ...vigenciaDesdeAhora() })
+    .eq("id", r.inv.id)
+  if (error) return { error: dbErrorMessage(error) }
+
+  const fallo = await mandarInvitacion({
+    email: r.inv.email,
+    token,
+    cafe: ctx.business.name,
+    quienInvita: ctx.fullName,
+    rol: r.inv.role,
+  })
+  await logAudit("miembro.invitado", r.inv.email, { rol: r.inv.role, reenvio: true, ...(fallo ? { correo: "no salió" } : {}) })
+  revalidateTeam()
+  return { success: true, correoEnviado: !fallo }
+}
+
+/** Cancelar: el enlace deja de servir. */
+export async function revokeInvitation(id: string): Promise<ActionResult> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+  const admin = createAdminClient()
+  const r = await invitacionDelCafe(admin, ctx, id)
+  if ("error" in r) return { error: r.error }
+
+  const { error } = await admin
+    .from("team_invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", r.inv.id)
+    .is("accepted_at", null)
+  if (error) return { error: dbErrorMessage(error) }
+  await logAudit("miembro.invitacion.cancelada", r.inv.email, { rol: r.inv.role })
+  revalidateTeam()
+  return { success: true }
+}
+
+export interface InvitacionPendiente {
+  id: string
+  email: string
+  fullName: string
+  role: BusinessRole
+  sentAt: string
+  expiresAt: string
+  vencida: boolean
+}
+
+/** Las invitaciones sin contestar del café activo, la más reciente primero. */
+export async function listPendingInvitations(): Promise<ActionResult<{ invitaciones: InvitacionPendiente[] }>> {
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("team_invitations")
+    .select("id, email, full_name, role, sent_at, expires_at, accepted_at, revoked_at")
+    .eq("business_id", ctx.business.id)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .order("sent_at", { ascending: false })
+  if (error) return { error: dbErrorMessage(error) }
+  const ahora = new Date()
+  return {
+    success: true,
+    invitaciones: (data ?? []).map((i) => ({
+      id: i.id,
+      email: i.email,
+      fullName: i.full_name,
+      role: i.role,
+      sentAt: i.sent_at,
+      expiresAt: i.expires_at,
+      vencida: estadoInvitacion(i, ahora) === "vencida",
+    })),
+  }
 }
 
 /* ── Editar nombre y rol ──────────────────────────────────────────── */
@@ -503,7 +631,7 @@ export async function changeMemberEmail(formData: FormData): Promise<ActionResul
   if (!currentEmail) return { error: "No se encontró la cuenta de esa persona." }
   if (isSyntheticEmail(currentEmail)) {
     return {
-      error: "Esa cuenta entra con su usuario, no con correo. Para darle acceso por correo, agrégala de nuevo con su correo.",
+      error: "Esa cuenta entra con su usuario, no con correo. Para darle acceso por correo, invítala con su correo.",
     }
   }
 
