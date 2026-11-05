@@ -87,7 +87,7 @@ const createTicketSchema = z.object({
 
 export type CreateTicketInput = z.infer<typeof createTicketSchema>
 
-interface CreateTicketData {
+export interface CreateTicketData {
   ticketId: string
   folio: number
   subtotal: number
