@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import type { ReporteUtilidad } from "./types"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /** Los tres que casi toda cafetería paga: se ofrecen de un clic al arrancar. */
 const SUGERENCIAS: Array<{ name: string; category: CategoriaGasto }> = [
@@ -86,7 +87,7 @@ export function GastosClient({
   }
 
   function guardarFijo(datos: { id?: string; name: string; category: CategoriaGasto; monthlyAmount: number }) {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const r = await saveFixedExpense(datos)
       if (!r.success) {
         toast.error(r.error)
@@ -94,7 +95,7 @@ export function GastosClient({
       }
       setEditandoFijo(null)
       refrescar(datos.id ? "Gasto fijo actualizado." : `«${datos.name}» quedó en tus gastos de cada mes.`)
-    })
+    }))
   }
 
   function guardarGasto(datos: {
@@ -105,7 +106,7 @@ export function GastosClient({
     amount: number
     paidWith: string | null
   }) {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const r = await saveExpense(datos)
       if (!r.success) {
         toast.error(r.error)
@@ -113,7 +114,7 @@ export function GastosClient({
       }
       setEditandoGasto(null)
       refrescar(datos.id ? "Gasto actualizado." : "Gasto registrado.")
-    })
+    }))
   }
 
   return (
@@ -268,14 +269,14 @@ export function GastosClient({
                   className="mt-3 bg-white"
                   disabled={isPending}
                   onClick={() =>
-                    startTransition(async () => {
+                    startTransition(sinTumbar(async () => {
                       const r = await applyBreakEvenGoal()
                       if (!r.success) {
                         toast.error(r.error)
                         return
                       }
                       refrescar(`Tu meta del día quedó en ${formatCurrency(r.goal)}.`)
-                    })
+                    }))
                   }
                 >
                   <Target className="h-4 w-4" />
@@ -341,14 +342,14 @@ export function GastosClient({
                     disabled={isPending}
                     aria-label={f.isActive ? `Dejar de contar ${f.name}` : `Volver a contar ${f.name}`}
                     onCheckedChange={(v) =>
-                      startTransition(async () => {
+                      startTransition(sinTumbar(async () => {
                         const r = await toggleFixedExpense(f.id, v)
                         if (!r.success) {
         toast.error(r.error)
         return
       }
                         router.refresh()
-                      })
+                      }))
                     }
                   />
                   <Button variant="ghost" size="icon" onClick={() => setEditandoFijo(f)} aria-label={`Editar ${f.name}`}>
@@ -359,14 +360,14 @@ export function GastosClient({
                     size="icon"
                     aria-label={`Borrar ${f.name}`}
                     onClick={() =>
-                      startTransition(async () => {
+                      startTransition(sinTumbar(async () => {
                         const r = await deleteFixedExpense(f.id)
                         if (!r.success) {
         toast.error(r.error)
         return
       }
                         refrescar("Gasto fijo borrado.")
-                      })
+                      }))
                     }
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
@@ -425,14 +426,14 @@ export function GastosClient({
                     size="icon"
                     aria-label="Borrar gasto"
                     onClick={() =>
-                      startTransition(async () => {
+                      startTransition(sinTumbar(async () => {
                         const r = await deleteExpense(g.id)
                         if (!r.success) {
         toast.error(r.error)
         return
       }
                         refrescar("Gasto borrado.")
-                      })
+                      }))
                     }
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />

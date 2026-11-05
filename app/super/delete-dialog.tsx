@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /**
  * Borrado real de una cafetería. Dos puertas a propósito: primero hay que
@@ -46,7 +47,7 @@ export function DeleteBusinessDialog({
   const matches = typed.trim().toLowerCase() === business.slug
 
   const doDelete = () => {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await deleteBusiness({ businessId: business.id, slug: business.slug })
       if (!result.success) {
         toast.error(result.error)
@@ -66,7 +67,7 @@ export function DeleteBusinessDialog({
       setOpen(false)
       setTyped("")
       onDeleted()
-    })
+    }))
   }
 
   return (

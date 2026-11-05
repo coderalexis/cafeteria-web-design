@@ -9,6 +9,7 @@ import { installFullTemplate, installMenuPacks } from "@/app/actions/menu-packs"
 import { MENU_PACKS, packSummary } from "@/lib/menu-packs"
 import { formatCurrency } from "@/lib/format"
 import { Button } from "@/components/ui/button"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /**
  * Selector de paquetes de menú.
@@ -33,7 +34,7 @@ export function MenuPackPicker({ menuEmpty, onDone }: { menuEmpty: boolean; onDo
   }
 
   function instalar() {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await installMenuPacks(elegidos)
       if (!result.success) {
         toast.error(result.error)
@@ -50,11 +51,11 @@ export function MenuPackPicker({ menuEmpty, onDone }: { menuEmpty: boolean; onDo
       setElegidos([])
       onDone?.()
       router.refresh()
-    })
+    }))
   }
 
   function copiarEjemplo() {
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await installFullTemplate()
       if (!result.success) {
         toast.error(result.error)
@@ -63,7 +64,7 @@ export function MenuPackPicker({ menuEmpty, onDone }: { menuEmpty: boolean; onDo
       toast.success(`Se copió el menú de ejemplo: ${result.productos} productos.`)
       onDone?.()
       router.refresh()
-    })
+    }))
   }
 
   return (

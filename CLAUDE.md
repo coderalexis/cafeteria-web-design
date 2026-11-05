@@ -436,7 +436,11 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   señal, deploy a medias) tumba la pantalla ENTERA al error boundary**: React 19
   trata ese rechazo como error de render. En el POS eso es quedarse sin caja a
   media fila por anotar una merma. Dentro de una transición, la acción va
-  SIEMPRE con `try/catch` y `mensajeDeFallo(e)` (`lib/version.ts`); y tras una
+  SIEMPRE envuelta: `startTransition(sinTumbar(async () => …))`
+  (`lib/sin-tumbar.ts`, avisa con `mensajeDeFallo`), o con su propio
+  `try/catch` cuando la pantalla necesita más (el POS). La prueba
+  `tests/unit/sin-tumbar.test.ts` recorre la app y falla si aparece una
+  transición async desprotegida. Y tras una
   acción que ya revalida la ruta, NO va `router.refresh()`: la respuesta del
   POST ya trae la página nueva y pedirla otra vez era descargarla dos veces.
 - **CUALQUIER `revalidatePath` en una acción re-arma la página DESDE la que se
@@ -478,21 +482,22 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-11-04 y pendientes
 
-- Producción = `main` hasta el PR #91; migraciones aplicadas hasta la **60**
+- Producción = `main` hasta el PR #97; migraciones aplicadas hasta la **60**
   (`p46_operacion`). Lo último, de la revisión general del 2026-11-04: el token
   renovado no viaja como cookie de la acción (#85), una cafetería no puede
   cambiarle el correo a una cuenta ajena (#86), cuentas y cola sin señal
   (#87, #88), un cobro ya no descarga el POS entero (#89), crons con rastro y
   correo de errores siempre (#90), errores con cubetas y crons sin correos
-  repetidos (#91). Antes: pedido por voz en dos modos (solo `cafe-de-prueba`),
-  respaldos de 90 días, inventario Fase 1, cuentas con reconciliación de
-  sellos, avisos silenciosos en el correo de la mañana.
-- Pendiente de la revisión (en este orden): partir `pos-client.tsx` y quitar
-  duplicados (Resend, zona horaria fija), pruebas de `trialState` y
-  `force_close_cash_session`, los ~25 `startTransition(async` del panel sin
-  try/catch, invitación con aceptación en `addMemberByEmail`, la hora del
-  servidor para la cola (reloj del teléfono adelantado), y cargar bajo demanda
-  la voz y el recibo con QR cuidando que el service worker guarde esos trozos.
+  repetidos (#91); sin duplicados de correo y zona horaria, con pruebas de lo
+  que suspende y cierra cajas (#93); `pos-client.tsx` partido en barra, rejilla,
+  cobro y cuenta abierta (#94–#96); ninguna transición del panel tumba la
+  pantalla sin señal (`sinTumbar`, #97). Antes: pedido por voz en dos modos
+  (solo `cafe-de-prueba`), respaldos de 90 días, inventario Fase 1, cuentas con
+  reconciliación de sellos, avisos silenciosos en el correo de la mañana.
+- Pendiente de la revisión (en este orden): invitación con aceptación en
+  `addMemberByEmail`, la hora del servidor para la cola (reloj del teléfono
+  adelantado), y cargar bajo demanda la voz y el recibo con QR cuidando que el
+  service worker guarde esos trozos.
 - Siguiente, cuando el usuario lo pida: inventario Fase 2 (conteo en una
   pantalla, «se está acabando» en Resumen y correo semanal, «agotado» en el
   menú público) y Fase 3 (lista de compras, «lo pagué de la caja», mermas en

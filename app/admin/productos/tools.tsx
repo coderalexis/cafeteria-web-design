@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /* ------------------------------------------------------------------ */
 /*  Precios en lote                                                    */
@@ -64,7 +65,7 @@ export function BulkPricesButton({
 
   const apply = () => {
     if (!input || isPending) return
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await bulkUpdatePrices(input)
       if ("error" in result) {
         toast.error(result.error)
@@ -74,7 +75,7 @@ export function BulkPricesButton({
       setOpen(false)
       setValueInput("")
       router.refresh()
-    })
+    }))
   }
 
   const selectClass = "h-9 rounded-md border border-stone-200 bg-white px-2.5 text-sm w-full"
@@ -238,7 +239,7 @@ export function ReorderButton({
 
   const save = () => {
     if (isPending) return
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await reorderProducts({ categoryId, orderedIds: order })
       if ("error" in result) {
         toast.error(result.error)
@@ -247,7 +248,7 @@ export function ReorderButton({
       toast.success("Orden guardado.")
       setOpen(false)
       router.refresh()
-    })
+    }))
   }
 
   return (

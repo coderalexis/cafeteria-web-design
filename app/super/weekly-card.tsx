@@ -8,6 +8,7 @@ import type { WeeklySendResult } from "@/lib/weekly-summary"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 const STATUS_STYLES: Record<WeeklySendResult["status"], string> = {
   enviado: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -28,7 +29,7 @@ export function WeeklySummaryCard() {
   const run = (dry: boolean) => {
     if (isPending) return
     if (!dry && !window.confirm("¿Enviar el resumen semanal por correo a todas las cafeterías ahora?")) return
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const result = await runWeeklySummariesNow({ dry })
       if (!result.success) {
         toast.error(result.error)
@@ -37,7 +38,7 @@ export function WeeklySummaryCard() {
       setResults(result.results)
       setLastWasDry(dry)
       if (!dry) toast.success("Resúmenes procesados.")
-    })
+    }))
   }
 
   return (

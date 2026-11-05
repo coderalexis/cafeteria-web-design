@@ -8,6 +8,7 @@ import { quitarLogo, subirLogo } from "@/app/actions/business"
 import { LOGO_MAX_BYTES, TICKET_ANCHO_PUNTOS, revisarLogo, type RanuraLogo } from "@/lib/logo"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { sinTumbar } from "@/lib/sin-tumbar"
 
 /**
  * Dos logos y no uno, a propósito: el menú es una pantalla a color y el ticket
@@ -65,7 +66,7 @@ export function LogoCard({ logoMenu, logoTicket }: { logoMenu: string | null; lo
     datos.set("archivo", archivo)
 
     setSubiendo(ranura)
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const resultado = await subirLogo(datos)
       setSubiendo(null)
       if (resultado?.error) {
@@ -74,12 +75,18 @@ export function LogoCard({ logoMenu, logoTicket }: { logoMenu: string | null; lo
       }
       toast.success("Logo guardado")
       router.refresh()
-    })
+    }, alFallar))
+  }
+
+  /** Si la llamada ni llegó, la ranura no se queda con el «subiendo…» girando. */
+  function alFallar(mensaje: string) {
+    setSubiendo(null)
+    toast.error(mensaje)
   }
 
   function quitar(ranura: RanuraLogo) {
     setSubiendo(ranura)
-    startTransition(async () => {
+    startTransition(sinTumbar(async () => {
       const resultado = await quitarLogo(ranura)
       setSubiendo(null)
       if (resultado?.error) {
@@ -88,7 +95,7 @@ export function LogoCard({ logoMenu, logoTicket }: { logoMenu: string | null; lo
       }
       toast.success("Logo quitado")
       router.refresh()
-    })
+    }, alFallar))
   }
 
   return (
