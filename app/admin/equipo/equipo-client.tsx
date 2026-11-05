@@ -517,7 +517,8 @@ export default function EquipoClient({ members }: Props) {
                     />
                     <p className="text-xs text-stone-400">
                       Con este correo entra y recupera su contraseña. Si quedó mal escrito, corrígelo aquí: la persona
-                      no puede hacerlo sola porque no recibiría el correo de recuperación.
+                      no puede hacerlo sola porque no recibiría el correo de recuperación. Si también pertenece a otra
+                      cafetería, su correo ya no se cambia desde aquí.
                     </p>
                     <Button type="submit" variant="outline" disabled={isPending} className="w-full">
                       Cambiar correo

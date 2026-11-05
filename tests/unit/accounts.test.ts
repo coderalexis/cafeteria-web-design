@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   isSyntheticEmail,
+  motivoParaNoTocarLaCuenta,
   normalizeSlug,
   slugify,
   syntheticEmail,
@@ -113,5 +114,33 @@ describe("elegirCafe", () => {
       tipo: "uno",
       candidato: c("gym-coffe"),
     })
+  })
+})
+
+describe("quién puede cambiarle el correo o la contraseña a una cuenta", () => {
+  const caso = (otrosCafes: number, objetivoEsOperador = false, quienPideEsOperador = false) =>
+    motivoParaNoTocarLaCuenta({ otrosCafes, objetivoEsOperador, quienPideEsOperador })
+
+  it("la cafetería sí, cuando la cuenta es solo suya (el correo mal escrito)", () => {
+    expect(caso(0)).toBeNull()
+  })
+
+  it("no, si la cuenta también está en otro café: así se robaban la cuenta de otro dueño", () => {
+    // Registro gratis → agregar el correo de la víctima a mi equipo → cambiarle el
+    // correo por uno mío → «olvidé mi contraseña» → dentro del café de la víctima.
+    expect(caso(1)).toMatch(/otra cafetería/)
+    expect(caso(3)).toMatch(/otra cafetería/)
+  })
+
+  it("nunca la de un operador de la plataforma, aunque solo esté en este café", () => {
+    expect(caso(0, true)).toMatch(/operador/)
+  })
+
+  it("el operador sí puede (es el soporte para el correo mal escrito)", () => {
+    expect(caso(2, false, true)).toBeNull()
+  })
+
+  it("si no se pudo contar, no se toca", () => {
+    expect(caso(Number.POSITIVE_INFINITY)).not.toBeNull()
   })
 })

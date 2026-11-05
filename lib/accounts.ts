@@ -64,6 +64,32 @@ export function isSyntheticEmail(email: string | null | undefined): boolean {
   )
 }
 
+/**
+ * ¿Puede una cafetería cambiarle el correo o la contraseña a esta cuenta?
+ * Devuelve el motivo para NO hacerlo, o null si puede.
+ *
+ * Solo si la cuenta es únicamente de esa cafetería. Cambiar el correo desde
+ * Equipo existe para corregir uno mal escrito, y una cuenta que además está
+ * en otro café no es un error de captura: es la cuenta de alguien más. Sin
+ * este freno, cualquiera se registraba gratis, agregaba a su equipo el correo
+ * del dueño de otro café (eso no pide permiso), le cambiaba el correo por uno
+ * propio, pedía «olvidé mi contraseña» y entraba al café de la víctima como
+ * dueño. Las membresías inactivas cuentan igual: siguen siendo de otro café.
+ */
+export function motivoParaNoTocarLaCuenta(c: {
+  /** Membresías de la cuenta en OTRAS cafeterías, activas o no. */
+  otrosCafes: number
+  objetivoEsOperador: boolean
+  quienPideEsOperador: boolean
+}): string | null {
+  if (c.quienPideEsOperador) return null
+  if (c.objetivoEsOperador) return "Esa cuenta es de un operador de la plataforma: no se puede cambiar desde una cafetería."
+  if (c.otrosCafes > 0) {
+    return "Esa persona también pertenece a otra cafetería, así que su cuenta no se cambia desde aquí. Si de verdad su correo quedó mal escrito, pídelo al soporte de Cafecito POS."
+  }
+  return null
+}
+
 /** Contraseña temporal legible (cumple la política: letras + dígitos, 12 chars). */
 export function generateTempPassword(): string {
   const letters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"

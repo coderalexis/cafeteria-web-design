@@ -11,6 +11,7 @@ import type { BusinessRole } from "@/lib/context-shape"
 import {
   generateTempPassword,
   isSyntheticEmail,
+  motivoParaNoTocarLaCuenta,
   normalizeUsername,
   syntheticEmail,
   USERNAME_PATTERN,
@@ -49,6 +50,19 @@ async function getMembership(admin: ReturnType<typeof createAdminClient>, busine
     .eq("user_id", userId)
     .maybeSingle()
   return data
+}
+
+/**
+ * En cuántas OTRAS cafeterías está la cuenta (activa o no). Si la consulta
+ * falla se responde «en alguna», para no tocar una cuenta a ciegas.
+ */
+async function contarOtrosCafes(admin: ReturnType<typeof createAdminClient>, businessId: string, userId: string) {
+  const { count, error } = await admin
+    .from("business_members")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .neq("business_id", businessId)
+  return error ? Number.POSITIVE_INFINITY : (count ?? 0)
 }
 
 async function countActiveOwners(admin: ReturnType<typeof createAdminClient>, businessId: string) {
@@ -350,6 +364,12 @@ export async function resetMemberPassword(formData: FormData): Promise<ActionRes
   if (!isSyntheticEmail(authUser?.user?.email)) {
     return { error: "Esa cuenta entra con correo real: la contraseña la cambia la persona desde «Mi cuenta»." }
   }
+  const noTocar = motivoParaNoTocarLaCuenta({
+    otrosCafes: await contarOtrosCafes(admin, ctx.business.id, userId),
+    objetivoEsOperador: false,
+    quienPideEsOperador: ctx.isPlatformAdmin,
+  })
+  if (noTocar) return { error: noTocar }
 
   const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword })
   if (error) return { error: error.message }
@@ -428,13 +448,22 @@ export async function removeMember(formData: FormData): Promise<ActionResult> {
 export async function getMemberEmails(
   userIds: string[],
 ): Promise<ActionResult<{ emails: Record<string, string | null> }>> {
-  const { error: authError } = await requireAdmin()
-  if (authError) return { error: authError }
+  const { ctx, error: authError } = await requireAdmin()
+  if (authError || !ctx) return { error: authError ?? "Sesión inválida." }
 
   const admin = createAdminClient()
+  // Solo de quien está en ESTE equipo: la función es pública como cualquier
+  // server action, y sin el filtro devolvía el correo de cualquier cuenta.
+  const pedidos = userIds.slice(0, 100).filter((id) => uuid.safeParse(id).success)
+  const { data: delEquipo } = await admin
+    .from("business_members")
+    .select("user_id")
+    .eq("business_id", ctx.business.id)
+    .in("user_id", pedidos)
+  const propios = new Set((delEquipo ?? []).map((m) => m.user_id))
   const emails: Record<string, string | null> = {}
-  for (const id of userIds.slice(0, 100)) {
-    if (!uuid.safeParse(id).success) continue
+  for (const id of pedidos) {
+    if (!propios.has(id)) continue
     const { data } = await admin.auth.admin.getUserById(id)
     const email = data?.user?.email ?? null
     emails[id] = email && !isSyntheticEmail(email) ? email : null
@@ -478,16 +507,19 @@ export async function changeMemberEmail(formData: FormData): Promise<ActionResul
     }
   }
 
-  // Un administrador de cafetería no puede apoderarse de la cuenta de un
-  // operador de la plataforma cambiándole el correo.
+  // Nadie se apodera de una cuenta ajena cambiándole el correo: ni de un
+  // operador de la plataforma, ni de alguien que además está en otro café.
   const { data: targetProfile } = await admin
     .from("profiles")
     .select("full_name, is_platform_admin")
     .eq("id", userId)
     .maybeSingle()
-  if (targetProfile?.is_platform_admin && !ctx.isPlatformAdmin) {
-    return { error: "No puedes cambiar el correo de un operador de la plataforma." }
-  }
+  const noTocar = motivoParaNoTocarLaCuenta({
+    otrosCafes: await contarOtrosCafes(admin, ctx.business.id, userId),
+    objetivoEsOperador: targetProfile?.is_platform_admin === true,
+    quienPideEsOperador: ctx.isPlatformAdmin,
+  })
+  if (noTocar) return { error: noTocar }
 
   if (currentEmail === email) return { error: "Ese ya es su correo actual." }
 
