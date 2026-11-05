@@ -4,7 +4,6 @@ import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireSuperAdmin } from "@/lib/context"
-import { escapeHtml, sendWithResend } from "@/lib/email"
 import { ERRORES_DIAS } from "@/lib/errores"
 import type { ActionResult } from "./types"
 
@@ -105,65 +104,4 @@ export async function getRecentErrors(days = ERRORES_DIAS): Promise<ActionResult
     }
   }
   return { success: true, errors: [...grupos.values()] }
-}
-
-/**
- * Resumen de las últimas 24 h para el operador. Lo dispara el cron diario;
- * si no hubo errores no manda nada, para que un correo signifique algo.
- */
-export async function sendErrorDigest(options: { dryRun: boolean }): Promise<{
-  sent: boolean
-  count: number
-  error?: string
-}> {
-  const admin = createAdminClient()
-  const desde = new Date(Date.now() - 24 * 3600_000).toISOString()
-  const { data, error } = await admin
-    .from("app_errors")
-    .select("route, message, created_at, businesses(name)")
-    .gte("created_at", desde)
-    .order("created_at", { ascending: false })
-    .limit(500)
-  if (error) return { sent: false, count: 0, error: error.message }
-  const filas = data ?? []
-  if (filas.length === 0) return { sent: false, count: 0 }
-
-  const grupos = new Map<string, { n: number; biz: string; route: string; message: string }>()
-  for (const r of filas) {
-    const biz = r.businesses as unknown as { name: string } | { name: string }[] | null
-    const nombre = (Array.isArray(biz) ? biz[0]?.name : biz?.name) ?? "(sin sesión)"
-    const clave = `${nombre}|${r.route}|${r.message}`
-    const g = grupos.get(clave)
-    if (g) g.n += 1
-    else grupos.set(clave, { n: 1, biz: nombre, route: r.route, message: r.message })
-  }
-  const lista = [...grupos.values()].sort((a, b) => b.n - a.n)
-
-  const destino = process.env.OPERATOR_EMAIL
-  const apiKey = process.env.RESEND_API_KEY
-  if (!destino || !apiKey) return { sent: false, count: filas.length, error: "Falta OPERATOR_EMAIL o RESEND_API_KEY." }
-  if (options.dryRun) return { sent: false, count: filas.length }
-
-  const text = lista.map((g) => `${g.n}× · ${g.biz} · ${g.route}\n   ${g.message}`).join("\n\n")
-  const html = `<p>Errores y avisos de las últimas 24 horas en Cafecito POS (${filas.length} en total, ${lista.length} distintos):</p>
-<table style="border-collapse:collapse;font:14px system-ui">
-${lista
-  .map(
-    (g) =>
-      `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap"><b>${g.n}×</b></td><td style="padding:6px 10px;border-bottom:1px solid #eee">${escapeHtml(g.biz)} · <code>${escapeHtml(g.route)}</code><br><span style="color:#555">${escapeHtml(g.message)}</span></td></tr>`,
-  )
-  .join("\n")}
-</table>
-<p style="color:#777;font-size:12px">El detalle con traza y hora está en /super.</p>`
-
-  const fallo = await sendWithResend({
-    apiKey,
-    fromName: "Cafecito POS",
-    fromAddress: "alertas@cafecitopos.com",
-    to: [destino],
-    subject: `Cafecito POS: ${filas.length} ${filas.length === 1 ? "aviso o error" : "avisos y errores"} en las últimas 24 h`,
-    html,
-    text,
-  })
-  return fallo ? { sent: false, count: filas.length, error: fallo } : { sent: true, count: filas.length }
 }

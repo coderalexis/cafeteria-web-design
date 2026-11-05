@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Copy, ExternalLink, Printer, QrCode } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { escapeHtml } from "@/lib/receipt"
 
 /**
  * QR del menú público. El cartel se imprime en una ventana aparte (el panel
@@ -41,8 +42,12 @@ export function MenuQrCard({
       toast.error("El navegador bloqueó la ventana de impresión.")
       return
     }
+    // El nombre lo puede cambiar un administrador y esta ventana corre con la
+    // sesión de quien imprime (el dueño, o el operador «como dueño»): sin
+    // escapar, un nombre con <img onerror=…> ejecutaba código en su sesión.
+    const nombre = escapeHtml(businessName)
     win.document.write(
-      `<html><head><title>Menú de ${businessName}</title><style>
+      `<html><head><title>Menú de ${nombre}</title><style>
         body { font-family: system-ui, Arial, sans-serif; text-align: center; padding: 48px 24px; margin: 0; }
         h1 { font-size: 28px; margin: 0 0 4px; }
         p.sub { color: #78716c; margin: 0 0 28px; font-size: 15px; }
@@ -50,10 +55,10 @@ export function MenuQrCard({
         p.url { color: #a8a29e; font-size: 12px; margin-top: 24px; word-break: break-all; }
         @page { margin: 12mm; }
       </style></head><body>
-        <h1>${businessName}</h1>
+        <h1>${nombre}</h1>
         <p class="sub">Escanea para ver el menú</p>
         ${svg}
-        <p class="url">${url}</p>
+        <p class="url">${escapeHtml(url)}</p>
         <script>window.onload = function () { window.print() }<\/script>
       </body></html>`,
     )

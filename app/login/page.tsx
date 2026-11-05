@@ -1,5 +1,7 @@
 "use client"
 
+import { unstable_rethrow } from "next/navigation"
+import { mensajeDeFallo } from "@/lib/version"
 import { useEffect, useState, useTransition } from "react"
 import { borrarCacheDelPos } from "@/lib/arranque-rapido"
 import Link from "next/link"
@@ -55,7 +57,16 @@ export default function LoginPage() {
     formData.set("cafeEscrito", mostrarCafe ? "1" : "")
     if (slug) window.localStorage.setItem(BUSINESS_STORAGE_KEY, slug)
     startTransition(async () => {
-      const result = await login(formData)
+      // Sin señal (o un deploy a medias) la acción rechaza, y dentro de una
+      // transición eso tumbaba la pantalla entera: se dice y se sigue.
+      let result: Awaited<ReturnType<typeof login>>
+      try {
+        result = await login(formData)
+      } catch (e) {
+        unstable_rethrow(e)
+        setError(mensajeDeFallo(e))
+        return
+      }
       // Si llegamos aquí, el login falló (el éxito redirige)
       if (result?.error) {
         setError(result.error)

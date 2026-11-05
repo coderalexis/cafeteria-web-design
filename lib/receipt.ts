@@ -478,11 +478,13 @@ export function buildCorteLines(s: CashSessionSummary, biz: ReceiptBusiness): st
 /*  Popup de impresión                                                 */
 /* ------------------------------------------------------------------ */
 
-function escapeHtml(text: string): string {
+/** Texto ajeno dentro del HTML de una ventana de impresión (misma origen que la app). */
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
 }
 
 /**

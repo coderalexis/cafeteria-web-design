@@ -1,4 +1,8 @@
 import { previewWeeklyHtml, runWeeklySummaries } from "@/lib/weekly-summary"
+import { anotarFallosDelCron, rechazoDelCron } from "@/lib/cron"
+
+/** Un correo por cafetería: que un Resend lento no corte el cron a medias. */
+export const maxDuration = 60
 
 /**
  * GET /api/resumen-semanal — lo dispara el cron de Vercel cada lunes 14:00 UTC
@@ -10,13 +14,8 @@ import { previewWeeklyHtml, runWeeklySummaries } from "@/lib/weekly-summary"
  * · ?html=1&business=slug (devuelve el HTML del correo, sin enviar).
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
-    return Response.json({ error: "Falta CRON_SECRET en el entorno." }, { status: 503 })
-  }
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return new Response("No autorizado", { status: 401 })
-  }
+  const rechazo = rechazoDelCron(request)
+  if (rechazo) return rechazo
 
   const url = new URL(request.url)
 
@@ -28,10 +27,20 @@ export async function GET(request: Request) {
     return new Response(preview.html, { headers: { "Content-Type": "text/html; charset=utf-8" } })
   }
 
+  const dryRun = url.searchParams.get("dry") === "1"
   const { results, error } = await runWeeklySummaries({
-    dryRun: url.searchParams.get("dry") === "1",
+    dryRun,
     onlySlug: url.searchParams.get("business"),
   })
+  // Un resumen que no salió se ve en el correo de errores del día siguiente.
+  if (!dryRun) {
+    await anotarFallosDelCron("resumen-semanal", [
+      ...(error ? [{ detalle: `Resumen semanal: ${error}` }] : []),
+      ...results
+        .filter((r) => r.status === "error")
+        .map((r) => ({ businessId: r.businessId, detalle: `Resumen semanal de ${r.name}: ${r.detail}` })),
+    ])
+  }
   if (error) {
     return Response.json({ error }, { status: 500 })
   }

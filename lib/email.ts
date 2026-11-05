@@ -18,17 +18,25 @@ export async function sendWithResend(args: {
   html: string
   text: string
 }): Promise<string | null> {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${args.apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: `${args.fromName} <${args.fromAddress ?? "resumen@cafecitopos.com"}>`,
-      to: args.to,
-      subject: args.subject,
-      html: args.html,
-      text: args.text,
-    }),
-  })
+  let response: Response
+  try {
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${args.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `${args.fromName} <${args.fromAddress ?? "resumen@cafecitopos.com"}>`,
+        to: args.to,
+        subject: args.subject,
+        html: args.html,
+        text: args.text,
+      }),
+      // Un Resend que no contesta no puede comerse el tiempo del cron entero:
+      // los demás cafés también tienen correo que mandar.
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch (e) {
+    return `Resend no contestó: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200)
+  }
   if (!response.ok) {
     const body = await response.text().catch(() => "")
     return `Resend ${response.status}: ${body.slice(0, 200)}`

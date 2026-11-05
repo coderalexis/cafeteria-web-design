@@ -1,5 +1,7 @@
 "use client"
 
+import { unstable_rethrow } from "next/navigation"
+import { mensajeDeFallo } from "@/lib/version"
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { requestPasswordReset } from "@/app/actions/auth"
@@ -16,7 +18,16 @@ export default function OlvideContrasenaPage() {
     setError(null)
     const email = String(formData.get("email") ?? "").trim().toLowerCase()
     startTransition(async () => {
-      const result = await requestPasswordReset(formData)
+      // Sin señal (o un deploy a medias) la acción rechaza, y dentro de una
+      // transición eso tumbaba la pantalla entera: se dice y se sigue.
+      let result: Awaited<ReturnType<typeof requestPasswordReset>>
+      try {
+        result = await requestPasswordReset(formData)
+      } catch (e) {
+        unstable_rethrow(e)
+        setError(mensajeDeFallo(e))
+        return
+      }
       if (result?.error) {
         setError(result.error)
         return

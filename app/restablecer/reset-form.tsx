@@ -1,7 +1,8 @@
 "use client"
 
+import { mensajeDeFallo } from "@/lib/version"
 import { useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, unstable_rethrow } from "next/navigation"
 import { toast } from "sonner"
 import { completePasswordReset } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,16 @@ export function ResetPasswordForm() {
   function handleSubmit(formData: FormData) {
     setError(null)
     startTransition(async () => {
-      const result = await completePasswordReset(formData)
+      // Sin señal (o un deploy a medias) la acción rechaza, y dentro de una
+      // transición eso tumbaba la pantalla entera: se dice y se sigue.
+      let result: Awaited<ReturnType<typeof completePasswordReset>>
+      try {
+        result = await completePasswordReset(formData)
+      } catch (e) {
+        unstable_rethrow(e)
+        setError(mensajeDeFallo(e))
+        return
+      }
       if (result?.error) {
         setError(result.error)
         return
