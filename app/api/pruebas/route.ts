@@ -1,6 +1,6 @@
 import { runTrialCheck } from "@/lib/trials"
 import { sendErrorDigest } from "@/lib/correo-errores"
-import { anotarFallosDelCron, rechazoDelCron } from "@/lib/cron"
+import { anotarFallosDelCron, limpiarEnviosViejos, rechazoDelCron } from "@/lib/cron"
 
 /** Varias cafeterías, cada una con su correo: que un Resend lento no corte el cron a medias. */
 export const maxDuration = 60
@@ -31,6 +31,7 @@ export async function GET(request: Request) {
   // Lo que no salió queda en app_errors ANTES del resumen: así llega en el
   // correo de esta misma mañana y no solo en una respuesta que nadie lee.
   if (!dryRun) {
+    await limpiarEnviosViejos()
     await anotarFallosDelCron("pruebas", [
       ...(prueba.error ? [{ detalle: `Revisión de pruebas: ${prueba.error}` }] : []),
       ...(prueba.barrido ? [{ detalle: prueba.barrido }] : []),

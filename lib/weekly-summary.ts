@@ -2,6 +2,7 @@ import "server-only"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendWithResend } from "@/lib/email"
+import { reservarEnvio } from "@/lib/cron"
 import { isSyntheticEmail } from "@/lib/accounts"
 import { addDays, dateStringInTz, formatDateString, type DateString } from "@/lib/dates"
 import { formatCurrency } from "@/lib/format"
@@ -217,6 +218,12 @@ export async function runWeeklySummaries(options: {
         continue
       }
 
+      // Un resumen por café y por semana, aunque el cron corra dos veces.
+      const reserva = await reservarEnvio("resumen-semanal", `${biz.id}:${from}`)
+      if (!reserva.primera) {
+        results.push({ ...base, status: "omitido", detail: `Ya se mandó el de la semana del ${from}.` })
+        continue
+      }
       const sendError = await sendWithResend({
         apiKey: apiKey!,
         fromName: `${biz.name} · Cafecito POS`,
@@ -226,6 +233,7 @@ export async function runWeeklySummaries(options: {
         text: buildWeeklyEmailText(summary),
       })
       if (sendError) {
+        await reserva.liberar()
         results.push({ ...base, status: "error", detail: sendError })
       } else {
         results.push({ ...base, status: "enviado", detail: `Semana del ${from} al ${to}.`, recipients: emails })

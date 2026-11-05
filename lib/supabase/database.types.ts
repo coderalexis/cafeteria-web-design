@@ -545,6 +545,24 @@ export type Database = {
           },
         ]
       }
+      cron_corridas: {
+        Row: {
+          clave: string
+          creada: string
+          trabajo: string
+        }
+        Insert: {
+          clave: string
+          creada?: string
+          trabajo: string
+        }
+        Update: {
+          clave?: string
+          creada?: string
+          trabajo?: string
+        }
+        Relationships: []
+      }
       deleted_businesses: {
         Row: {
           business_id: string

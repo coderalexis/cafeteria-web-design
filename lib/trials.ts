@@ -6,6 +6,7 @@ import { formatDateString, dateStringInTz, type DateString } from "@/lib/dates"
 import { trialState } from "@/lib/signup"
 import { closeStaleSessions } from "@/lib/stale-cash"
 import { escapeHtml, sendWithResend } from "@/lib/email"
+import { reservarEnvio } from "@/lib/cron"
 
 /**
  * Vigilancia diaria de las pruebas gratuitas (/api/pruebas, cron de Vercel).
@@ -174,7 +175,14 @@ export async function runTrialCheck(options: {
         results.push({ ...base, action: "error", detail: "Falta RESEND_API_KEY en el entorno." })
         continue
       }
+      // Un aviso por café, por estado y por día, aunque el cron corra dos veces.
+      const reserva = await reservarEnvio("aviso-prueba", `${biz.id}:${state}:${dateStringInTz(biz.timezone, now)}`)
+      if (!reserva.primera) {
+        results.push({ ...base, action: "sin-cambios", detail: "Ya se le avisó hoy." })
+        continue
+      }
       const sendError = await sendWithResend({ apiKey, fromName: "Cafecito POS", fromAddress: "avisos@cafecitopos.com", to: emails, ...mail })
+      if (sendError) await reserva.liberar()
       results.push(
         sendError
           ? { ...base, action: "error", detail: sendError }
