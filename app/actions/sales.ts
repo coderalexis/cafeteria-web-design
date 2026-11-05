@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidarFueraDelPos } from "@/lib/revalidar"
 import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { checkExpectedBusiness, requireContext } from "@/lib/context"
@@ -16,9 +16,9 @@ import {
 import type { ActionResult } from "./types"
 import { cambiosDe, type CambioExistencia } from "@/lib/existencias"
 
+/** Desde el POS no se revalida: ver lib/revalidar.ts. */
 function revalidateSales() {
-  revalidatePath("/admin", "layout")
-  revalidatePath("/pos")
+  return revalidarFueraDelPos(["/admin", "layout"], "/pos")
 }
 
 /* ------------------------------------------------------------------ */
@@ -154,7 +154,7 @@ export async function createTicket(
     credit: { customer_id: string; name: string; balance: number } | null
   }
 
-  revalidateSales()
+  await revalidateSales()
 
   return {
     success: true,
@@ -247,7 +247,7 @@ export async function correctTicket(
     return it.variant_id && fila ? [{ variant_id: it.variant_id, qty: fila.qty }] : []
   })
 
-  revalidateSales()
+  await revalidateSales()
 
   return {
     success: true,
@@ -295,7 +295,7 @@ export async function cancelTicket(
     return { error: error.message }
   }
 
-  revalidateSales()
+  await revalidateSales()
   return { success: true, folio: (data as { folio: number }).folio, stock: cambiosDe(data) }
 }
 

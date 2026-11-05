@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { previewPromotion } from "@/app/actions/promotions"
+import type { previewPromotion } from "@/app/actions/promotions"
 import { type CartLine, linesToItems } from "./cart"
 
 /* ── Promoción viva ────────────────────────────────────────────────
@@ -28,15 +28,30 @@ export function usePromoPreview(lines: CartLine[], otroDescuento: boolean, hayPr
       return
     }
     let vigente = true
+    const corte = new AbortController()
     // Un respiro antes de preguntar: agregar tres productos seguidos no debe
-    // disparar tres viajes al servidor.
+    // disparar tres viajes al servidor. Va por `fetch` y no como server
+    // action: como acción hacía fila delante del cobro (app/pos/datos/promocion).
     const t = setTimeout(async () => {
-      const r = await previewPromotion(JSON.parse(promoClave))
-      if (vigente) setPromo(r.success ? r.promo : null)
+      try {
+        const res = await fetch("/pos/datos/promocion", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: promoClave,
+          cache: "no-store",
+          signal: corte.signal,
+        })
+        const r = (res.ok ? await res.json() : null) as Awaited<ReturnType<typeof previewPromotion>> | null
+        if (vigente) setPromo(r?.success ? r.promo : null)
+      } catch {
+        // Sin señal o cancelada porque el carrito cambió: sin vista previa. Cobrar decide igual.
+        if (vigente) setPromo(null)
+      }
     }, 400)
     return () => {
       vigente = false
       clearTimeout(t)
+      corte.abort()
     }
   }, [promoClave])
   return { promo, sinPromo }

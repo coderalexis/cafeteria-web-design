@@ -434,6 +434,18 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   SIEMPRE con `try/catch` y `mensajeDeFallo(e)` (`lib/version.ts`); y tras una
   acción que ya revalida la ruta, NO va `router.refresh()`: la respuesta del
   POST ya trae la página nueva y pedirla otra vez era descargarla dos veces.
+- **CUALQUIER `revalidatePath` en una acción re-arma la página DESDE la que se
+  llamó** (sea cual sea la ruta: «TODO: only revalidate if the path matches» en
+  el código de Next) y la manda pegada a la respuesta. Desde el POS eso era
+  bajar el POS entero en cada cobro (52.6 KB y 1.08 s en local, contra 0.3 KB
+  y 0.40 s sin revalidar). Por eso las acciones que usa el POS revalidan con
+  `revalidarFueraDelPos` (`lib/revalidar.ts`): el middleware marca la página en
+  `x-cafecito-ruta` y desde `/pos` no se revalida; el POS pone al día lo suyo
+  con lo que devuelve cada acción, y donde de verdad cambian los datos de la
+  página (abrir/cerrar caja, cancelar, fiados) pide UN `router.refresh()`.
+  Y lo que se consulta en segundo plano (sondeo de cuentas, vista previa de
+  promoción) va por `fetch` a `app/pos/datos/*`, no como server action: las
+  acciones de una pestaña van EN FILA y un sondeo lento hacía esperar al cobro.
 - `ActionResult`: la rama de error es `{ error: string }` y `""` es falso,
   así que `if (r?.error)` NO acota para TypeScript; usar `if (!r.success)`.
   Un archivo «use server» solo exporta funciones async (una constante

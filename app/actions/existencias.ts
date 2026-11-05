@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "@/lib/zod"
-import { revalidatePath } from "next/cache"
+import { revalidarFueraDelPos } from "@/lib/revalidar"
 import { createClient } from "@/lib/supabase/server"
 import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActionResult } from "./types"
@@ -17,9 +17,9 @@ import type { CambioExistencia, KindMovimiento, Movimiento } from "@/lib/existen
 /*  devuelve a lo que la pantalla y el POS necesitan.                   */
 /* ------------------------------------------------------------------ */
 
+/** Desde el POS no se revalida: ver lib/revalidar.ts. */
 function revalidar() {
-  revalidatePath("/admin/existencias")
-  revalidatePath("/pos")
+  return revalidarFueraDelPos("/admin/existencias", "/pos")
 }
 
 /** Hasta dónde se lee el historial de un artículo: meses de una cafetería normal. */
@@ -86,7 +86,7 @@ export async function contarDelMenu(
   })
   if (error) return { error: dbErrorMessage(error) }
   const r = (data ?? {}) as { item_id?: string; qty?: number; min_qty?: number }
-  revalidar()
+  await revalidar()
   return { success: true, itemId: String(r.item_id ?? ""), qty: Number(r.qty ?? 0), minQty: Number(r.min_qty ?? 0) }
 }
 
@@ -116,7 +116,7 @@ export async function guardarInsumo(
   })
   if (error) return { error: dbErrorMessage(error) }
   const r = (data ?? {}) as { item_id?: string; supply_id?: string; qty?: number }
-  revalidar()
+  await revalidar()
   return {
     success: true,
     itemId: String(r.item_id ?? ""),
@@ -147,7 +147,7 @@ export async function dejarDeContar(input: {
   } else {
     return { error: "Artículo inválido." }
   }
-  revalidar()
+  await revalidar()
   return { success: true }
 }
 
@@ -181,7 +181,7 @@ export async function registrarMovimiento(
   if (error) return { error: dbErrorMessage(error) }
   const r = (data ?? {}) as { qty?: number; qty_after?: number; moved?: boolean }
   const qtyAfter = Number(r.qty_after ?? 0)
-  revalidar()
+  await revalidar()
   return {
     success: true,
     cambios: [{ item_id: v.itemId, qty: qtyAfter }],
