@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import {
   useState,
   useEffect,
@@ -46,8 +47,8 @@ import { DividirCuentaDialog } from "./dividir-cuenta-dialog"
 import { TicketHistoryDialog } from "./ticket-history-dialog"
 import { RecentOrdersDialog } from "./recent-orders-dialog"
 import { ModifierSheet } from "./modifier-sheet"
-import { useDictado } from "./voz/use-dictado"
-import { DictadoPanel } from "./voz/dictado-panel"
+import type { BotonDictado } from "./voz/dictado-mostrador"
+import { precargarQr } from "@/components/qr-diferido"
 import { ParkDialog, ParkedTrayDialog } from "./parked-dialog"
 import { AccountDialog } from "./account-dialog"
 import { useParkedOrders } from "./use-parked-orders"
@@ -106,6 +107,13 @@ import {
 export type { ModifierGroup, ModifierOption, Product, SizeOption, TicketDiscount } from "./cart"
 import { aplicarCambios, esquinaProducto, porVariante, type CambioExistencia, type ItemExistencia } from "@/lib/existencias"
 import { ExistenciasPosDialog } from "./existencias-dialog"
+
+// La voz solo existe donde VOZ_CAFES la nombra: su código se baja solo ahí
+// (ver voz/dictado-mostrador.tsx). Si el trozo no llega, el POS sigue sin voz.
+const DictadoMostrador = dynamic(
+  () => import("./voz/dictado-mostrador").then((m) => m.DictadoMostrador).catch(() => () => null),
+  { ssr: false },
+)
 
 interface POSClientProps {
   categories: Category[]
@@ -473,19 +481,24 @@ export default function POSClient({
   // Layout: en pantallas chicas el carrito vive en una hoja inferior
   const isMobile = useIsMobile()
 
+  // El QR de la nota se baja aparte (components/qr-diferido.tsx). Donde el café
+  // la tiene encendida se baja en reposo, ya con el POS pintado: así el service
+  // worker lo guarda y está a mano aunque después se vaya la señal.
+  useEffect(() => {
+    if (!publicReceipt) return
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void }
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(precargarQr)
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(precargarQr, 3000)
+    return () => window.clearTimeout(t)
+  }, [publicReceipt])
+
   // Modo ayudante (voz): el cajero dicta y entra directo al carrito. Lo que
-  // llega sin un extra obligatorio abre la MISMA hoja que un toque.
-  const dictado = useDictado({
-    productos: products,
-    alAgregar: (product, size, modifiers, cantidad, nota) => {
-      addLineas(product, size, modifiers, cantidad, nota)
-      vibra(12)
-    },
-    alAbrirHoja: (product, size) => setPendingModifiers({ product, size }),
-    lineas: lines,
-    alQuitarLinea: removeLine,
-    alCambiarCantidad: (lineId, cantidad) => (cantidad <= 0 ? removeLine(lineId) : setQuantityTo(lineId, cantidad)),
-  })
+  // llega sin un extra obligatorio abre la MISMA hoja que un toque. El botón
+  // del encabezado sabe del dictado por lo que le avisa DictadoMostrador.
+  const [botonDictado, setBotonDictado] = useState<BotonDictado | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
 
   // ── Encabezado que se encoge (móvil) ──
@@ -1549,7 +1562,7 @@ export default function POSClient({
           onAprender={() => setShowAprender(true)}
           onExistencias={existencias.length > 0 ? () => setShowExistencias(true) : undefined}
           vozEnMostrador={vozEnMostrador}
-          dictado={vozEnMostrador ? { activo: dictado.estado === "conectando" || dictado.estado === "escuchando", alternar: dictado.alternar } : undefined}
+          dictado={vozEnMostrador ? (botonDictado ?? undefined) : undefined}
           instalar={instalar}
           parkedEnabled={cuentasActivas}
           openAccount={openAccount}
@@ -1876,7 +1889,23 @@ export default function POSClient({
           onClose={() => setAccountToView(null)}
         />
       )}
-      {vozEnMostrador && <DictadoPanel dictado={dictado} isMobile={isMobile === true} />}
+      {vozEnMostrador && (
+        <DictadoMostrador
+          isMobile={isMobile === true}
+          alCambiar={setBotonDictado}
+          opciones={{
+            productos: products,
+            alAgregar: (product, size, modifiers, cantidad, nota) => {
+              addLineas(product, size, modifiers, cantidad, nota)
+              vibra(12)
+            },
+            alAbrirHoja: (product, size) => setPendingModifiers({ product, size }),
+            lineas: lines,
+            alQuitarLinea: removeLine,
+            alCambiarCantidad: (lineId, cantidad) => (cantidad <= 0 ? removeLine(lineId) : setQuantityTo(lineId, cantidad)),
+          }}
+        />
+      )}
       <ModifierSheet
         pending={pendingModifiers}
         onClose={() => setPendingModifiers(null)}

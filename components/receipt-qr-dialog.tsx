@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import QRCode from "react-qr-code"
+import { QrDiferido } from "@/components/qr-diferido"
 import { Copy, QrCode } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -62,7 +62,7 @@ export function ReceiptQrDialog({
         <div className="flex flex-col items-center gap-3">
           {url && (
             <div className="rounded-xl border border-stone-200 bg-white p-3">
-              <QRCode value={url} size={168} bgColor="#ffffff" fgColor="#1c1917" />
+              <QrDiferido value={url} size={168} bgColor="#ffffff" fgColor="#1c1917" />
             </div>
           )}
           {/* Copiar el enlace: sirve para mandarlo por WhatsApp cuando el
