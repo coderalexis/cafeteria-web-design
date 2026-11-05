@@ -1,5 +1,7 @@
 "use client"
 
+import { unstable_rethrow } from "next/navigation"
+import { mensajeDeFallo } from "@/lib/version"
 import { useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { LockKeyhole, Loader2 } from "lucide-react"
@@ -18,7 +20,16 @@ export function PinCard({ hasPin, businessName }: { hasPin: boolean; businessNam
   function handleSubmit(formData: FormData) {
     setError(null)
     startTransition(async () => {
-      const result = await setMyPin(formData)
+      // Sin señal (o un deploy a medias) la acción rechaza, y dentro de una
+      // transición eso tumbaba la pantalla entera: se dice y se sigue.
+      let result: Awaited<ReturnType<typeof setMyPin>>
+      try {
+        result = await setMyPin(formData)
+      } catch (e) {
+        unstable_rethrow(e)
+        setError(mensajeDeFallo(e))
+        return
+      }
       if (result?.error) {
         setError(result.error)
         return

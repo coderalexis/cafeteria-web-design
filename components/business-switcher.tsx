@@ -1,7 +1,8 @@
 "use client"
 
+import { mensajeDeFallo } from "@/lib/version"
 import { useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, unstable_rethrow } from "next/navigation"
 import { toast } from "sonner"
 import { Check, ChevronsUpDown, Loader2, Store } from "lucide-react"
 import { switchBusiness } from "@/app/actions/business"
@@ -42,7 +43,17 @@ export function BusinessSwitcher({ memberships, activeId, variant = "full", clas
     if (id === activeId) return
     setSwitchingTo(id)
     startTransition(async () => {
-      const result = await switchBusiness(id)
+      // Sin señal (o un deploy a medias) la acción rechaza, y dentro de una
+      // transición eso tumbaba la pantalla entera: se dice y se sigue.
+      let result: Awaited<ReturnType<typeof switchBusiness>>
+      try {
+        result = await switchBusiness(id)
+      } catch (e) {
+        unstable_rethrow(e)
+        setSwitchingTo(null)
+        toast.error(mensajeDeFallo(e))
+        return
+      }
       setSwitchingTo(null)
       if (!result.success) {
         toast.error(result.error)

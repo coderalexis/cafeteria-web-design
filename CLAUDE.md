@@ -106,7 +106,12 @@ termina su prueba, suspende las vencidas salvo que tengan caja abierta, cierra
 cajas olvidadas y manda el **correo de errores y avisos** del día al
 operador) y `/api/resumen-semanal` los lunes 14:00 UTC (resumen por correo a
 cada café que lo tenga encendido). Respaldo diario de la base por GitHub
-Actions (`backup.yml`, 09:00 UTC).
+Actions (`backup.yml`, 09:00 UTC). Lo común de los crons vive en `lib/cron.ts`:
+el secreto se compara en tiempo constante, y lo que un cron no pudo hacer (un
+aviso que no salió, el barrido de cajas que falló) se anota en `app_errors` con
+digest `cron`, así que llega en el correo de la mañana; ese correo sale SIEMPRE,
+aunque la revisión de pruebas falle (`lib/correo-errores.ts`). En local los
+crons responden 503: `CRON_SECRET` solo existe en Vercel.
 
 **Errores y avisos.** El cliente y las actions reportan por el RPC
 `report_error` (anti-tormenta 300/h) a `app_errors`; `/super` los agrupa y el

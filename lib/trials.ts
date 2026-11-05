@@ -5,6 +5,7 @@ import { isSyntheticEmail } from "@/lib/accounts"
 import { formatDateString, dateStringInTz, type DateString } from "@/lib/dates"
 import { trialState } from "@/lib/signup"
 import { closeStaleSessions } from "@/lib/stale-cash"
+import { escapeHtml, sendWithResend } from "@/lib/email"
 
 /**
  * Vigilancia diaria de las pruebas gratuitas (/api/pruebas, cron de Vercel).
@@ -24,16 +25,12 @@ import { closeStaleSessions } from "@/lib/stale-cash"
 
 export interface TrialResult {
   slug: string
+  /** Para anotar el fallo en app_errors a nombre del café. */
+  businessId?: string
   name: string
   action: "aviso" | "suspendida" | "esperando-corte" | "sin-cambios" | "error"
   detail: string
   recipients?: string[]
-}
-
-const FROM = "Cafecito POS <avisos@cafecitopos.com>"
-
-function esc(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
 export function trialEmail(args: {
@@ -55,31 +52,15 @@ export function trialEmail(args: {
 
   const html = [
     '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#292524">',
-    `<h1 style="font-size:19px;margin:0 0 12px">${esc(args.businessName)}</h1>`,
-    `<p style="font-size:15px;line-height:1.6;margin:0 0 16px${ultimo ? ";color:#b91c1c;font-weight:600" : ""}">${esc(cuerpo)}</p>`,
-    `<p style="font-size:15px;line-height:1.6;margin:0 0 16px">${esc(nota)}</p>`,
+    `<h1 style="font-size:19px;margin:0 0 12px">${escapeHtml(args.businessName)}</h1>`,
+    `<p style="font-size:15px;line-height:1.6;margin:0 0 16px${ultimo ? ";color:#b91c1c;font-weight:600" : ""}">${escapeHtml(cuerpo)}</p>`,
+    `<p style="font-size:15px;line-height:1.6;margin:0 0 16px">${escapeHtml(nota)}</p>`,
     '<p style="font-size:13px;color:#78716c;margin:24px 0 0">Cafecito POS · cafecitopos.com</p>',
     "</div>",
   ].join("\n")
 
   const text = `${args.businessName}\n\n${cuerpo}\n\n${nota}\n\nCafecito POS · cafecitopos.com`
   return { subject, html, text }
-}
-
-async function sendWithResend(args: {
-  apiKey: string
-  to: string[]
-  subject: string
-  html: string
-  text: string
-}): Promise<string | null> {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${args.apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, to: args.to, subject: args.subject, html: args.html, text: args.text }),
-  })
-  if (!response.ok) return `Resend ${response.status}: ${(await response.text().catch(() => "")).slice(0, 200)}`
-  return null
 }
 
 /** Correos reales de dueños/administradores activos (los sintéticos no reciben). */
@@ -104,14 +85,23 @@ export async function runTrialCheck(options: {
   dryRun: boolean
   onlySlug?: string | null
   now?: Date
-}): Promise<{ results: TrialResult[]; error?: string }> {
+}): Promise<{ results: TrialResult[]; error?: string; barrido?: string }> {
   const apiKey = process.env.RESEND_API_KEY
   const now = options.now ?? new Date()
   const admin = createAdminClient()
 
   // Primero las cajas olvidadas: si no, «tiene la caja abierta» sería excusa
   // permanente para no vencer nunca.
-  if (!options.dryRun) await closeStaleSessions()
+  // Si el barrido falla se sigue con las pruebas, pero queda dicho.
+  let barrido: string | undefined
+  if (!options.dryRun) {
+    try {
+      const r = await closeStaleSessions()
+      barrido = r.error
+    } catch (e) {
+      barrido = e instanceof Error ? e.message : "Error inesperado al cerrar cajas olvidadas."
+    }
+  }
 
   let query = admin
     .from("businesses")
@@ -123,12 +113,12 @@ export async function runTrialCheck(options: {
   if (options.onlySlug) query = query.eq("slug", options.onlySlug)
 
   const { data: businesses, error } = await query
-  if (error) return { results: [], error: error.message }
+  if (error) return { results: [], error: error.message, barrido }
 
   const results: TrialResult[] = []
 
   for (const biz of businesses ?? []) {
-    const base = { slug: biz.slug, name: biz.name }
+    const base = { slug: biz.slug, name: biz.name, businessId: biz.id }
     try {
       const { state, daysLeft } = trialState(biz.trial_ends_at, now)
 
@@ -184,7 +174,7 @@ export async function runTrialCheck(options: {
         results.push({ ...base, action: "error", detail: "Falta RESEND_API_KEY en el entorno." })
         continue
       }
-      const sendError = await sendWithResend({ apiKey, to: emails, ...mail })
+      const sendError = await sendWithResend({ apiKey, fromName: "Cafecito POS", fromAddress: "avisos@cafecitopos.com", to: emails, ...mail })
       results.push(
         sendError
           ? { ...base, action: "error", detail: sendError }
@@ -195,5 +185,5 @@ export async function runTrialCheck(options: {
     }
   }
 
-  return { results }
+  return { results, barrido }
 }

@@ -1,5 +1,9 @@
 import { runTrialCheck } from "@/lib/trials"
-import { sendErrorDigest } from "@/app/actions/errors"
+import { sendErrorDigest } from "@/lib/correo-errores"
+import { anotarFallosDelCron, rechazoDelCron } from "@/lib/cron"
+
+/** Varias cafeterías, cada una con su correo: que un Resend lento no corte el cron a medias. */
+export const maxDuration = 60
 
 /**
  * GET /api/pruebas — cron diario de Vercel (10:00 UTC = 04:00 en CDMX: después
@@ -10,25 +14,43 @@ import { sendErrorDigest } from "@/app/actions/errors"
  * Query: ?dry=1 (no manda ni suspende, solo reporta) · ?business=slug.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
-    return Response.json({ error: "Falta CRON_SECRET en el entorno." }, { status: 503 })
-  }
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return new Response("No autorizado", { status: 401 })
-  }
+  const rechazo = rechazoDelCron(request)
+  if (rechazo) return rechazo
 
   const url = new URL(request.url)
   const dryRun = url.searchParams.get("dry") === "1"
-  const { results, error } = await runTrialCheck({
+  const prueba = await runTrialCheck({
     dryRun,
     onlySlug: url.searchParams.get("business"),
-  })
-  if (error) return Response.json({ error }, { status: 500 })
+  }).catch((e: unknown) => ({
+    results: [],
+    error: e instanceof Error ? e.message : "Error inesperado.",
+    barrido: undefined,
+  }))
+
+  // Lo que no salió queda en app_errors ANTES del resumen: así llega en el
+  // correo de esta misma mañana y no solo en una respuesta que nadie lee.
+  if (!dryRun) {
+    await anotarFallosDelCron("pruebas", [
+      ...(prueba.error ? [{ detalle: `Revisión de pruebas: ${prueba.error}` }] : []),
+      ...(prueba.barrido ? [{ detalle: prueba.barrido }] : []),
+      ...prueba.results
+        .filter((r) => r.action === "error")
+        .map((r) => ({ businessId: r.businessId, detalle: `Prueba de ${r.name}: ${r.detail}` })),
+    ])
+  }
 
   // El resumen diario de errores viaja en este mismo cron porque el plan de
-  // Vercel limita cuántos crons hay, y ya son dos. Va DESPUÉS de las pruebas
-  // y no las bloquea: si el correo falla, las suspensiones ya quedaron.
-  const errores = await sendErrorDigest({ dryRun })
-  return Response.json({ results, errores })
+  // Vercel limita cuántos crons hay, y ya son dos. Sale SIEMPRE, también si
+  // la revisión de pruebas falló: antes un fallo ahí cortaba el cron y el
+  // correo no salía justo el día que más hacía falta.
+  const errores = await sendErrorDigest({ dryRun }).catch((e: unknown) => ({
+    sent: false,
+    count: 0,
+    error: e instanceof Error ? e.message : "Error inesperado.",
+  }))
+  return Response.json(
+    { results: prueba.results, barrido: prueba.barrido, errores, error: prueba.error },
+    { status: prueba.error ? 500 : 200 },
+  )
 }

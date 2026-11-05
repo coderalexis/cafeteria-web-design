@@ -104,14 +104,17 @@ export async function sweepStaleSession(biz: BusinessForSweep): Promise<SweepRes
 }
 
 /** Barrido de todas las cafeterías con caja abierta (cron diario). */
-export async function closeStaleSessions(): Promise<StaleCloseResult[]> {
+export async function closeStaleSessions(): Promise<{ cerradas: StaleCloseResult[]; error?: string }> {
   const admin = createAdminClient()
   // Las cajas abiertas CON su negocio en una sola consulta. Antes era una
   // consulta para la lista y dos más por cada cafetería encontrada.
-  const { data: sessions } = await admin
+  const { data: sessions, error } = await admin
     .from("cash_sessions")
     .select("id, businesses(id, slug, timezone, settings)")
     .eq("status", "abierta")
+  // Antes este error se tiraba: si la consulta fallaba, ninguna caja olvidada
+  // se cerraba y nadie se enteraba.
+  if (error) return { cerradas: [], error: `Cajas olvidadas: ${error.message}` }
 
   const cerradas: StaleCloseResult[] = []
   for (const s of sessions ?? []) {
@@ -120,5 +123,5 @@ export async function closeStaleSessions(): Promise<StaleCloseResult[]> {
     const { closed } = await sweepStaleSession(biz)
     if (closed) cerradas.push(closed)
   }
-  return cerradas
+  return { cerradas }
 }

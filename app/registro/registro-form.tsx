@@ -1,5 +1,7 @@
 "use client"
 
+import { unstable_rethrow } from "next/navigation"
+import { mensajeDeFallo } from "@/lib/version"
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -17,7 +19,16 @@ export function RegistroForm() {
 
   const enviar = (formData: FormData) => {
     startTransition(async () => {
-      const result = await startRegistration(formData)
+      // Sin señal (o un deploy a medias) la acción rechaza, y dentro de una
+      // transición eso tumbaba la pantalla entera: se dice y se sigue.
+      let result: Awaited<ReturnType<typeof startRegistration>>
+      try {
+        result = await startRegistration(formData)
+      } catch (e) {
+        unstable_rethrow(e)
+        toast.error(mensajeDeFallo(e))
+        return
+      }
       if (!result.success) {
         toast.error(result.error)
         return

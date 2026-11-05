@@ -43,6 +43,8 @@ export interface WeeklySummaryData {
 
 export interface WeeklySendResult {
   slug: string
+  /** Para anotar el fallo en app_errors a nombre del café. */
+  businessId?: string
   name: string
   status: "enviado" | "listo" | "omitido" | "error"
   detail: string
@@ -160,7 +162,7 @@ export async function runWeeklySummaries(options: {
   const results: WeeklySendResult[] = []
 
   for (const biz of businesses ?? []) {
-    const base = { slug: biz.slug, name: biz.name }
+    const base = { slug: biz.slug, name: biz.name, businessId: biz.id }
     try {
       if (!parseBusinessSettings(biz.settings).weeklyEmail) {
         results.push({ ...base, status: "omitido", detail: "Desactivado en Negocio." })
