@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
+import { ENCABEZADO_RUTA } from "@/lib/ruta"
 
 /**
  * Portero de la aplicación: deja pasar solo a quien trae sesión y refresca su
@@ -33,6 +34,9 @@ import { updateSession } from "@/lib/supabase/middleware"
  */
 
 export async function middleware(request: NextRequest) {
+  // Desde qué página viene: las acciones del POS se saltan la revalidación
+  // (lib/revalidar.ts). Se sobrescribe lo que mande el cliente.
+  request.headers.set(ENCABEZADO_RUTA, request.nextUrl.pathname)
   const { haySesion, response } = await updateSession(request)
 
   if (haySesion) return response

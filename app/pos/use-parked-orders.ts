@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { serializeCart, type CartState } from "./cart"
 // (serializeCart se usa en `park`; `update` ya recibe el carrito serializado)
-import { listParked, markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
+import { markOwed, parkOrder, removeParked, updateParked } from "@/app/actions/parked"
+import type { listParked } from "@/app/actions/parked"
 import {
   PARKED_MAX,
   borradasVigentes,
@@ -169,7 +170,19 @@ export function useParkedOrders(businessId: string) {
     cargando.current = true
     cargandoDesde.current = Date.now()
     try {
-      const r = await listParked()
+      // `fetch` y no la server action: las acciones van en fila y un sondeo
+      // lento hacía esperar al cobro (app/pos/datos/cuentas). Con tope: uno
+      // que no contesta no se queda colgado.
+      const res = await fetch("/pos/datos/cuentas", {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+        signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(SONDEO_MAX_MS) : undefined,
+      })
+      // Sin sesión, el middleware manda al login (HTML): eso no es una lista.
+      if (!res.ok || !(res.headers.get("content-type") ?? "").includes("application/json")) {
+        throw new Error("Failed to fetch")
+      }
+      const r = (await res.json()) as Awaited<ReturnType<typeof listParked>>
       if (r.success) {
         if (hayVersionNueva(BUILD_ID, r.build)) setVersionNueva((n) => n + 1)
         // Más reciente primero: es el que más probablemente se retoma. Y

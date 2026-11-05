@@ -77,18 +77,22 @@ export async function listParked(): Promise<ActionResult<{ orders: ParkedRecord[
   const supabase = await createClient()
   const limite = new Date(Date.now() - CADUCIDAD_HORAS * 3600_000).toISOString()
 
-  // Sin `await`: que la limpieza no retrase la lista. Si falla, no pasa nada
-  // —el filtro de abajo igual los esconde— y se reintenta a la siguiente.
-  void supabase.from("parked_orders").delete().lt("created_at", limite).is("owed_since", null)
-
-  const { data, error } = await supabase
-    .from("parked_orders")
-    .select("id, name, cart, created_at, updated_at, owed_since, owed_contact")
-    // El fiado se salva de la caducidad: `or` mantiene las recientes Y todas
-    // las que alguien debe, sin importar de cuándo sean.
-    .or(`created_at.gte.${limite},owed_since.not.is.null`)
-    .order("created_at", { ascending: true })
-    .limit(50)
+  // La limpieza va JUNTO con la lista, no después: no la retrasa. Antes iba
+  // con `void` y sin `await`, y las consultas de Supabase solo se envían
+  // cuando alguien las espera: nunca se mandó, y las cuentas vencidas se
+  // quedaban para siempre (había del 6 de septiembre en noviembre). Si falla
+  // no pasa nada: el filtro de abajo igual las esconde.
+  const [, { data, error }] = await Promise.all([
+    supabase.from("parked_orders").delete().lt("created_at", limite).is("owed_since", null),
+    supabase
+      .from("parked_orders")
+      .select("id, name, cart, created_at, updated_at, owed_since, owed_contact")
+      // El fiado se salva de la caducidad: `or` mantiene las recientes Y todas
+      // las que alguien debe, sin importar de cuándo sean.
+      .or(`created_at.gte.${limite},owed_since.not.is.null`)
+      .order("created_at", { ascending: true })
+      .limit(50),
+  ])
 
   if (error) return { error: dbErrorMessage(error) }
 

@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "@/lib/zod"
-import { revalidatePath } from "next/cache"
+import { revalidarFueraDelPos } from "@/lib/revalidar"
 import { createClient } from "@/lib/supabase/server"
 import { dbErrorMessage } from "@/lib/db-errors"
 import type { ActionResult } from "./types"
@@ -37,9 +37,9 @@ export interface CreditStatement {
   entries: CreditEntry[]
 }
 
+/** Desde el POS no se revalida: ver lib/revalidar.ts. */
 function revalidar() {
-  revalidatePath("/admin/por-cobrar")
-  revalidatePath("/pos")
+  return revalidarFueraDelPos("/admin/por-cobrar", "/pos")
 }
 
 /** Todas las cuentas del negocio con su saldo (las de saldo cero también). */
@@ -70,7 +70,7 @@ export async function upsertCreditCustomer(
   })
   if (error) return { error: dbErrorMessage(error) }
   const row = data as { id: string; name: string; phone: string | null; balance: number }
-  revalidar()
+  await revalidar()
   return { success: true, customer: { id: row.id, name: row.name, phone: row.phone, balance: Number(row.balance) } }
 }
 
@@ -102,7 +102,7 @@ export async function payCredit(
   })
   if (error) return { error: dbErrorMessage(error) }
   const row = data as { name: string; amount: number; balance: number; movement_id: string | null }
-  revalidar()
+  await revalidar()
   return { success: true, name: row.name, amount: Number(row.amount), balance: Number(row.balance), movementId: row.movement_id ?? null }
 }
 

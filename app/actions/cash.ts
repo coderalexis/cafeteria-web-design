@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidarFueraDelPos } from "@/lib/revalidar"
 import { z } from "@/lib/zod"
 import { createClient } from "@/lib/supabase/server"
 import { checkExpectedBusiness } from "@/lib/context"
@@ -12,9 +12,9 @@ import type { ActionResult } from "./types"
 /*  vive en los RPC de Postgres; aquí solo se valida la forma.         */
 /* ------------------------------------------------------------------ */
 
+/** Desde el POS no se revalida: ver lib/revalidar.ts. */
 function revalidateCash() {
-  revalidatePath("/pos")
-  revalidatePath("/admin", "layout")
+  return revalidarFueraDelPos("/pos", ["/admin", "layout"])
 }
 
 const moneySchema = z.number().finite().nonnegative().max(9_999_999)
@@ -52,7 +52,7 @@ export async function openCashSession(
   }
 
   const row = data as { session_id: string; opened_at: string; opening_float: number }
-  revalidateCash()
+  await revalidateCash()
   return {
     success: true,
     sessionId: row.session_id,
@@ -96,7 +96,7 @@ export async function closeCashSession(
     return { error: error.message }
   }
 
-  revalidateCash()
+  await revalidateCash()
   return { success: true, summary: data as unknown as CashSessionSummary }
 }
 
@@ -135,7 +135,7 @@ export async function addCashMovement(
   }
 
   const row = data as { id: string; amount: number }
-  revalidateCash()
+  await revalidateCash()
   return { success: true, id: row.id, amount: row.amount }
 }
 
