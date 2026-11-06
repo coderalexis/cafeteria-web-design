@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { intentar } from "@/lib/sin-tumbar"
 
 export interface Deuda {
   id: string
@@ -72,7 +73,7 @@ export function PorCobrarClient({
 
   const abrirEstado = async (c: CreditAccount) => {
     setCargandoEstado(c.id)
-    const r = await getCreditStatement(c.id)
+    const r = await intentar(() => getCreditStatement(c.id))
     setCargandoEstado(null)
     if (!r.success) {
       toast.error(r.error)
@@ -84,7 +85,7 @@ export function PorCobrarClient({
   const condonar = async () => {
     if (!condonando || guardando) return
     setGuardando(true)
-    const r = await forgiveOwed({ id: condonando.id, reason: motivo.trim() })
+    const r = await intentar(() => forgiveOwed({ id: condonando.id, reason: motivo.trim() }))
     setGuardando(false)
     if (!r.success) {
       toast.error(r.error)

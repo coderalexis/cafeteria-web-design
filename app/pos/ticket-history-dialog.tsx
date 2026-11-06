@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Ban, ChefHat, Pencil, Printer, QrCode, Receipt, RefreshCw } from "lucide-react"
@@ -32,6 +32,7 @@ import { useBusiness } from "@/components/business-provider"
 import { ticketItemLabel, type TicketRecord } from "@/lib/tickets"
 import type { CambioExistencia } from "@/lib/existencias"
 import { ReceiptQrDialog, useReceiptQr } from "@/components/receipt-qr-dialog"
+import { intentar } from "@/lib/sin-tumbar"
 
 interface Props {
   open: boolean
@@ -58,7 +59,7 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    const result = await getTodayTickets()
+    const result = await intentar(() => getTodayTickets())
     setIsLoading(false)
     if (!result.success) {
       toast.error(result.error)
@@ -83,12 +84,25 @@ export function TicketHistoryDialog({ open, onOpenChange, isAdmin, publicReceipt
     }
   }
 
+  // Candado inmediato: dos toques en «Cancelar venta» antes del siguiente render pasaban los dos.
+  const cancelando = useRef(false)
   const confirmCancel = async () => {
-    if (!toCancel || isCancelling) return
+    if (!toCancel || cancelando.current) return
+    cancelando.current = true
     setIsCancelling(true)
-    const result = await cancelTicket({ ticketId: toCancel.id, reason: reason.trim() })
+    const result = await intentar(() => cancelTicket({ ticketId: toCancel.id, reason: reason.trim() }))
+    cancelando.current = false
     setIsCancelling(false)
     if (!result.success) {
+      // Un toque anterior cuya respuesta se perdió ya la canceló: está hecho.
+      if (/ya estaba cancelado/i.test(result.error)) {
+        toast.info("Esa venta ya estaba cancelada.")
+        setToCancel(null)
+        setReason("")
+        await load()
+        router.refresh()
+        return
+      }
       toast.error(result.error)
       return
     }

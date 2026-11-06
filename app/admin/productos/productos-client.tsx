@@ -40,6 +40,7 @@ import {
   SlidersHorizontal, Smartphone, Star } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { intentar } from "@/lib/sin-tumbar"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -426,8 +427,8 @@ function EditProductSheet({
     setGuardandoTocar(true)
     const r =
       que === "prompt"
-        ? await setProductPrompt({ productId: product.id, on })
-        : await setProductPinned({ productId: product.id, on })
+        ? await intentar(() => setProductPrompt({ productId: product.id, on }))
+        : await intentar(() => setProductPinned({ productId: product.id, on }))
     setGuardandoTocar(false)
     if ("error" in r) {
       toast.error(r.error)
@@ -463,7 +464,7 @@ function EditProductSheet({
     const next = enabled
       ? [...product.modifierGroupIds, groupId]
       : product.modifierGroupIds.filter((id) => id !== groupId)
-    const result = await setProductModifierGroups({ productId: product.id, groupIds: next })
+    const result = await intentar(() => setProductModifierGroups({ productId: product.id, groupIds: next }))
     setSavingGroups(false)
     if (!result.success) {
       toast.error(result.error)
@@ -478,7 +479,7 @@ function EditProductSheet({
     fd.set("id", product.id)
     fd.set("is_active", (!product.isActive).toString())
 
-    const result = await toggleProductActive(fd)
+    const result = await intentar(() => toggleProductActive(fd))
 
     if (result.error) {
       toast.error(result.error)
@@ -505,7 +506,7 @@ function EditProductSheet({
     const fd = new FormData()
     fd.set("id", product.id)
 
-    const result = await deleteProduct(fd)
+    const result = await intentar(() => deleteProduct(fd))
 
     if (result.error) {
       toast.error(result.error)

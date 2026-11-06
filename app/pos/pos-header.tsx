@@ -1,5 +1,6 @@
 "use client"
 
+import { toast } from "sonner"
 import Link from "next/link"
 import type { RefObject } from "react"
 import {
@@ -372,7 +373,9 @@ export function PosHeader(p: PosHeaderProps) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={() => {
-                        if (puedeSalirConCola(appCtx.business?.id)) void logout()
+                        if (puedeSalirConCola(appCtx.business?.id)) {
+                          logout().catch(() => toast.error("Sin conexión: no se pudo cerrar la sesión. Vuelve a intentar cuando regrese la señal."))
+                        }
                       }}
                       className="text-red-600 focus:text-red-700"
                     >

@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { intentar } from "@/lib/sin-tumbar"
 
 export type CuentaFiado = { id: string; name: string; balance: number }
 
@@ -60,7 +61,7 @@ export function CreditPickerDialog({
     const nombre = q.trim()
     if (!nombre || busy) return
     setBusy(true)
-    const r = await upsertCreditCustomer({ name: nombre })
+    const r = await intentar(() => upsertCreditCustomer({ name: nombre }))
     setBusy(false)
     if (!r.success) {
       toast.error(r.error)
@@ -162,7 +163,7 @@ export function CreditAccountsDialog({
 
   async function recargar() {
     setCargando(true)
-    const r = await getCreditBalances()
+    const r = await intentar(() => getCreditBalances())
     setCargando(false)
     if (r.success) setLista(r.accounts)
   }

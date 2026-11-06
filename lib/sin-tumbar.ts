@@ -31,3 +31,25 @@ export function sinTumbar(
     }
   }
 }
+
+/**
+ * Lo mismo para una acción que se llama fuera de una transición (un
+ * manejador `async` de un botón): si la llamada no llega, en vez de rechazar
+ * devuelve `{ success: false, error }` con el mensaje de siempre, y la
+ * pantalla lo trata como cualquier error que ya sabe mostrar.
+ *
+ *   const r = await intentar(() => closeCashSession({ … }))
+ *
+ * Sin esto, el rechazo dejaba el estado de «cargando» puesto para siempre:
+ * prueba de caos del 2026-11-05, cancelar una venta sin señal dejó el diálogo
+ * en «Cancelando…» con todos los botones apagados, «Volver» incluido. Lo mismo
+ * pasaba con el corte, abrir caja, los movimientos de efectivo y más.
+ */
+export async function intentar<T>(accion: () => Promise<T>): Promise<T | { success: false; error: string }> {
+  try {
+    return await accion()
+  } catch (e) {
+    unstable_rethrow(e)
+    return { success: false, error: mensajeDeFallo(e) }
+  }
+}
