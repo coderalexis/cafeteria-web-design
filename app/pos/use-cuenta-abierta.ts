@@ -1,10 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { reportClientError } from "@/app/actions/errors"
 import { serializeCart, type CartLine, type CartState, type PersistedCart } from "./cart"
-import { applyCartDelta, conflictName, esFiado, mergeParkedCarts, repartirCuenta } from "./parked"
+import { applyCartDelta, conflictName, esFiado, mergeParkedCarts, mismaCuenta, repartirCuenta } from "./parked"
 import { vibra } from "./pos-utils"
 import type { useParkedOrders } from "./use-parked-orders"
 
@@ -61,7 +61,7 @@ export function useCuentaAbierta({
    * dos versiones de la misma mesa.
    */
   const cuentasVisibles = useMemo(
-    () => parked.orders.filter((o) => o.id !== openAccount?.id),
+    () => parked.orders.filter((o) => !mismaCuenta(o.id, openAccount?.id)),
     [parked.orders, openAccount],
   )
 
@@ -73,7 +73,7 @@ export function useCuentaAbierta({
     async (id: string, contact: string | undefined) => {
       const ok = await parked.fiar(id, contact)
       if (ok) {
-        if (openAccount?.id === id) setOpenAccount(null)
+        if (mismaCuenta(openAccount?.id, id)) setOpenAccount(null)
         toast.success("Pasó a «Por cobrar». No se registró ninguna venta.")
       }
       return ok
@@ -109,7 +109,17 @@ export function useCuentaAbierta({
    */
   useEffect(() => {
     if (!openAccount || !parked.listo) return
-    if (parked.orders.some((o) => o.id === openAccount.id)) return
+    const enLista = parked.orders.find((o) => mismaCuenta(o.id, openAccount.id))
+    if (enLista) {
+      // Guardada sin señal y ya subió: su id cambió de `local-<uuid>` a
+      // `<uuid>`. Es la MISMA cuenta; antes esto soltaba el puntero, avisaba
+      // «ya no existe» y la cuenta reaparecía en la barra con sus productos
+      // todavía en el carrito (cobrable dos veces).
+      if (enLista.id !== openAccount.id) {
+        setOpenAccount({ ...openAccount, id: enLista.id, updatedAt: enLista.updatedAt || openAccount.updatedAt })
+      }
+      return
+    }
     setOpenAccount(null)
     toast.warning(
       `La cuenta «${openAccount.name}» ya no existe: alguien la cobró o la descartó. Lo que tienes en el carrito sigue aquí.`,
@@ -230,7 +240,7 @@ export function useGuardarCuenta({
    * se guarda aparte con nombre reconocible. Son productos ya servidos; una
    * ronda perdida en silencio es comida que nunca se cobra.
    */
-  const saveToOpenAccount = useCallback(async ({ callado = false } = {}): Promise<Guardado> => {
+  const guardarRonda = useCallback(async ({ callado = false } = {}): Promise<Guardado> => {
     if (!openAccount || lines.length === 0) return { ok: false, guardadaComo: null }
     // El sello más fresco que se conoce: el de la lista que el sondeo mantiene
     // al día, no el de cuando se abrió la cuenta. Con el de entonces, un
@@ -287,6 +297,30 @@ export function useGuardarCuenta({
     // tarjeta no debe decir además «quedó guardada», que sería media verdad.
     return { ok: true, guardadaComo: null }
   }, [openAccount, lines.length, parked, cartStateNow, clearCart, clearTip, setOpenAccount])
+
+  /**
+   * Una ronda a la vez. Gym Coffe, 2026-11-05 09:16: dos guardados de «Mesa 2»
+   * con 0.44 s de diferencia (un doble toque en «Guardar», o en otra cuenta
+   * mientras se guardaba). El segundo salió antes de que volviera el primero,
+   * con el sello viejo, y chocó; como era el mismo carrito fue un choque falso
+   * y se arregló solo, pero dejó un aviso y dos «Guardado». Con contenido
+   * distinto habría guardado la ronda aparte como «Mesa 2 (2)». Mientras uno
+   * está en el aire, el segundo toque no hace nada (quien llama ve `ok: false`
+   * y no sigue: el primero ya está haciendo lo suyo).
+   */
+  const guardandoRonda = useRef(false)
+  const saveToOpenAccount = useCallback(
+    async (opciones: { callado?: boolean } = {}): Promise<Guardado> => {
+      if (guardandoRonda.current) return { ok: false, guardadaComo: null }
+      guardandoRonda.current = true
+      try {
+        return await guardarRonda(opciones)
+      } finally {
+        guardandoRonda.current = false
+      }
+    },
+    [guardarRonda],
+  )
 
   /**
    * Separar la cuenta: se cobra una parte y el resto sigue abierto.

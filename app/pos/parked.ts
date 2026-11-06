@@ -282,6 +282,49 @@ export const idDeServidor = (id: string) => (esProvisional(id) ? id.slice(PREFIJ
 export interface CuentaBorrada {
   id: string
   desde: number
+  /**
+   * Cuándo confirmó el servidor el borrado. NO se olvida en ese momento: un
+   * sondeo que salió ANTES y llega después (señal lenta; desde que el sondeo
+   * va por `fetch`, ya no hace fila detrás del cobro) traería la cuenta de
+   * vuelta, cobrable otra vez. Se olvida cuando contesta un sondeo enviado
+   * después de esta hora (`borradasTrasSondeo`).
+   */
+  confirmada?: number
+}
+
+/**
+ * Las marcas que siguen haciendo falta después de un sondeo enviado a la hora
+ * `enviado`: las confirmadas antes de que saliera ya no (ese sondeo leyó la
+ * base con el borrado hecho); las demás, sí.
+ */
+export function borradasTrasSondeo(lista: CuentaBorrada[], enviado: number): CuentaBorrada[] {
+  return lista.filter((b) => !(b.confirmada !== undefined && b.confirmada < enviado))
+}
+
+/** ¿Es la misma cuenta? Una guardada sin señal cambia `local-<uuid>` por `<uuid>` al subir. */
+export function mismaCuenta(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && idDeServidor(a) === idDeServidor(b)
+}
+
+/**
+ * El caso espejo de las borradas: una cuenta que el servidor acaba de
+ * confirmar (guardada aquí) y que un sondeo enviado ANTES no trae. Sin esto
+ * desaparecía hasta el siguiente sondeo —y si estaba abierta en el carrito,
+ * el POS avisaba «ya no existe»—. Se conservan las que se confirmaron
+ * después de que salió el sondeo; las demás las decide el servidor.
+ */
+export function conservarRecientes(
+  lista: ParkedOrder[],
+  local: ParkedOrder[],
+  recientes: ReadonlyMap<string, number>,
+  enviado: number,
+): ParkedOrder[] {
+  const ya = new Set(lista.map((o) => idDeServidor(o.id)))
+  const faltan = local.filter((o) => {
+    const cuando = recientes.get(o.id)
+    return cuando !== undefined && cuando >= enviado && !ya.has(idDeServidor(o.id))
+  })
+  return faltan.length ? [...faltan, ...lista] : lista
 }
 
 /** Lo que vive una cuenta abierta: después de eso, el servidor ya la limpió. */
