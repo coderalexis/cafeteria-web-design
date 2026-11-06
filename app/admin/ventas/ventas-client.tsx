@@ -62,6 +62,7 @@ import {
 } from "lucide-react"
 import { VentasFiltersBar } from "./filters"
 import { PAGE_SIZE, filtersToSearchParams, type SalesReport, type VentasFilters } from "./params"
+import { intentar } from "@/lib/sin-tumbar"
 
 /* ────────────────────────────────────────────────────── Types */
 
@@ -188,7 +189,7 @@ export default function VentasClient({
   async function handleCancel() {
     if (!selectedTicket || cancelling) return
     setCancelling(true)
-    const result = await cancelTicket({ ticketId: selectedTicket.id, reason: cancelReason.trim() })
+    const result = await intentar(() => cancelTicket({ ticketId: selectedTicket.id, reason: cancelReason.trim() }))
     setCancelling(false)
 
     if (!result.success) {

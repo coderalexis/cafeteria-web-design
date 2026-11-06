@@ -10,6 +10,7 @@ import { getCashSessionSummary } from "@/app/actions/cash"
 import { formatCurrency, formatDate, formatTime } from "@/lib/format"
 import { buildCorteLines, printLines, receiptBusinessFrom } from "@/lib/receipt"
 import { useBusiness } from "@/components/business-provider"
+import { intentar } from "@/lib/sin-tumbar"
 
 export interface CashSessionRecord {
   id: string
@@ -63,7 +64,7 @@ export default function CortesClient({ sessions }: { sessions: CashSessionRecord
 
   const reprint = async (session: CashSessionRecord) => {
     setPrintingId(session.id)
-    const result = await getCashSessionSummary(session.id)
+    const result = await intentar(() => getCashSessionSummary(session.id))
     setPrintingId(null)
     if (!result.success) {
       toast.error(result.error)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Lock, Unlock, Printer, Wallet, ArrowDownToLine, ArrowUpFromLine, Plus, AlertTriangle } from "lucide-react"
@@ -30,6 +30,8 @@ import {
   type Conteo,
 } from "@/lib/conteo-caja"
 import { useBusiness } from "@/components/business-provider"
+import { intentar } from "@/lib/sin-tumbar"
+import { mensajeDeFallo } from "@/lib/version"
 
 export interface OpenSession {
   id: string
@@ -100,16 +102,28 @@ function OpenSessionForm({
 
   const amount = parseMoney(floatValue)
 
+  // El candado de verdad: `isSubmitting` no se entera hasta el siguiente render.
+  const enviando = useRef(false)
   const submit = async () => {
-    if (amount === null || isSubmitting) return
+    if (amount === null || enviando.current) return
+    enviando.current = true
     setIsSubmitting(true)
-    const result = await openCashSession({
+    const result = await intentar(() => openCashSession({
       openingFloat: amount,
       notes: notes.trim() || undefined,
       expectedBusinessId: business.id,
-    })
+    }))
+    enviando.current = false
     setIsSubmitting(false)
     if (!result.success) {
+      // Un toque anterior cuya respuesta se perdió, u otro aparato, ya la
+      // abrió: es justo lo que se quería. Se pone al día y listo.
+      if (/ya hay una caja abierta/i.test(result.error)) {
+        toast.info("La caja ya estaba abierta.")
+        onDone()
+        router.refresh()
+        return
+      }
       toast.error(result.error)
       return
     }
@@ -243,7 +257,7 @@ function CloseSessionForm({
   const [isSavingMovement, setIsSavingMovement] = useState(false)
 
   const loadSummary = useCallback(async () => {
-    const result = await getCashSessionSummary(session.id)
+    const result = await intentar(() => getCashSessionSummary(session.id))
     if (result.success) setSummary(result.summary)
     else setLoadError(result.error)
   }, [session.id])
@@ -254,6 +268,8 @@ function CloseSessionForm({
       if (cancelled) return
       if (result.success) setSummary(result.summary)
       else setLoadError(result.error)
+    }).catch((e) => {
+      if (!cancelled) setLoadError(mensajeDeFallo(e))
     })
     return () => {
       cancelled = true
@@ -283,12 +299,12 @@ function CloseSessionForm({
   const saveMovement = async () => {
     if (!canSaveMovement || movementKind === null || movementAmountNum === null || isSavingMovement) return
     setIsSavingMovement(true)
-    const result = await addCashMovement({
+    const result = await intentar(() => addCashMovement({
       kind: movementKind,
       amount: movementAmountNum,
       reason: movementReason.trim(),
       expectedBusinessId: business.id,
-    })
+    }))
     setIsSavingMovement(false)
     if (!result.success) {
       toast.error(result.error)
@@ -301,19 +317,31 @@ function CloseSessionForm({
     await loadSummary()
   }
 
+  const cerrando = useRef(false)
   const submit = async (print: boolean) => {
-    if (counted === null || isSubmitting) return
+    if (counted === null || errorFondo || cerrando.current) return
+    cerrando.current = true
     setIsSubmitting(true)
-    if (errorFondo) return
-    const result = await closeCashSession({
+    const result = await intentar(() => closeCashSession({
       countedCash: counted,
       notes: notes.trim() || undefined,
       countDetail: modoConteo === "contar" ? detalleConteo(conteo) : undefined,
       nextFloat: fondo ?? undefined,
       expectedBusinessId: business.id,
-    })
+    }))
+    cerrando.current = false
     setIsSubmitting(false)
     if (!result.success) {
+      // Prueba de caos del 2026-11-05: se perdió la respuesta del corte, la
+      // caja SÍ se cerró y el POS la seguía creyendo abierta; el reintento
+      // decía «No hay una caja abierta.» y ya no había botón para abrir otra.
+      // Si ya está cerrada, el corte está hecho: se pone al día.
+      if (/no hay una caja abierta/i.test(result.error)) {
+        toast.info("La caja ya estaba cerrada: el corte quedó hecho. Revísalo en Administrar → Cortes.", { duration: 8000 })
+        onDone()
+        router.refresh()
+        return
+      }
       toast.error(result.error)
       return
     }

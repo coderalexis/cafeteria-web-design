@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { toast } from "sonner"
 import { HandCoins, Loader2 } from "lucide-react"
 import { payCredit } from "@/app/actions/credit"
 import { formatCurrency, PAYMENT_METHODS } from "@/lib/format"
+import { intentar } from "@/lib/sin-tumbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -53,10 +54,15 @@ export function AbonarDialog({
   const cantidad = Number(String(monto).replace(/,/g, ""))
   const valido = cuenta !== null && Number.isFinite(cantidad) && cantidad > 0 && cantidad <= cuenta.balance + 0.001
 
+  // Candado inmediato: dos toques antes del siguiente render registraban DOS abonos
+  // (credit_pay no lleva referencia de idempotencia).
+  const enviando = useRef(false)
   async function abonar() {
-    if (!cuenta || !valido || guardando) return
+    if (!cuenta || !valido || enviando.current) return
+    enviando.current = true
     setGuardando(true)
-    const r = await payCredit({ customerId: cuenta.id, amount: Math.round(cantidad * 100) / 100, method: metodo, notes: nota || undefined })
+    const r = await intentar(() => payCredit({ customerId: cuenta.id, amount: Math.round(cantidad * 100) / 100, method: metodo, notes: nota || undefined }))
+    enviando.current = false
     setGuardando(false)
     if (!r.success) {
       toast.error(r.error)

@@ -88,7 +88,10 @@ el servidor confirme Y conteste un sondeo enviado DESPUÉS de esa confirmación
 se podía cobrar dos veces). Lo mismo al revés: una recién confirmada no se
 pierde con un sondeo que salió antes (`conservarRecientes`). Y la cuenta
 abierta en el carrito se compara con `mismaCuenta` (`local-<uuid>` y `<uuid>`
-son la misma). Ambas listas en localStorage
+son la misma). Cobrar una cuenta desde la barra usa una referencia FIJA por
+versión de la cuenta (`refDeCobroDeCuenta`: id + sello → UUID v5), así que
+cobrar la misma cuenta dos veces —dos toques, dos aparatos, cola y línea— da
+UNA venta (create_ticket ya es idempotente por `client_ref`). Ambas listas en localStorage
 (`pos-cuentas-pendientes:` / `pos-cuentas-borradas:`).
 
 **Módulos por cafetería** (`businesses.settings`, saneado en `lib/settings.ts`):
@@ -458,7 +461,14 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
   (`lib/sin-tumbar.ts`, avisa con `mensajeDeFallo`), o con su propio
   `try/catch` cuando la pantalla necesita más (el POS). La prueba
   `tests/unit/sin-tumbar.test.ts` recorre la app y falla si aparece una
-  transición async desprotegida. Y tras una
+  transición async desprotegida. **Fuera** de una transición (un manejador
+  `async` de un botón) va `await intentar(() => accion(…))`, que devuelve
+  `{ success: false, error }` en vez de rechazar: sin eso, sin señal el
+  «Cancelando…» o «Cerrando…» se quedaba puesto para siempre, con los botones
+  apagados (el mismo guardián lo revisa). Y el candado contra el doble toque es
+  un `useRef`, NUNCA el estado: el estado no se entera hasta el siguiente
+  render y los toques que caen antes pasan todos (prueba de caos del
+  2026-11-05: seis toques en «Cobrar» de la barra = seis ventas). Y tras una
   acción que ya revalida la ruta, NO va `router.refresh()`: la respuesta del
   POST ya trae la página nueva y pedirla otra vez era descargarla dos veces.
 - **CUALQUIER `revalidatePath` en una acción re-arma la página DESDE la que se
@@ -500,7 +510,7 @@ lee mirando QUÉ paso falló: la suite y los tipos son pasos distintos.
 
 ## Estado al 2026-11-04 y pendientes
 
-- Producción = `main` hasta el PR #101; migraciones aplicadas hasta la **61**
+- Producción = `main` hasta el PR #102; migraciones aplicadas hasta la **61**
   (`p47_invitaciones`). Lo último, de la revisión general del 2026-11-04: el token
   renovado no viaja como cookie de la acción (#85), una cafetería no puede
   cambiarle el correo a una cuenta ajena (#86), cuentas y cola sin señal

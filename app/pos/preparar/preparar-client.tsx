@@ -9,6 +9,7 @@ import { getPendingOrders, setAccountPrepared, setOrderPrepared, type KitchenOrd
 import { formatTime } from "@/lib/format"
 import { useBusiness } from "@/components/business-provider"
 import { sinNoticiasMs } from "@/lib/settings"
+import { intentar } from "@/lib/sin-tumbar"
 
 /**
  * El ritmo lo decide cada cafeteria en Datos y ajustes; aqui solo se aplica.
@@ -122,11 +123,11 @@ export default function PrepararClient({
     let anterior: Record<string, number> | undefined
     let fallo: string | undefined
     if (order.accountName) {
-      const r = await setAccountPrepared(listo ? { id: order.id } : { id: order.id, restore: previa ?? {} })
+      const r = await intentar(() => setAccountPrepared(listo ? { id: order.id } : { id: order.id, restore: previa ?? {} }))
       if (r.success) anterior = r.previous
       else fallo = r.error
     } else {
-      const r = await setOrderPrepared({ ticketId: order.id, prepared: listo })
+      const r = await intentar(() => setOrderPrepared({ ticketId: order.id, prepared: listo }))
       if (!r.success) fallo = r.error
     }
     setMarcando(null)

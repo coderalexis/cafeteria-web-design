@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { getRecentOrders, type KitchenOrder } from "@/app/actions/kitchen"
 import { formatTime } from "@/lib/format"
 import { useBusiness } from "@/components/business-provider"
+import { intentar } from "@/lib/sin-tumbar"
 
 /**
  * «Últimos pedidos»: los diez más recientes del día, solo para consultar.
@@ -44,7 +45,7 @@ export function RecentOrdersDialog({
 
   const cargar = useCallback(async () => {
     setCargando(true)
-    const r = await getRecentOrders()
+    const r = await intentar(() => getRecentOrders())
     setCargando(false)
     if (!r.success) {
       toast.error(r.error)

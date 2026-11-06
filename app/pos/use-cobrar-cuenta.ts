@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { toast } from "sonner"
 import { createTicket } from "@/app/actions/sales"
 import type { CambioExistencia } from "@/lib/existencias"
@@ -9,7 +9,7 @@ import { esErrorDeVersion } from "@/lib/version"
 import { avisarEncolada, avisarVersionNueva } from "./avisos-cobro"
 import { cartSubtotal, linesToItems, rehydrateCart, type Product } from "./cart"
 import type { OpenSession } from "./cash-session-dialog"
-import { ventaCompletada, ventaParaLaCola } from "./cobro"
+import { refDeCobroDeCuenta, ventaCompletada, ventaParaLaCola } from "./cobro"
 import { mismaCuenta, PARKED_MAX_AGE_MS, type ParkedOrder } from "./parked"
 import { vibra } from "./pos-utils"
 import { QUEUE_MAX } from "./queue"
@@ -54,9 +54,12 @@ export function useCobrarCuenta({
   // cobre nada.
   const [cobrandoCuenta, setCobrandoCuenta] = useState<string | null>(null)
   const [confirmarCobro, setConfirmarCobro] = useState<string | null>(null)
+  // El candado de verdad: `cobrandoCuenta` (estado) no se entera hasta el
+  // siguiente render, y los toques que caen antes pasaban todos.
+  const cobrandoRef = useRef(false)
   const cobrarCuenta = useCallback(
     async (o: ParkedOrder) => {
-      if (cobrandoCuenta || !openSession) return
+      if (cobrandoRef.current || !openSession) return
       const estado = rehydrateCart(o.cart, products, Date.now(), PARKED_MAX_AGE_MS)
       if (!estado || estado.lines.length === 0) {
         toast.error("Esta cuenta no se puede cobrar: sus productos ya no están en el menú. Reactívalos en Menú → Productos.", {
@@ -69,10 +72,17 @@ export function useCobrarCuenta({
         toast.error("Algún artículo de esta cuenta ya no está en el menú. Ábrela para revisarla antes de cobrar.")
         return
       }
+      cobrandoRef.current = true
       setCobrandoCuenta(o.id)
-      const clientRef = crypto.randomUUID()
       const items = linesToItems(estado.lines)
       const notas = estado.ticketNotes.trim() || undefined
+      // Misma cuenta y mismo sello → misma referencia → una sola venta.
+      let clientRef: string
+      try {
+        clientRef = await refDeCobroDeCuenta(o.id, o.updatedAt)
+      } catch {
+        clientRef = crypto.randomUUID()
+      }
       try {
         const result = await createTicket({
           clientRef,
@@ -125,11 +135,12 @@ export function useCobrarCuenta({
           toast.error(`Ya hay ${QUEUE_MAX} ventas esperando internet. Recupera la señal antes de seguir cobrando.`)
         }
       } finally {
+        cobrandoRef.current = false
         setCobrandoCuenta(null)
         setConfirmarCobro(null)
       }
     },
-    [cobrandoCuenta, openSession, products, businessId, parked, openAccount, setOpenAccount, clearCart, cola, aplicarExistencias, setCompletedSale, setTotalSales],
+    [openSession, products, businessId, parked, openAccount, setOpenAccount, clearCart, cola, aplicarExistencias, setCompletedSale, setTotalSales],
   )
   const tocarCobro = useCallback(
     (o: ParkedOrder) => {

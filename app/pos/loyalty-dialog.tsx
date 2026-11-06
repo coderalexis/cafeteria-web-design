@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { intentar } from "@/lib/sin-tumbar"
 
 /** Teléfono como lo diría el cliente: 55 1234 5678. */
 export function formatPhone(phone: string): string {
@@ -53,7 +54,7 @@ export function LoyaltyDialog({
   async function buscar() {
     if (!phoneOk || busy) return
     setBusy(true)
-    const result = await lookupLoyaltyCustomer(phone)
+    const result = await intentar(() => lookupLoyaltyCustomer(phone))
     setBusy(false)
     if (!result.success) {
       toast.error(result.error)
@@ -64,7 +65,7 @@ export function LoyaltyDialog({
 
   async function registrarYAdjuntar() {
     setBusy(true)
-    const result = await registerLoyaltyCustomer(phone, name)
+    const result = await intentar(() => registerLoyaltyCustomer(phone, name))
     setBusy(false)
     if (!result.success) {
       toast.error(result.error)

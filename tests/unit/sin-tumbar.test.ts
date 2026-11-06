@@ -3,12 +3,24 @@ import path from "node:path"
 import ts from "typescript"
 import { describe, expect, it } from "vitest"
 import { redirect } from "next/navigation"
-import { sinTumbar } from "@/lib/sin-tumbar"
+import { intentar, sinTumbar } from "@/lib/sin-tumbar"
 
 // Una server action que RECHAZA dentro de startTransition(async …) tumba la
 // pantalla entera al error boundary (React 19). sinTumbar lo convierte en un
 // aviso; este archivo prueba eso y vigila que nadie vuelva a escribir una
 // transición async desprotegida.
+
+describe("intentar", () => {
+  it("si la llamada no llega, devuelve el error en vez de rechazar", async () => {
+    const r = await intentar(async () => {
+      throw new TypeError("Failed to fetch")
+    })
+    expect(r).toEqual({ success: false, error: "Sin conexión: no se guardó. Vuelve a intentar cuando regrese la señal." })
+  })
+  it("si sale bien, devuelve lo de la acción", async () => {
+    expect(await intentar(async () => ({ success: true as const, folio: 7 }))).toEqual({ success: true, folio: 7 })
+  })
+})
 
 describe("sinTumbar", () => {
   it("si la llamada no llegó, avisa en vez de rechazar", async () => {
@@ -93,6 +105,60 @@ function desprotegidas(archivo: string): string[] {
 describe("ninguna transición async puede tumbar una pantalla", () => {
   it("toda startTransition(async …) con await va envuelta en sinTumbar o con su try/catch", () => {
     const fuera = ["app", "components", "hooks"].flatMap((d) => archivos(path.join(process.cwd(), d))).flatMap(desprotegidas)
+    expect(fuera).toEqual([])
+  })
+})
+
+/**
+ * Las acciones del servidor que un componente del cliente espera con `await`
+ * fuera de un try, de sinTumbar o de intentar. Sin red, ese rechazo dejaba el
+ * estado de «cargando» puesto para siempre (prueba de caos del 2026-11-05:
+ * cancelar una venta sin señal y el corte se quedaban trabados).
+ */
+function awaitsDesprotegidos(archivo: string): string[] {
+  const texto = readFileSync(archivo, "utf8")
+  if (!texto.startsWith("\"use client\"")) return []
+  const acciones = new Set<string>()
+  // Lo importado de "@/app/actions/…" (sin expresiones con barras invertidas: se pierden al escribir en esta máquina).
+  for (const linea of texto.split("import {").slice(1)) {
+    const fin = linea.indexOf("}")
+    if (fin < 0 || !linea.slice(fin).replace(/\s+/g, " ").startsWith('} from "@/app/actions/')) continue
+    for (const n of linea.slice(0, fin).split(",")) {
+      const x = n.trim().replace(/^type /, "").split(" as ").pop()
+      if (x && !/^[A-Z]/.test(x)) acciones.add(x)
+    }
+  }
+  if (!acciones.size) return []
+  const sf = ts.createSourceFile(archivo, texto, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const fuera: string[] = []
+  const visitar = (n: ts.Node, enTry: boolean) => {
+    if (ts.isTryStatement(n)) {
+      visitar(n.tryBlock, true)
+      if (n.catchClause) visitar(n.catchClause, enTry)
+      if (n.finallyBlock) visitar(n.finallyBlock, enTry)
+      return
+    }
+    if (ts.isAwaitExpression(n) && ts.isCallExpression(n.expression) && ts.isIdentifier(n.expression.expression)) {
+      const nombre = n.expression.expression.text
+      if (acciones.has(nombre) && !enTry) {
+        let p: ts.Node | undefined = n.parent
+        let protegido = false
+        while (p) {
+          if (ts.isCallExpression(p) && ts.isIdentifier(p.expression) && p.expression.text === "sinTumbar") protegido = true
+          p = p.parent
+        }
+        if (!protegido) fuera.push(`${path.relative(process.cwd(), archivo)}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1} await ${nombre}()`)
+      }
+    }
+    ts.forEachChild(n, (h) => visitar(h, ts.isFunctionLike(n) ? false : enTry))
+  }
+  visitar(sf, false)
+  return fuera
+}
+
+describe("ninguna acción esperada a pelo puede trabar una pantalla", () => {
+  it("todo await de una acción del servidor en el cliente va con intentar(), sinTumbar o try", () => {
+    const fuera = ["app", "components", "hooks"].flatMap((d) => archivos(path.join(process.cwd(), d))).flatMap(awaitsDesprotegidos)
     expect(fuera).toEqual([])
   })
 })

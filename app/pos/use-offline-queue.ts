@@ -97,12 +97,25 @@ export function useOfflineQueue(
   const key = queueKey(businessId)
 
   /**
+   * Si la última escritura no entró (aparato lleno), lo guardado está VIEJO:
+   * le faltan las ventas que solo viven en memoria. Antes se leía igual y,
+   * como una cola ilegible o ausente se lee como «vacía», la venta cobrada
+   * sin señal nunca subía y el siguiente cambio la pisaba (prueba de caos del
+   * 2026-11-05). Mientras no se pueda escribir, manda la memoria.
+   */
+  const memoriaManda = useRef(false)
+  const base = useCallback(
+    () => (memoriaManda.current ? estadoRef.current : (leerDisco(key) ?? estadoRef.current)),
+    [key],
+  )
+
+  /**
    * Aplica un cambio sobre lo guardado y lo guarda. Devuelve el estado nuevo
    * y si quedó guardado en el aparato.
    */
   const actualizar = useCallback(
     (cambio: (q: QueueState) => QueueState): { next: QueueState; guardada: boolean } => {
-      const next = cambio(leerDisco(key) ?? estadoRef.current)
+      const next = cambio(base())
       estadoRef.current = next
       setState(next)
       let guardada = true
@@ -111,10 +124,11 @@ export function useOfflineQueue(
       } catch {
         guardada = false
       }
+      memoriaManda.current = !guardada
       setSoloEnMemoria(!guardada)
       return { next, guardada }
     },
-    [key],
+    [key, base],
   )
 
   useEffect(() => {
@@ -143,13 +157,13 @@ export function useOfflineQueue(
    */
   const encolar = useCallback(
     (sale: Omit<QueuedSale, "provisional" | "status" | "attempts">): { provisional: string; guardada: boolean } | null => {
-      const base = leerDisco(key) ?? estadoRef.current
-      if (!canEnqueue(base)) return null
+      const actual = base()
+      if (!canEnqueue(actual)) return null
       // La desviación del reloj que se conocía AL COBRAR viaja con la venta.
-      const { next, guardada } = actualizar(() => enqueue(base, { ...sale, desfase: sale.desfase ?? desfaseGuardado() }))
+      const { next, guardada } = actualizar(() => enqueue(actual, { ...sale, desfase: sale.desfase ?? desfaseGuardado() }))
       return { provisional: next.sales[next.sales.length - 1].provisional, guardada }
     },
-    [actualizar, key],
+    [actualizar, base],
   )
 
   /**
@@ -158,7 +172,7 @@ export function useOfflineQueue(
    * respuesta, el servidor devuelve el mismo folio en vez de duplicarla.
    */
   const correr = useCallback(async () => {
-    const pendientes = (leerDisco(key) ?? estadoRef.current).sales.filter((s) => s.status === "pendiente")
+    const pendientes = base().sales.filter((s) => s.status === "pendiente")
     if (pendientes.length === 0) return
     setSubiendo({ hecho: 0, total: pendientes.length })
 
@@ -239,7 +253,7 @@ export function useOfflineQueue(
     }
     setFallos((n) => (fallo ? n + 1 : 0))
     setSubiendo(null)
-  }, [actualizar, businessId, key])
+  }, [actualizar, base, businessId])
 
   const subir = useCallback(async () => {
     if (subiendoRef.current) return
